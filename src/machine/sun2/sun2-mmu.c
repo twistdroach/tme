@@ -1,4 +1,4 @@
-/* $Id: sun2-mmu.c,v 1.9 2003/10/16 02:48:24 fredette Exp $ */
+/* $Id: sun2-mmu.c,v 1.10 2005/02/17 12:37:25 fredette Exp $ */
 
 /* machine/sun2/sun2-mmu.c - implementation of Sun 2 MMU emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun2-mmu.c,v 1.9 2003/10/16 02:48:24 fredette Exp $");
+_TME_RCSID("$Id: sun2-mmu.c,v 1.10 2005/02/17 12:37:25 fredette Exp $");
 
 /* includes: */
 #include "sun2-impl.h"
@@ -737,7 +737,7 @@ _tme_sun2_mmu_context_user_set(struct tme_sun2 *sun2)
 int
 _tme_sun2_mmu_tlb_set_allocate(struct tme_bus_connection *conn_bus_asker,
 			       unsigned int count, unsigned int sizeof_one, 
-			       TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb **) _tlbs)
+			       TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb *) _tlbs)
 {
   struct tme_sun2 *sun2;
   int rc;
@@ -829,6 +829,7 @@ _tme_sun2_mmu_reset(struct tme_sun2 *sun2)
     return (TME_OK);
   }
   sun2->tme_sun2_reset_tlbs = NULL;
+  /* XXX FIXME - this is not thread-safe: */
   tlb = &tlb_m68k->tme_m68k_tlb_bus_tlb;
   
   /* fill the TLB entry: */

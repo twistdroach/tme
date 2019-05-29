@@ -52,6 +52,7 @@ AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
+CFLAGS_NO_STRICT_ALIASING = @CFLAGS_NO_STRICT_ALIASING@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CXX = @CXX@
@@ -174,6 +175,7 @@ tmegeneric_HEADERS = \
 	disk.h \
 	tape.h \
 	mouse.h \
+	float.h \
 	keyboard.h
 
 subdir = tme/generic

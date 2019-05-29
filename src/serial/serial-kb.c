@@ -1,4 +1,4 @@
-/* $Id: serial-kb.c,v 1.4 2003/10/16 02:48:25 fredette Exp $ */
+/* $Id: serial-kb.c,v 1.5 2005/05/14 19:18:42 fredette Exp $ */
 
 /* serial/serial-kb.c - serial keyboard emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: serial-kb.c,v 1.4 2003/10/16 02:48:25 fredette Exp $");
+_TME_RCSID("$Id: serial-kb.c,v 1.5 2005/05/14 19:18:42 fredette Exp $");
 
 /* includes: */
 #include "serial-kb.h"
@@ -626,8 +626,12 @@ _tme_serial_kb_connection_make(struct tme_connection *conn,
 
 	  /* otherwise, the reparsing failed: */
 	  else {
-	    /* XXX diagnostic */
-	    abort();
+
+	    /* log a complaint: */
+	    tme_log(&serial_kb->tme_serial_kb_element->tme_element_log_handle, 0, ENOENT,
+	      (&serial_kb->tme_serial_kb_element->tme_element_log_handle,
+	       _("cannot add macro '%s', one or more keysyms are missing"),
+	       serial_kb->tme_serial_kb_macros[kb_macro_i]));
 	  }
 	}
 

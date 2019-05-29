@@ -1,4 +1,4 @@
-/* $Id: scsi-msg.c,v 1.1 2003/07/29 18:30:41 fredette Exp $ */
+/* $Id: scsi-msg.c,v 1.2 2005/01/26 13:13:29 fredette Exp $ */
 
 /* scsi/scsi-msg.c - implementation of generic SCSI device message support: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: scsi-msg.c,v 1.1 2003/07/29 18:30:41 fredette Exp $");
+_TME_RCSID("$Id: scsi-msg.c,v 1.2 2005/01/26 13:13:29 fredette Exp $");
 
 /* includes: */
 #include <tme/scsi/scsi-msg.h>
@@ -96,5 +96,9 @@ _TME_SCSI_DEVICE_MSG_DECL(tme_scsi_device_msg_parity_error)
 /* this handles the IDENTIFY message: */
 _TME_SCSI_DEVICE_MSG_DECL(tme_scsi_device_msg_identify)
 {
-  abort();
+  
+  /* set the addressed LUN: */
+  scsi_device->tme_scsi_device_addressed_lun
+    = TME_FIELD_MASK_EXTRACTU(scsi_device->tme_scsi_device_msg[0],
+			      TME_SCSI_MSG_IDENTIFY_LUN_MASK);
 }

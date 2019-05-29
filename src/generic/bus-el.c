@@ -1,4 +1,4 @@
-/* $Id: bus-el.c,v 1.9 2003/07/29 18:19:12 fredette Exp $ */
+/* $Id: bus-el.c,v 1.13 2005/02/17 12:37:24 fredette Exp $ */
 
 /* generic/bus-el.c - a real generic bus element: */
 
@@ -34,16 +34,148 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: bus-el.c,v 1.9 2003/07/29 18:19:12 fredette Exp $");
+_TME_RCSID("$Id: bus-el.c,v 1.13 2005/02/17 12:37:24 fredette Exp $");
 
 /* includes: */
+#define TME_BUS_VERSION TME_X_VERSION(0, 0)
 #include <tme/generic/bus.h>
 #include <stdlib.h>
 #include <string.h>
 
 /* macros: */
 
-/* structures: */
+/* globals: */
+
+/* the generic bus signals: */
+static const struct tme_bus_signals _tme_bus_signals_default[] = {
+  TME_BUS_SIGNALS_GENERIC
+};
+
+/* this adds a bus signal set to the bus: */
+static int
+_tme_bus_signals_add(struct tme_bus_connection *conn_bus_caller,
+		     struct tme_bus_signals *bus_signals)
+{
+  struct tme_bus *bus;
+  unsigned int signal_i;
+  tme_uint32_t signals_count_new;
+  tme_uint32_t signals_count_old;
+  struct tme_bus_connection_int *conn_bus_int;
+  int rc;
+
+  /* recover our bus: */
+  bus = conn_bus_caller->tme_bus_connection.tme_connection_element->tme_element_private;
+
+  /* lock the bus for writing: */
+  rc = tme_rwlock_timedwrlock(&bus->tme_bus_rwlock, TME_THREAD_TIMEDLOCK);
+  if (TME_THREADS_ERRNO(rc) != TME_OK) {
+    return (TME_THREADS_ERRNO(rc));
+  }
+
+  /* search for an existing bus signals set that matches the caller's: */
+  for (signal_i = 0;
+       signal_i < bus->tme_bus_signals_count;
+       signal_i++) {
+
+    /* stop if this existing bus signals set has the right ID and the
+       versions overlap: */
+    if ((bus->tme_bus_signals[signal_i].tme_bus_signals_id
+	 == bus_signals->tme_bus_signals_id)
+	&& TME_X_VERSION_OK(bus->tme_bus_signals[signal_i].tme_bus_signals_version,
+			    bus_signals->tme_bus_signals_version)) {
+      break;
+    }
+  }
+
+  /* assume that this call succeeds: */
+  rc = TME_OK;
+
+  /* if an existing bus signals set was not found: */
+  if (signal_i == bus->tme_bus_signals_count) {
+
+    /* get the old count of bus signals from the current last bus
+       signals set in the bus signals sets array: */
+    signals_count_old =
+      (TME_BUS_SIGNAL_INDEX(bus->tme_bus_signals[bus->tme_bus_signals_count - 1].tme_bus_signals_first)
+       + bus->tme_bus_signals[bus->tme_bus_signals_count - 1].tme_bus_signals_count);
+
+    /* resize the bus signals sets array: */
+    bus->tme_bus_signals
+      = tme_renew(struct tme_bus_signals,
+		  bus->tme_bus_signals,
+		  bus->tme_bus_signals_count
+		  + 1);
+
+    /* add the new bus signals set: */
+    signals_count_new = signals_count_old + bus_signals->tme_bus_signals_count;
+    assert (signals_count_new > signals_count_old);
+    bus_signals->tme_bus_signals_first = TME_BUS_SIGNAL_X(signals_count_old);
+    bus->tme_bus_signals[bus->tme_bus_signals_count] = *bus_signals;
+    bus->tme_bus_signals_count++;
+
+    /* reallocate the bus' asserted-signals count array: */
+    bus->tme_bus_signal_asserts
+      = tme_renew(unsigned int,
+		  bus->tme_bus_signal_asserts,
+		  signals_count_new);
+    memset ((char *) &bus->tme_bus_signal_asserts[signals_count_old],
+	    0,
+	    (sizeof(bus->tme_bus_signal_asserts[0])
+	     * (signals_count_new
+		- signals_count_old)));
+
+    /* if needed, reallocate each connection's asserted-signals
+       bitmap: */
+    if (TME_BUS_SIGNAL_BIT_BYTES(signals_count_new)
+	> TME_BUS_SIGNAL_BIT_BYTES(signals_count_old)) {
+      for (conn_bus_int = bus->tme_bus_connections;
+	   conn_bus_int != NULL;
+	   conn_bus_int =
+	     (struct tme_bus_connection_int *) 
+	     conn_bus_int->tme_bus_connection_int
+	     .tme_bus_connection
+	     .tme_connection_next) {
+	conn_bus_int->tme_bus_connection_int_signals
+	  = tme_renew(tme_uint8_t,
+		      conn_bus_int->tme_bus_connection_int_signals,
+		      TME_BUS_SIGNAL_BIT_BYTES(signals_count_new));
+	memset ((char *) &conn_bus_int->tme_bus_connection_int_signals[TME_BUS_SIGNAL_BIT_BYTES(signals_count_old)],
+		0,
+		(sizeof (conn_bus_int->tme_bus_connection_int_signals[0])
+		 * (TME_BUS_SIGNAL_BIT_BYTES(signals_count_new)
+		    - TME_BUS_SIGNAL_BIT_BYTES(signals_count_old))));
+      }
+    }
+  }
+
+  /* otherwise, we found an existing bus signals set.  however, even
+     though the versions overlap, if they don't support the same least
+     version, something is wrong: */
+  else if ((TME_X_VERSION_CURRENT(bus->tme_bus_signals[signal_i].tme_bus_signals_version)
+	    - TME_X_VERSION_AGE(bus->tme_bus_signals[signal_i].tme_bus_signals_version))
+	   != (TME_X_VERSION_CURRENT(bus_signals->tme_bus_signals_version)
+	       - TME_X_VERSION_AGE(bus_signals->tme_bus_signals_version))) {
+    rc = EINVAL;
+  }
+
+  /* otherwise, we found an existing bus signals set that fully matches
+     and is compatible with the caller's: */
+  else {
+    
+    /* update the versioning on this bus signals set: */
+    if (TME_X_VERSION_CURRENT(bus_signals->tme_bus_signals_version)
+	> TME_X_VERSION_CURRENT(bus->tme_bus_signals[signal_i].tme_bus_signals_version)) {
+      bus->tme_bus_signals[signal_i].tme_bus_signals_version = bus_signals->tme_bus_signals_version;
+    }
+
+    /* return the existing bus signals set: */
+    *bus_signals = bus->tme_bus_signals[signal_i];
+  }
+    
+  /* unlock the bus and return: */
+  tme_rwlock_unlock(&bus->tme_bus_rwlock);
+  return (rc);
+}
 
 /* this handles a bus connection signal edge: */
 static int
@@ -66,10 +198,9 @@ _tme_bus_signal(struct tme_bus_connection *conn_bus_edger, unsigned int signal)
   conn_bus_int_edger = (struct tme_bus_connection_int *) conn_bus_edger;
 
   /* take out the level and edge: */
-  level_edge = signal & (TME_BUS_SIGNAL_LEVEL_MASK
-			 | TME_BUS_SIGNAL_EDGE);
-  signal &= ~(TME_BUS_SIGNAL_LEVEL_MASK
-	      | TME_BUS_SIGNAL_EDGE);
+  level_edge = signal;
+  signal = TME_BUS_SIGNAL_WHICH(signal);
+  level_edge ^= signal;
 
   /* lock the bus for writing: */
   rc = tme_rwlock_timedwrlock(&bus->tme_bus_rwlock, TME_THREAD_TIMEDLOCK);
@@ -95,86 +226,79 @@ _tme_bus_signal(struct tme_bus_connection *conn_bus_edger, unsigned int signal)
   /* assume we don't need to propagate this signal across the bus: */
   need_propagate = FALSE;
 
-  /* if this is a random bus-specific signal, just propagate it: */
-  if (TME_BUS_SIGNAL_IS_X(signal)) {
-    need_propagate = TRUE;
+  /* see whether the device is asserting or negating this signal.  iff
+     one or more devices on a bus are asserting a signal, the signal
+     appears asserted on the bus.  this gives an ORed effect: */
+  signal_asserted = TRUE;
+  switch (level_edge & TME_BUS_SIGNAL_LEVEL_MASK) {
+  case TME_BUS_SIGNAL_LEVEL_NEGATED:
+    signal_asserted = FALSE;
+  case TME_BUS_SIGNAL_LEVEL_ASSERTED:
+    break;
+  default:
+    abort();
   }
 
-  /* otherwise, this is a generic bus signal: */
-  else {
-    
-    /* decide whether the device is asserting or negating this signal: */
-    /* XXX we currently assume that for all bus signals handled by this
-       function, low implies assertion, and signals are always ORed
-       together.  this could be configurable, possibly even per-signal: */
-    signal_asserted = TRUE;
-    switch (level_edge & TME_BUS_SIGNAL_LEVEL_MASK) {
-    case TME_BUS_SIGNAL_LEVEL_LOW: 
-    case TME_BUS_SIGNAL_LEVEL_ASSERTED:
-      break;
-    case TME_BUS_SIGNAL_LEVEL_HIGH: 
-    case TME_BUS_SIGNAL_LEVEL_NEGATED:
-      signal_asserted = FALSE;
-      break;
-    }
-    level_edge = ((level_edge & TME_BUS_SIGNAL_EDGE)
-		  | (signal_asserted
-		     ? TME_BUS_SIGNAL_LEVEL_ASSERTED
-		     : TME_BUS_SIGNAL_LEVEL_NEGATED));
+  /* get the index and mask of this signal in signal byte arrays: */
+  signal_index = TME_BUS_SIGNAL_BIT_INDEX(signal);
+  signal_mask = TME_BUS_SIGNAL_BIT_MASK(signal);
 
-    /* get the index and mask of this signal in signal byte arrays: */
-    signal_index = TME_BUS_SIGNAL_BIT_INDEX(signal);
-    signal_mask = TME_BUS_SIGNAL_BIT_MASK(signal);
+  /* if this signal is being asserted: */
+  if (signal_asserted) {
 
-    /* if this signal is being asserted: */
-    if (signal_asserted) {
+    /* if this device wasn't already asserting this signal: */
+    if (!(conn_bus_int_edger->tme_bus_connection_int_signals[signal_index]
+	  & signal_mask)) {
 
-      /* if this device wasn't already asserting this signal: */
-      if (!(conn_bus_int_edger->tme_bus_connection_int_signals[signal_index]
-	    & signal_mask)) {
+      /* it is now asserting this signal: */
+      conn_bus_int_edger->tme_bus_connection_int_signals[signal_index]
+	|= signal_mask;
+      bus->tme_bus_signal_asserts[TME_BUS_SIGNAL_INDEX(signal)]++;
 
-	/* it is now asserting this signal: */
-	conn_bus_int_edger->tme_bus_connection_int_signals[signal_index]
-	  |= signal_mask;
-	bus->tme_bus_signal_asserts[TME_BUS_SIGNAL_WHICH(signal)]++;
-
-	/* if this is the only device asserting this signal,
-	   propagate the change across the bus: */
-	if (bus->tme_bus_signal_asserts[TME_BUS_SIGNAL_WHICH(signal)] == 1) {
-	  need_propagate = TRUE;
-	}
-      }
-
-      /* otherwise, this device was already asserting this signal: */
-      else {
-	assert(bus->tme_bus_signal_asserts[TME_BUS_SIGNAL_WHICH(signal)] > 0);
+      /* if this is the only device asserting this signal,
+	 propagate the change across the bus: */
+      if (bus->tme_bus_signal_asserts[TME_BUS_SIGNAL_INDEX(signal)] == 1) {
+	need_propagate = TRUE;
       }
     }
 
-    /* otherwise, this signal is being negated: */
+    /* otherwise, this device was already asserting this signal: */
     else {
+      assert(bus->tme_bus_signal_asserts[TME_BUS_SIGNAL_INDEX(signal)] > 0);
+    }
+  }
 
-      /* if this device was asserting this signal: */
-      if (conn_bus_int_edger->tme_bus_connection_int_signals[signal_index]
-	  & signal_mask) {
+  /* otherwise, this signal is being negated: */
+  else {
 
-	/* it is no longer asserting this signal: */
-	conn_bus_int_edger->tme_bus_connection_int_signals[signal_index]
-	  &= ~signal_mask;
-	assert(bus->tme_bus_signal_asserts[TME_BUS_SIGNAL_WHICH(signal)] > 0);
-	bus->tme_bus_signal_asserts[TME_BUS_SIGNAL_WHICH(signal)]--;
+    /* if this device was asserting this signal: */
+    if (conn_bus_int_edger->tme_bus_connection_int_signals[signal_index]
+	& signal_mask) {
+
+      /* it is no longer asserting this signal: */
+      conn_bus_int_edger->tme_bus_connection_int_signals[signal_index]
+	&= ~signal_mask;
+      assert(bus->tme_bus_signal_asserts[TME_BUS_SIGNAL_INDEX(signal)] > 0);
+      bus->tme_bus_signal_asserts[TME_BUS_SIGNAL_INDEX(signal)]--;
+
+      /* if this was the last device asserting this signal, propagate
+	 the change across the bus: */
+      if (bus->tme_bus_signal_asserts[TME_BUS_SIGNAL_INDEX(signal)] == 0) {
+	need_propagate = TRUE;
       }
+    }
 
-      /* we always propagate across the bus a signal that some device
-	 has negated, because often code will lazily only send
-	 negating edges, or other devices might still be asserting it,
-	 we assume these signals are always ORed together, and it
-	 kicks (even though this signal isn't edging) emulated
-	 circuitry that is meant to do things like interrupt
-	 arbitration, etc.: */
-      if (bus->tme_bus_signal_asserts[TME_BUS_SIGNAL_WHICH(signal)] > 0) {
-	level_edge = TME_BUS_SIGNAL_LEVEL_ASSERTED;
-      }
+    /* otherwise, this device was not asserting this signal, but it
+       negated it anyways.  often, lazy code will only send negating
+       edges for signals (for example, see the do_reset code in
+       machine/sun2/sun2-mainbus.c, which should really assert RESET,
+       sleep, then negate it), so if we get a negated edge for a
+       signal that no one else (including the edger) was asserting, we
+       propagate the edge anyways.
+
+       so, TME_BUS_SIGNAL_EDGE should only be used for this purpose: */
+    else if ((level_edge & TME_BUS_SIGNAL_EDGE)
+	     && bus->tme_bus_signal_asserts[TME_BUS_SIGNAL_INDEX(signal)] == 0) {
       need_propagate = TRUE;
     }
   }
@@ -246,8 +370,7 @@ _tme_bus_intack(struct tme_bus_connection *conn_bus_acker, unsigned int signal, 
   bus = conn_bus_acker->tme_bus_connection.tme_connection_element->tme_element_private;
 
   /* get rid of any level and edge: */
-  signal &= ~(TME_BUS_SIGNAL_LEVEL_MASK
-	      | TME_BUS_SIGNAL_EDGE);
+  signal = TME_BUS_SIGNAL_WHICH(signal);
 
   /* this must be an interrupt signal: */
   assert(TME_BUS_SIGNAL_IS_INT(signal));
@@ -282,10 +405,10 @@ _tme_bus_intack(struct tme_bus_connection *conn_bus_acker, unsigned int signal, 
     if (conn_bus_int->tme_bus_connection_int_signals[signal_index]
 	& signal_mask) {
 
-      /* if this device doesn't acknowledge interrupts, 
-	 return an undefined vector: */
+      /* if this device doesn't acknowledge interrupts, return any
+	 user-specified vector or TME_BUS_INTERRUPT_VECTOR_UNDEF: */
       if (conn_bus_other->tme_bus_intack == NULL) {
-	*vector = TME_BUS_INTERRUPT_VECTOR_UNDEF;
+	*vector = conn_bus_int->tme_bus_connection_int_vector_int;
 	rc = TME_OK;
       }
 
@@ -353,7 +476,7 @@ _tme_bus_tlb_fill(struct tme_bus_connection *conn_bus_asker,
 static int
 _tme_bus_tlb_set_allocate(struct tme_bus_connection *conn_bus_asker,
 			  unsigned int count, unsigned int sizeof_one, 
-			  TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb **) _tlbs)
+			  TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb *) _tlbs)
 {
   struct tme_bus *bus;
   struct tme_bus_connection_int *conn_int;
@@ -422,6 +545,7 @@ _tme_bus_connection_make(struct tme_connection *conn, unsigned int state)
 {
   struct tme_bus *bus;
   struct tme_bus_connection_int *conn_int;
+  const struct tme_bus_signals *bus_signals;
   int rc;
 
   /* both sides must be generic bus connections: */
@@ -442,6 +566,16 @@ _tme_bus_connection_make(struct tme_connection *conn, unsigned int state)
   rc = tme_bus_connection_make(bus,
 			       conn_int,
 			       state);
+
+  /* XXX this is a perfect example of the poor division between
+     bus-el.c and bus.c.  should the signal handling code be in bus.c?  */
+  if (rc == TME_OK) {
+    bus_signals = &bus->tme_bus_signals[bus->tme_bus_signals_count - 1];
+    conn_int->tme_bus_connection_int_signals
+      = tme_new0(tme_uint8_t,
+		 TME_BUS_SIGNAL_BIT_BYTES(TME_BUS_SIGNAL_INDEX(bus_signals->tme_bus_signals_first)
+					  + bus_signals->tme_bus_signals_count));
+  }
 
   /* unlock the bus: */
   tme_rwlock_unlock(&bus->tme_bus_rwlock);
@@ -468,6 +602,7 @@ _tme_bus_connections_new(struct tme_element *element,
   struct tme_bus_connection *conn_bus;
   struct tme_connection *conn;
   int ipl;
+  int vector;
   int arg_i;
   int usage;
 
@@ -483,6 +618,7 @@ _tme_bus_connections_new(struct tme_element *element,
   /* loop reading our arguments: */
   usage = FALSE;
   arg_i = 1;
+  conn_int->tme_bus_connection_int_vector_int = TME_BUS_INTERRUPT_VECTOR_UNDEF;
   for (;;) {
 
     /* the address of this connection: */
@@ -506,6 +642,14 @@ _tme_bus_connections_new(struct tme_element *element,
       arg_i += 2;
     }
 
+    /* the interrupt vector for this connection: */
+    else if (TME_ARG_IS(args[arg_i + 0], "vector")
+	     && args[arg_i + 1] != NULL
+	     && (vector = atoi(args[arg_i + 1])) > 0) {
+      conn_int->tme_bus_connection_int_vector_int = vector;
+      arg_i += 2;
+    }      
+
     /* if we've run out of arguments: */
     else if (args[arg_i + 0] == NULL) {
       break;
@@ -524,11 +668,12 @@ _tme_bus_connections_new(struct tme_element *element,
 
   if (usage) {
     tme_output_append_error(_output, 
-			    "%s %s [ addr %s ] [ ipl %s ]",
+			    "%s %s [ addr %s ] [ ipl %s ] [ vector %s ]",
 			    _("usage:"),
 			    args[0],
 			    _("BUS-ADDRESS"),
-			    _("INTERRUPT-LEVEL"));
+			    _("INTERRUPT-LEVEL"),
+			    _("INTERRUPT-VECTOR"));
     tme_free(conn_int);
     return (EINVAL);
   }
@@ -540,6 +685,7 @@ _tme_bus_connections_new(struct tme_element *element,
     = bus->tme_bus_address_mask;
   conn_bus->tme_bus_subregions.tme_bus_subregion_next
     = NULL;
+  conn_bus->tme_bus_signals_add = _tme_bus_signals_add;
   conn_bus->tme_bus_signal = _tme_bus_signal;
   conn_bus->tme_bus_intack = _tme_bus_intack;
   conn_bus->tme_bus_tlb_set_allocate = _tme_bus_tlb_set_allocate;
@@ -568,7 +714,14 @@ TME_ELEMENT_SUB_NEW_DECL(tme_generic,bus) {
   failed = TRUE;
   bus_size = 0;
   if (TME_ARG_IS(args[1], "size")) {
-    bus_size = tme_bus_addr_parse_any(args[2], &failed);
+    /* XXX FIXME - this is a hack: */
+    if (sizeof(bus_size) == sizeof(tme_uint32_t) &&
+	TME_ARG_IS(args[1], "4GB")) {
+      bus_size = 0;
+    }
+    else {
+      bus_size = tme_bus_addr_parse_any(args[2], &failed);
+    }
     if (bus_size & (bus_size - 1)) {
       failed = TRUE;
     }
@@ -590,6 +743,12 @@ TME_ELEMENT_SUB_NEW_DECL(tme_generic,bus) {
   bus->tme_bus_addressables_size = 1;
   bus->tme_bus_addressables = tme_new(struct tme_bus_addressable,
 				      bus->tme_bus_addressables_size);
+  bus->tme_bus_signals_count = TME_ARRAY_ELS(_tme_bus_signals_default);
+  bus->tme_bus_signals = tme_dup(struct tme_bus_signals,
+				 _tme_bus_signals_default,
+				 TME_ARRAY_ELS(_tme_bus_signals_default));
+  bus->tme_bus_signal_asserts = tme_new0(unsigned int,
+					 _tme_bus_signals_default[0].tme_bus_signals_count);
 
   /* fill the element: */
   element->tme_element_private = bus;

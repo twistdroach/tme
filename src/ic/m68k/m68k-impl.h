@@ -1,4 +1,4 @@
-/* $Id: m68k-impl.h,v 1.13 2003/10/16 02:48:24 fredette Exp $ */
+/* $Id: m68k-impl.h,v 1.16 2005/03/23 12:12:37 fredette Exp $ */
 
 /* ic/m68k/m68k-impl.h - implementation header file for Motorola 68k emulation: */
 
@@ -37,10 +37,11 @@
 #define _IC_M68K_IMPL_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: m68k-impl.h,v 1.13 2003/10/16 02:48:24 fredette Exp $");
+_TME_RCSID("$Id: m68k-impl.h,v 1.16 2005/03/23 12:12:37 fredette Exp $");
 
 /* includes: */
 #include <tme/ic/m68k.h>
+#include <tme/ic/ieee754.h>
 #include <tme/generic/ic.h>
 #include <setjmp.h>
 
@@ -51,6 +52,15 @@ _TME_RCSID("$Id: m68k-impl.h,v 1.13 2003/10/16 02:48:24 fredette Exp $");
 #define TME_M68K_M68010		(1)
 #define TME_M68K_M68020		(2)
 #define TME_M68K_M68030		(3)
+#define TME_M68K_M68040		(4)
+
+/* FPUs: */
+#define TME_M68K_FPU_NONE	(0)
+#define TME_M68K_FPU_M68881	TME_BIT(0)
+#define TME_M68K_FPU_M68882	TME_BIT(1)
+#define TME_M68K_FPU_M6888X	(TME_M68K_FPU_M68881 | TME_M68K_FPU_M68882)
+#define TME_M68K_FPU_M68040	TME_BIT(2)
+#define TME_M68K_FPU_ANY	(TME_M68K_FPU_M68881 | TME_M68K_FPU_M68882 | TME_M68K_FPU_M68040)
 
 /* generic registers: */
 #define tme_m68k_ireg_uint32(x)	tme_m68k_ic.tme_ic_ireg_uint32(x)
@@ -69,13 +79,14 @@ _TME_RCSID("$Id: m68k-impl.h,v 1.13 2003/10/16 02:48:24 fredette Exp $");
 #define TME_M68K_FLAG_IPM(x)	TME_FIELD_EXTRACTU(x, 8, 3)
 #define TME_M68K_FLAG_M		TME_BIT(12)
 #define TME_M68K_FLAG_S		TME_BIT(13)
-#define TME_M68K_FLAG_T(x)	TME_FIELD_EXTRACTU(x, 14, 2)
+#define TME_M68K_FLAG_T0	TME_BIT(14)
+#define TME_M68K_FLAG_T1	TME_BIT(15)
 #define TME_M68K_FLAG_CCR	(TME_M68K_FLAG_C | TME_M68K_FLAG_V | \
 				 TME_M68K_FLAG_Z | TME_M68K_FLAG_N | \
 				 TME_M68K_FLAG_X)
 #define TME_M68K_FLAG_SR	(TME_M68K_FLAG_CCR | (0x7 << 8) | \
 				 TME_M68K_FLAG_M | TME_M68K_FLAG_S | \
-				 (0x3 << 14))
+				 TME_M68K_FLAG_T0 | TME_M68K_FLAG_T1)
 
 /* conditions: */
 #define TME_M68K_C_T	(0)
@@ -105,43 +116,132 @@ _TME_RCSID("$Id: m68k-impl.h,v 1.13 2003/10/16 02:48:24 fredette Exp $");
 
 /* exceptions: */
 #define TME_M68K_EXCEPTION_NONE			(0)
-#define TME_M68K_EXCEPTION_GROUP0_RESET		TME_BIT(0)
-#define TME_M68K_EXCEPTION_GROUP0_AERR		TME_BIT(1)
-#define TME_M68K_EXCEPTION_GROUP0_BERR		TME_BIT(2)
-#define TME_M68K_EXCEPTION_GROUP1_TRACE		TME_BIT(3)
-#define TME_M68K_EXCEPTION_GROUP1_INT(ipl, vec)	(((ipl) << 4) | ((vec) << 7))
-#define TME_M68K_EXCEPTION_IS_GROUP1_INT(x)	(((x) >> 4) & 0x7)
-#define TME_M68K_EXCEPTION_GROUP1_INT_VEC(x)	(((x) >> 7) & 0xff)
-#define TME_M68K_EXCEPTION_GROUP1_ILL		TME_BIT(15)
-#define TME_M68K_EXCEPTION_GROUP1_PRIV		TME_BIT(16)
-#define TME_M68K_EXCEPTION_GROUP2(x)		((x) << 17)
-#define TME_M68K_EXCEPTION_IS_GROUP2(x)		((x) >> 17)
+#define TME_M68K_EXCEPTION_RESET		TME_BIT(0)
+#define TME_M68K_EXCEPTION_AERR			TME_BIT(1)
+#define TME_M68K_EXCEPTION_BERR			TME_BIT(2)
+#define TME_M68K_EXCEPTION_TRACE		TME_BIT(3)
+#define TME_M68K_EXCEPTION_INT(ipl, vec)	(((ipl) << 4) | ((vec) << 7))
+#define TME_M68K_EXCEPTION_IS_INT(x)		(((x) >> 4) & 0x7)
+#define TME_M68K_EXCEPTION_INT_VEC(x)		(((x) >> 7) & 0xff)
+#define TME_M68K_EXCEPTION_ILL			TME_BIT(15)
+#define TME_M68K_EXCEPTION_PRIV			TME_BIT(16)
+#define TME_M68K_EXCEPTION_INST(x)		((x) << 17)
+#define TME_M68K_EXCEPTION_IS_INST(x)		((x) >> 17)
 
 /* exception frame formats: */
 #define TME_M68K_FORMAT_0	(0)
+#define TME_M68K_FORMAT_1	(1)
+#define TME_M68K_FORMAT_2	(2)
 #define TME_M68K_FORMAT_8	(8)
+#define TME_M68K_FORMAT_B	(0xB)
+
+/* exception vectors: */
+#define TME_M68K_VECTOR_RESET_PC	(0x00)
+#define TME_M68K_VECTOR_RESET_SP	(0x01)
+#define TME_M68K_VECTOR_BERR		(0x02)
+#define TME_M68K_VECTOR_AERR		(0x03)
+#define TME_M68K_VECTOR_ILL		(0x04)
+#define TME_M68K_VECTOR_DIV0		(0x05)
+#define TME_M68K_VECTOR_CHK		(0x06)
+#define TME_M68K_VECTOR_TRAP		(0x07)
+#define TME_M68K_VECTOR_PRIV		(0x08)
+#define TME_M68K_VECTOR_TRACE		(0x09)
+#define TME_M68K_VECTOR_LINE_A		(0x0a)
+#define TME_M68K_VECTOR_LINE_F		(0x0b)
+					/* (0x0c is unassigned, reserved) */
+#define TME_M68K_VECTOR_COPROC		(0x0d)
+#define TME_M68K_VECTOR_FORMAT		(0x0e)
+#define TME_M68K_VECTOR_INT_UNINIT	(0x0f)
+					/* (0x10 through 0x17 are unassigned, reserved) */
+#define TME_M68K_VECTOR_SPURIOUS	(0x18)
+					/* (0x19 through 0x1f are the interrupt autovectors) */
+#define TME_M68K_VECTOR_TRAP_0		(0x20)
+					/* (0x21 through 0x2f are also TRAP vectors) */
+
+/* m6888x type specifiers: */
+#define TME_M6888X_TYPE_LONG		(0)
+#define TME_M6888X_TYPE_SINGLE		(1)
+#define TME_M6888X_TYPE_EXTENDED80	(2)
+#define TME_M6888X_TYPE_PACKEDDEC	(3)
+#define TME_M6888X_TYPE_WORD		(4)
+#define TME_M6888X_TYPE_DOUBLE		(5)
+#define TME_M6888X_TYPE_BYTE		(6)
+#define TME_M6888X_TYPE_PACKEDDEC_DK	(7)
+#define TME_M6888X_TYPE_INVALID		(TME_M6888X_TYPE_PACKEDDEC_DK)
 
 /* sizes: */
-#define TME_M68K_SIZE_SUBMAP_X	(-2)
 #define TME_M68K_SIZE_UNDEF	(-1)
 #define TME_M68K_SIZE_UNSIZED	(0)
 #define TME_M68K_SIZE_8		(1)
 #define TME_M68K_SIZE_16	(2)
-#define TME_M68K_SIZE_16U8	(3)
+				/* 3 unused */
 #define TME_M68K_SIZE_32	(4)
-#define TME_M68K_SIZE_16S32	(5)
+				/* 5 unused */
+				/* 6 unused */
+				/* 7 unused */
+#define TME_M68K_SIZE_64	(8)
+				/* 8 unused */
+				/* 9 unused */
+				/* 10 unused */
+				/* 11 unused */
+#define TME_M68K_SIZE_96	(12)
 
-/* special opcodes: */
-#define TME_M68K_SPECOP_UNDEF		(-1)
-#define TME_M68K_SPECOP_BCC		(0)
-#define TME_M68K_SPECOP_SPECOP16	(1)
-#define TME_M68K_SPECOP_MOVES		(2)
-#define TME_M68K_SPECOP_MOVEMEMTOMEM	(3)
-#define TME_M68K_SPECOP_ILLEGAL		(4)
-#define TME_M68K_SPECOP_MULUL		(5)
-#define TME_M68K_SPECOP_DIVUL		(6)
-#define TME_M68K_SPECOP_CAS2		(7)
-#define TME_M68K_SPECOP_MOVENONMEMTOMEM	(8)
+/* opcode parameters: */
+
+/* bits 0 through 7, in the opcode map, are the instruction index.
+   immediately after the initial decoding, these bits are replaced
+   with the least significant 8 bits of the opcode word, making bits 0
+   through 2 any EA reg value, and bits 3 through 5 any EA mode
+   value: */
+#define TME_M68K_OPCODE_INSN(x)		((x) << 0)
+#define TME_M68K_OPCODE_INSN_MASK	TME_M68K_OPCODE_INSN(0xff)
+#define TME_M68K_OPCODE_INSN_WHICH(params)	TME_FIELD_MASK_EXTRACTU(params, TME_M68K_OPCODE_INSN(0xff))
+#define TME_M68K_OPCODE_EA_REG(x)      ((x) << 0)
+#define TME_M68K_OPCODE_EA_MODE(x)     ((x) << 3)
+#define TME_M68K_OPCODE_EA_REG_MASK    TME_M68K_OPCODE_EA_REG(0x7)
+#define TME_M68K_OPCODE_EA_MODE_MASK   TME_M68K_OPCODE_EA_MODE(0x7)
+#define TME_M68K_OPCODE_EA_MODE_WHICH(params)  TME_FIELD_MASK_EXTRACTU(params, TME_M68K_OPCODE_EA_MODE_MASK)
+#define TME_M68K_OPCODE_EA_REG_WHICH(params)   TME_FIELD_MASK_EXTRACTU(params, TME_M68K_OPCODE_EA_REG_MASK)
+
+/* bits 8 through 15 and 16 through 23 are the operands' ic offsets: */
+#define _TME_M68K_OPCODE_OP(f)		((tme_uint8_t) (((tme_uint8_t *) &((struct tme_m68k *) 0)->f) - ((tme_uint8_t *) (struct tme_m68k *) 0)))
+#define TME_M68K_OPCODE_OP1(f)		(_TME_M68K_OPCODE_OP(f) << 8)
+#define TME_M68K_OPCODE_OP0(f)		(_TME_M68K_OPCODE_OP(f) << 16)
+#define TME_M68K_OPCODE_OP1_WHICH(ic, params) (((tme_uint8_t *) (ic)) + TME_FIELD_MASK_EXTRACTU(params, 0x0000ff00))
+#define TME_M68K_OPCODE_OP0_WHICH(ic, params) (((tme_uint8_t *) (ic)) + TME_FIELD_MASK_EXTRACTU(params, 0x00ff0000))
+
+/* bits 24 and 25 give the size of any immediate operand: */
+#define TME_M68K_OPCODE_IMM_16		TME_BIT(24)
+#define TME_M68K_OPCODE_IMM_32		TME_BIT(25)
+#define TME_M68K_OPCODE_HAS_IMM(params)	(((params) & (TME_M68K_OPCODE_IMM_16 | TME_M68K_OPCODE_IMM_32)) != 0)
+
+/* bit 26 is set for a move instruction with a memory destination
+   ((TME_M68K_OPCODE_SPECOP is additionally set for a
+   move-memory-to-memory instruction).
+   bit 27 is set for an opcode that needs its EA read.
+   bit 28 is set for an opcode that needs its EA written.
+
+   if the EA needs to be read or written, bits 29 and 30 give the size
+   of the EA, which can be TME_M68K_SIZE_8, TME_M68K_SIZE_16, or
+   TME_M68K_SIZE_32, encoded as (TME_M68K_SIZE_32 - size).  if the EA
+   doesn't need to be read or written, but the EA must be calculated,
+   bit 29 is set, and size of the EA is understood to be
+   TME_M68K_SIZE_UNSIZED: */
+#define TME_M68K_OPCODE_EA_Y		TME_BIT(26)
+#define TME_M68K_OPCODE_EA_READ		TME_BIT(27)
+#define TME_M68K_OPCODE_EA_WRITE	TME_BIT(28)
+#define TME_M68K_OPCODE_EA_UNSIZED	TME_BIT(29)
+#define TME_M68K_OPCODE_EA_SIZE(x)	((TME_M68K_SIZE_32 - (x)) * TME_M68K_OPCODE_EA_UNSIZED)
+#define TME_M68K_OPCODE_EA_SIZE_MASK	TME_M68K_OPCODE_EA_SIZE(1)
+#define TME_M68K_OPCODE_HAS_EA(params)	((params) & (TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_EA_UNSIZED))
+#define TME_M68K_OPCODE_EA_SIZE_WHICH(params)					\
+	(((params) & (TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_WRITE)) ?	\
+	 (TME_M68K_SIZE_32							\
+	  - TME_FIELD_MASK_EXTRACTU(params, TME_M68K_OPCODE_EA_SIZE_MASK))	\
+	 : TME_M68K_SIZE_UNSIZED)
+
+/* if the opcode is special, bit 31 is set: */
+#define TME_M68K_OPCODE_SPECOP		TME_BIT(31)
 
 /* major modes of the emulator: */
 #define TME_M68K_MODE_EXECUTION	(0)
@@ -196,9 +296,9 @@ do {									\
 #define TME_M68K_INSN_EXCEPTION(e)	tme_m68k_exception(ic, e)
 #define TME_M68K_INSN_PRIV			\
   if (!TME_M68K_PRIV(ic))	\
-    TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_GROUP1_PRIV)
+    TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_PRIV)
 #define TME_M68K_INSN_ILL			\
-  TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_GROUP1_ILL)
+  TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_ILL)
 #define TME_M68K_INSN_CANFAULT			\
 do {						\
   ic->_tme_m68k_mode_flags			\
@@ -208,6 +308,10 @@ do {						\
 do {								\
   tme_m68k_verify_end_branch(ic, pc);				\
   ic->tme_m68k_ireg_pc = ic->tme_m68k_ireg_pc_next = (pc);	\
+  if (__tme_predict_false((ic->tme_m68k_ireg_sr			\
+			   & ic->_tme_m68k_sr_mask_t) != 0)) {	\
+    TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_TRACE);		\
+  }								\
   if (tme_m68k_go_slow(ic)) {					\
     TME_M68K_SEQUENCE_START;					\
     tme_m68k_redispatch(ic);					\
@@ -217,6 +321,17 @@ do {								\
 do {								\
   TME_M68K_INSN_PRIV;						\
   tme_m68k_change_sr(ic, reg);					\
+  tme_m68k_verify_end_branch(ic, ic->tme_m68k_ireg_pc_next);	\
+  if (__tme_predict_false((ic->tme_m68k_ireg_sr			\
+			   & ic->_tme_m68k_sr_mask_t) != 0)) {	\
+    ic->tme_m68k_ireg_pc_last = ic->tme_m68k_ireg_pc;		\
+    ic->tme_m68k_ireg_pc = ic->tme_m68k_ireg_pc_next;		\
+    TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_TRACE);		\
+  }								\
+  if (tme_m68k_go_slow(ic)) {					\
+    TME_M68K_SEQUENCE_START;					\
+    tme_m68k_redispatch(ic);					\
+  }								\
 } while (/* CONSTCOND */ 0)
 
 /* logging: */
@@ -253,8 +368,6 @@ do {						\
 } while (/* CONSTCOND */ 0)
 
 /* miscellaneous: */
-#define TME_M68K_OPNUM_SUBMAP_X	(-2)
-#define TME_M68K_OPNUM_UNDEF	(-1)
 #define TME_M68K_PRIV(ic)	((ic)->tme_m68k_ireg_sr & TME_M68K_FLAG_S)
 #define TME_M68K_FUNCTION_CODE_DATA(ic)	\
   (TME_M68K_PRIV(ic) ? TME_M68K_FC_SD : TME_M68K_FC_UD)
@@ -269,59 +382,8 @@ struct tme_m68k;
 typedef void (*_tme_m68k_xfer_memx) _TME_P((struct tme_m68k *));
 typedef void (*_tme_m68k_xfer_mem) _TME_P((struct tme_m68k *, int));
 
-/* an m68k opcode map entry: */
-struct _tme_m68k_opcode {
-
-  /* the instruction: */
-  void (*_tme_m68k_opcode_func) _TME_P((struct tme_m68k *, void *, void *));
-  
-  /* iff this opcode requires some special operand processing, this is
-     its type, else this is TME_M68K_SPECOP_TYPE_UNDEF: */
-  int _tme_m68k_opcode_specop_type;
-
-  /* if this opcode has an EA, this is the mask of bus cycles: */
-  int _tme_m68k_opcode_eax_cycles;
-};
-
-/* an m68k decoder generic map entry: */
-struct _tme_m68k_decoder_gen {
-
-  /* any known operands, else NULL: */
-  void *_tme_m68k_decoder_gen_operand0;
-  void *_tme_m68k_decoder_gen_operand1;
-    
-  /* any known EA size, else TME_M68K_SIZE_UNDEF: */
-  int _tme_m68k_decoder_gen_eax_size;
-
-  /* any known immediate operand number, else TME_M68K_OPNUM_UNDEF: */
-  int _tme_m68k_decoder_gen_imm_operand;
-
-  /* any known immediate operand size: */
-  int _tme_m68k_decoder_gen_imm_size;  
-};
-
-/* an m68k decoder submap entry: */
-struct _tme_m68k_decoder_submap {
-
-  /* the generic map entry: */
-  struct _tme_m68k_decoder_gen _tme_m68k_decoder_submap_gen;
-
-  /* the index for the opcode map: */
-  unsigned int _tme_m68k_decoder_submap_opcode_map_index;
-};
-
-/* an m68k decoder root map entry: */
-struct _tme_m68k_decoder_root {
-  
-  /* the generic map entry: */
-  struct _tme_m68k_decoder_gen _tme_m68k_decoder_root_gen;
-
-  /* the opcode map: */
-  const struct _tme_m68k_opcode *_tme_m68k_decoder_root_opcode_map;
-
-  /* the submap: */
-  const struct _tme_m68k_decoder_submap *_tme_m68k_decoder_root_submap;
-};
+/* an insn function: */
+typedef TME_M68K_INSN_DECL((*_tme_m68k_insn));
 
 /* an m68k sequence: */
 struct _tme_m68k_sequence {
@@ -385,6 +447,9 @@ struct tme_m68k {
   void (*_tme_m68k_mode_exception) _TME_P((struct tme_m68k *));
   void (*_tme_m68k_mode_rte) _TME_P((struct tme_m68k *));
 
+  /* the CPU-dependent status register T bits mask: */
+  tme_uint16_t _tme_m68k_sr_mask_t;
+
   /* the instruction decoder root map: */
   const struct _tme_m68k_decoder_root *_tme_m68k_decoder_root;
 
@@ -393,13 +458,12 @@ struct tme_m68k {
   unsigned int _tme_m68k_instruction_burst_remaining;
 
   /* the effective address: */
-  tme_uint32_t _tme_m68k_ea_address;
+#define _tme_m68k_ea_address tme_m68k_ireg_ea
   unsigned int _tme_m68k_ea_function_code;
 
   /* instruction fetch information: */
   tme_uint16_t _tme_m68k_insn_opcode;
   tme_uint16_t _tme_m68k_insn_specop;
-  tme_uint16_t _tme_m68k_insn_specop2;
   
   /* the instruction buffer: */
   tme_uint8_t _tme_m68k_insn_buffer[TME_M68K_INSN_WORDS_MAX * sizeof(tme_uint32_t)];
@@ -437,18 +501,56 @@ struct tme_m68k {
   unsigned int tme_m68k_external_reset;
   unsigned int tme_m68k_external_halt;
   unsigned int tme_m68k_external_ipl;
-  unsigned int tme_m68k_external_vector;
+  unsigned int tme_m68k_external_ipl_previous_nmi;
+
+  /* any FPU state: */
+  int tme_m68k_fpu_enabled;
+  int tme_m68k_fpu_type;
+  struct tme_ieee754_ctl tme_m68k_fpu_ieee754_ctl;
+  _tme_const struct tme_ieee754_ops *tme_m68k_fpu_ieee754_ops;
+  struct tme_float tme_m68k_fpu_fpreg[8];
+  tme_uint32_t tme_m68k_fpu_fpcr;
+  tme_uint32_t tme_m68k_fpu_fpsr;
+  tme_uint32_t tme_m68k_fpu_fpiar;
+  int tme_m68k_fpu_incomplete_abort;
+
+#ifdef _TME_M68K_STATS
+  /* statistics: */
+  struct {
+
+    /* the total number of instructions executed: */
+    tme_uint64_t tme_m68k_stats_insns_total;
+
+    /* the total number of instructions executed by the slow executor: */
+    tme_uint64_t tme_m68k_stats_insns_slow;
+
+    /* the total number of redispatches: */
+    tme_uint64_t tme_m68k_stats_redispatches;
+
+    /* the total number of data memory operations: */
+    tme_uint64_t tme_m68k_stats_memory_total;
+
+    /* the total number of ITLB fills: */
+    tme_uint64_t tme_m68k_stats_itlb_fill;
+
+    /* the total number of DTLB fills: */
+    tme_uint64_t tme_m68k_stats_dtlb_fill;
+
+  } tme_m68k_stats;
+#endif /* _TME_M68K_STATS */
 };
 
 /* globals: */
 extern const tme_uint16_t _tme_m68k_conditions[32];
-extern const tme_uint32_t _tme_m68k_imm32[9];
-extern const tme_uint16_t _tme_m68k_imm16[9];
-extern const tme_uint8_t _tme_m68k_imm8[9];
 extern const _tme_m68k_xfer_memx _tme_m68k_read_memx[5];
 extern const _tme_m68k_xfer_memx _tme_m68k_write_memx[5];
 extern const _tme_m68k_xfer_mem _tme_m68k_read_mem[5];
 extern const _tme_m68k_xfer_mem _tme_m68k_write_mem[5];
+extern tme_uint32_t tme_m68k_opcodes_m68000[65536];
+extern tme_uint32_t tme_m68k_opcodes_m68010[65536];
+extern tme_uint32_t tme_m68k_opcodes_m68020[65536];
+extern const _tme_m68k_insn tme_m68k_opcode_insns[];
+extern const tme_uint8_t _tme_m6888x_fpgen_opmode_bitmap[128 / 8];
 
 /* prototypes: */
 int tme_m68k_new _TME_P((struct tme_m68k *, const char * const *, const void *, char **));
@@ -463,16 +565,17 @@ void tme_m68k_do_reset _TME_P((struct tme_m68k *));
 void tme_m68k_exception _TME_P((struct tme_m68k *, tme_uint32_t));
 void tme_m68k_exception_process_start _TME_P((struct tme_m68k *, unsigned int));
 void tme_m68k_exception_process_finish _TME_P((struct tme_m68k *, tme_uint8_t, tme_uint8_t));
-void tme_m68k_exception_process _TME_P((struct tme_m68k *));
+void tme_m68000_exception_process _TME_P((struct tme_m68k *));
+void tme_m68020_exception_process _TME_P((struct tme_m68k *));
 
 /* rte support: */
 tme_uint16_t tme_m68k_rte_start _TME_P((struct tme_m68k *));
 void tme_m68k_rte_finish _TME_P((struct tme_m68k *, tme_uint32_t));
 
 /* decoder map support: */
-void _tme_m68000_decoder_map_init _TME_P((struct tme_m68k *));
-void _tme_m68010_decoder_map_init _TME_P((struct tme_m68k *));
-void _tme_m68020_decoder_map_init _TME_P((struct tme_m68k *));
+void tme_m68k_opcodes_init_m68000 _TME_P((tme_uint32_t *));
+void tme_m68k_opcodes_init_m68010 _TME_P((tme_uint32_t *));
+void tme_m68k_opcodes_init_m68020 _TME_P((tme_uint32_t *));
 
 /* read/modify/write cycle support: */
 struct tme_m68k_tlb *tme_m68k_rmw_start _TME_P((struct tme_m68k *));
@@ -495,6 +598,11 @@ tme_uint32_t _tme_m68k_bitfield_read _TME_P((struct tme_m68k *, int));
 #define tme_m68k_bitfield_read_unsigned(ic) _tme_m68k_bitfield_read(ic, FALSE)
 void tme_m68k_bitfield_write_unsigned _TME_P((struct tme_m68k *, tme_uint32_t, int));
 #define tme_m68k_bitfield_write_signed(ic, v, sf) tme_m68k_bitfield_write_unsigned(ic, (tme_uint32_t) (v), sf)
+
+/* FPU support: */
+int tme_m68k_fpu_new _TME_P((struct tme_m68k *, const char * const *, int *, int *, char **));
+void tme_m68k_fpu_reset _TME_P((struct tme_m68k *));
+void tme_m68k_fpu_usage _TME_P((char **));
 
 /* verification: */
 void tme_m68k_verify_hook _TME_P((void));
@@ -534,7 +642,9 @@ TME_M68K_INSN_DECL(tme_m68k_nop);
 TME_M68K_INSN_DECL(tme_m68k_scc);
 TME_M68K_INSN_DECL(tme_m68k_dbcc);
 TME_M68K_INSN_DECL(tme_m68k_bcc);
+TME_M68K_INSN_DECL(tme_m68k_bccl);
 TME_M68K_INSN_DECL(tme_m68k_bsr);
+TME_M68K_INSN_DECL(tme_m68k_bsrl);
 TME_M68K_INSN_DECL(tme_m68k_pea);
 TME_M68K_INSN_DECL(tme_m68k_bkpt);
 TME_M68K_INSN_DECL(tme_m68k_tas);
@@ -568,6 +678,18 @@ TME_M68K_INSN_DECL(tme_m68k_bfset);
 TME_M68K_INSN_DECL(tme_m68k_bftst);
 TME_M68K_INSN_DECL(tme_m68k_pack);
 TME_M68K_INSN_DECL(tme_m68k_unpk);
+TME_M68K_INSN_DECL(tme_m68k_fpgen);
+TME_M68K_INSN_DECL(tme_m68k_fmovemctl);
+TME_M68K_INSN_DECL(tme_m68k_fmovem);
+TME_M68K_INSN_DECL(tme_m68k_fmove_rm);
+TME_M68K_INSN_DECL(tme_m68k_fdbcc);
+TME_M68K_INSN_DECL(tme_m68k_ftrapcc);
+TME_M68K_INSN_DECL(tme_m68k_fscc);
+TME_M68K_INSN_DECL(tme_m68k_fbcc);
+TME_M68K_INSN_DECL(tme_m68k_fsave);
+TME_M68K_INSN_DECL(tme_m68k_frestore);
+TME_M68K_INSN_DECL(tme_m68k_divl);
+TME_M68K_INSN_DECL(tme_m68k_mull);
 
 #endif /* !_IC_M68K_IMPL_H */
 

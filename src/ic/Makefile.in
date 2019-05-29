@@ -83,6 +83,7 @@ AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
+CFLAGS_NO_STRICT_ALIASING = @CFLAGS_NO_STRICT_ALIASING@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CXX = @CXX@
@@ -195,11 +196,14 @@ AUTOMAKE_OPTIONS = 1.4 gnu
 INCLUDES = -I$(top_srcdir) -I$(srcdir) -I. -D_TME_IMPL
 
 SUBDIRS = @TME_IC_SUBDIRS@
-DIST_SUBDIRS = m68k
+DIST_SUBDIRS = m68k ieee754
 
 pkglib_LTLIBRARIES = @TME_ICS@
 EXTRA_LTLIBRARIES = tme_ic_am9513.la \
 	tme_ic_z8530.la \
+	tme_ic_i825x6.la \
+	tme_ic_isil7170.la \
+	tme_ic_ncr5380.la \
 	tme_ic_mm58167.la
 
 
@@ -220,6 +224,24 @@ tme_ic_mm58167_la_LDFLAGS = -rpath $(pkglibdir) -module -version-info 0:0:0
 tme_ic_mm58167_la_LIBADD = $(top_builddir)/libtme/libtme.la \
 	$(top_builddir)/generic/libtme-generic.la
 
+
+tme_ic_i825x6_la_SOURCES = i825x6.c i825x6reg.h
+tme_ic_i825x6_la_LDFLAGS = -rpath $(pkglibdir) -module -version-info 0:0:0
+tme_ic_i825x6_la_LIBADD = $(top_builddir)/libtme/libtme.la \
+	$(top_builddir)/generic/libtme-generic.la
+
+
+tme_ic_isil7170_la_SOURCES = isil7170.c
+tme_ic_isil7170_la_LDFLAGS = -rpath $(pkglibdir) -module -version-info 0:0:0
+tme_ic_isil7170_la_LIBADD = $(top_builddir)/libtme/libtme.la \
+	$(top_builddir)/generic/libtme-generic.la
+
+
+tme_ic_ncr5380_la_SOURCES = ncr5380.c
+tme_ic_ncr5380_la_LDFLAGS = -rpath $(pkglibdir) -module -version-info 0:0:0
+tme_ic_ncr5380_la_LIBADD = $(top_builddir)/libtme/libtme.la \
+	$(top_builddir)/generic/libtme-generic.la
+
 subdir = ic
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = $(top_builddir)/config.h
@@ -230,10 +252,22 @@ tme_ic_am9513_la_DEPENDENCIES = $(top_builddir)/libtme/libtme.la \
 	$(top_builddir)/generic/libtme-generic.la
 am_tme_ic_am9513_la_OBJECTS = am9513.lo
 tme_ic_am9513_la_OBJECTS = $(am_tme_ic_am9513_la_OBJECTS)
+tme_ic_i825x6_la_DEPENDENCIES = $(top_builddir)/libtme/libtme.la \
+	$(top_builddir)/generic/libtme-generic.la
+am_tme_ic_i825x6_la_OBJECTS = i825x6.lo
+tme_ic_i825x6_la_OBJECTS = $(am_tme_ic_i825x6_la_OBJECTS)
+tme_ic_isil7170_la_DEPENDENCIES = $(top_builddir)/libtme/libtme.la \
+	$(top_builddir)/generic/libtme-generic.la
+am_tme_ic_isil7170_la_OBJECTS = isil7170.lo
+tme_ic_isil7170_la_OBJECTS = $(am_tme_ic_isil7170_la_OBJECTS)
 tme_ic_mm58167_la_DEPENDENCIES = $(top_builddir)/libtme/libtme.la \
 	$(top_builddir)/generic/libtme-generic.la
 am_tme_ic_mm58167_la_OBJECTS = mm58167.lo
 tme_ic_mm58167_la_OBJECTS = $(am_tme_ic_mm58167_la_OBJECTS)
+tme_ic_ncr5380_la_DEPENDENCIES = $(top_builddir)/libtme/libtme.la \
+	$(top_builddir)/generic/libtme-generic.la
+am_tme_ic_ncr5380_la_OBJECTS = ncr5380.lo
+tme_ic_ncr5380_la_OBJECTS = $(am_tme_ic_ncr5380_la_OBJECTS)
 tme_ic_z8530_la_DEPENDENCIES = $(top_builddir)/libtme/libtme.la \
 	$(top_builddir)/generic/libtme-generic.la
 am_tme_ic_z8530_la_OBJECTS = z8530.lo
@@ -242,8 +276,9 @@ tme_ic_z8530_la_OBJECTS = $(am_tme_ic_z8530_la_OBJECTS)
 DEFAULT_INCLUDES =  -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
-@AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/am9513.Plo ./$(DEPDIR)/mm58167.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/z8530.Plo
+@AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/am9513.Plo ./$(DEPDIR)/i825x6.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/isil7170.Plo ./$(DEPDIR)/mm58167.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/ncr5380.Plo ./$(DEPDIR)/z8530.Plo
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) \
@@ -251,8 +286,9 @@ LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) \
 CCLD = $(CC)
 LINK = $(LIBTOOL) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
-DIST_SOURCES = $(tme_ic_am9513_la_SOURCES) $(tme_ic_mm58167_la_SOURCES) \
-	$(tme_ic_z8530_la_SOURCES)
+DIST_SOURCES = $(tme_ic_am9513_la_SOURCES) $(tme_ic_i825x6_la_SOURCES) \
+	$(tme_ic_isil7170_la_SOURCES) $(tme_ic_mm58167_la_SOURCES) \
+	$(tme_ic_ncr5380_la_SOURCES) $(tme_ic_z8530_la_SOURCES)
 
 RECURSIVE_TARGETS = info-recursive dvi-recursive pdf-recursive \
 	ps-recursive install-info-recursive uninstall-info-recursive \
@@ -260,7 +296,7 @@ RECURSIVE_TARGETS = info-recursive dvi-recursive pdf-recursive \
 	installdirs-recursive install-recursive uninstall-recursive \
 	check-recursive installcheck-recursive
 DIST_COMMON = $(top_srcdir)/modules Makefile.am Makefile.in
-SOURCES = $(tme_ic_am9513_la_SOURCES) $(tme_ic_mm58167_la_SOURCES) $(tme_ic_z8530_la_SOURCES)
+SOURCES = $(tme_ic_am9513_la_SOURCES) $(tme_ic_i825x6_la_SOURCES) $(tme_ic_isil7170_la_SOURCES) $(tme_ic_mm58167_la_SOURCES) $(tme_ic_ncr5380_la_SOURCES) $(tme_ic_z8530_la_SOURCES)
 
 all: all-recursive
 
@@ -301,8 +337,14 @@ clean-pkglibLTLIBRARIES:
 	done
 tme_ic_am9513.la: $(tme_ic_am9513_la_OBJECTS) $(tme_ic_am9513_la_DEPENDENCIES) 
 	$(LINK)  $(tme_ic_am9513_la_LDFLAGS) $(tme_ic_am9513_la_OBJECTS) $(tme_ic_am9513_la_LIBADD) $(LIBS)
+tme_ic_i825x6.la: $(tme_ic_i825x6_la_OBJECTS) $(tme_ic_i825x6_la_DEPENDENCIES) 
+	$(LINK)  $(tme_ic_i825x6_la_LDFLAGS) $(tme_ic_i825x6_la_OBJECTS) $(tme_ic_i825x6_la_LIBADD) $(LIBS)
+tme_ic_isil7170.la: $(tme_ic_isil7170_la_OBJECTS) $(tme_ic_isil7170_la_DEPENDENCIES) 
+	$(LINK)  $(tme_ic_isil7170_la_LDFLAGS) $(tme_ic_isil7170_la_OBJECTS) $(tme_ic_isil7170_la_LIBADD) $(LIBS)
 tme_ic_mm58167.la: $(tme_ic_mm58167_la_OBJECTS) $(tme_ic_mm58167_la_DEPENDENCIES) 
 	$(LINK)  $(tme_ic_mm58167_la_LDFLAGS) $(tme_ic_mm58167_la_OBJECTS) $(tme_ic_mm58167_la_LIBADD) $(LIBS)
+tme_ic_ncr5380.la: $(tme_ic_ncr5380_la_OBJECTS) $(tme_ic_ncr5380_la_DEPENDENCIES) 
+	$(LINK)  $(tme_ic_ncr5380_la_LDFLAGS) $(tme_ic_ncr5380_la_OBJECTS) $(tme_ic_ncr5380_la_LIBADD) $(LIBS)
 tme_ic_z8530.la: $(tme_ic_z8530_la_OBJECTS) $(tme_ic_z8530_la_DEPENDENCIES) 
 	$(LINK)  $(tme_ic_z8530_la_LDFLAGS) $(tme_ic_z8530_la_OBJECTS) $(tme_ic_z8530_la_LIBADD) $(LIBS)
 
@@ -313,7 +355,10 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/am9513.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/i825x6.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/isil7170.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mm58167.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ncr5380.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/z8530.Plo@am__quote@
 
 distclean-depend:

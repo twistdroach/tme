@@ -1,5 +1,5 @@
 
-/*  A Bison parser, made from tmesh-input.y
+/*  A Bison parser, made from ../../tmesh/tmesh-input.y
     by GNU Bison version 1.28  */
 
 #define YYBISON 1  /* Identify Bison output.  */
@@ -20,9 +20,9 @@
 #define	TMESH_TOKEN_ARG	270
 #define	TMESH_TOKEN_OPTS	271
 
-#line 1 "tmesh-input.y"
+#line 1 "../../tmesh/tmesh-input.y"
 
-/* $Id: tmesh-input.y,v 1.2 2003/07/29 18:32:55 fredette Exp $ */
+/* $Id: tmesh-input.y,v 1.3 2005/02/18 02:15:47 fredette Exp $ */
 
 /* tmesh/tmesh-input.y - the tme shell scanner and parser: */
 
@@ -58,7 +58,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: tmesh-input.y,v 1.2 2003/07/29 18:32:55 fredette Exp $");
+_TME_RCSID("$Id: tmesh-input.y,v 1.3 2005/02/18 02:15:47 fredette Exp $");
 
 /* includes: */
 #include <tme/threads.h>
@@ -79,6 +79,7 @@ _TME_RCSID("$Id: tmesh-input.y,v 1.2 2003/07/29 18:32:55 fredette Exp $");
 
 #define YYSTYPE struct tmesh_parser_value
 #define YYDEBUG 1
+#define YYMAXDEPTH 10000
 
 /* types: */
 
@@ -171,10 +172,10 @@ static const short yyrhs[] = {    21,
 
 #if YYDEBUG != 0
 static const short yyrline[] = { 0,
-    97,    98,    99,   100,   101,   102,   103,   104,   105,   106,
-   107,   108,   109,   114,   118,   123,   128,   133,   136,   145,
-   147,   152,   157,   166,   171,   176,   180,   181,   186,   193,
-   203,   209,   218,   221,   224,   234,   240,   249,   250
+    98,    99,   100,   101,   102,   103,   104,   105,   106,   107,
+   108,   109,   110,   115,   119,   124,   129,   134,   137,   146,
+   148,   153,   158,   167,   172,   177,   181,   182,   187,   194,
+   204,   210,   219,   222,   225,   235,   241,   250,   251
 };
 #endif
 
@@ -801,75 +802,75 @@ yyreduce:
   switch (yyn) {
 
 case 1:
-#line 97 "tmesh-input.y"
+#line 98 "../../tmesh/tmesh-input.y"
 { *_tmesh_input_parsed = yyvsp[0]; YYACCEPT; ;
     break;}
 case 2:
-#line 98 "tmesh-input.y"
+#line 99 "../../tmesh/tmesh-input.y"
 { *_tmesh_input_parsed = yyvsp[0]; YYACCEPT; ;
     break;}
 case 3:
-#line 99 "tmesh-input.y"
+#line 100 "../../tmesh/tmesh-input.y"
 { *_tmesh_input_parsed = yyvsp[0]; YYACCEPT; ;
     break;}
 case 4:
-#line 100 "tmesh-input.y"
+#line 101 "../../tmesh/tmesh-input.y"
 { *_tmesh_input_parsed = yyvsp[0]; YYACCEPT; ;
     break;}
 case 5:
-#line 101 "tmesh-input.y"
+#line 102 "../../tmesh/tmesh-input.y"
 { *_tmesh_input_parsed = yyvsp[0]; YYACCEPT; ;
     break;}
 case 6:
-#line 102 "tmesh-input.y"
+#line 103 "../../tmesh/tmesh-input.y"
 { *_tmesh_input_parsed = yyvsp[0]; YYACCEPT; ;
     break;}
 case 7:
-#line 103 "tmesh-input.y"
+#line 104 "../../tmesh/tmesh-input.y"
 { *_tmesh_input_parsed = yyvsp[0]; YYACCEPT; ;
     break;}
 case 8:
-#line 104 "tmesh-input.y"
+#line 105 "../../tmesh/tmesh-input.y"
 { *_tmesh_input_parsed = yyvsp[0]; YYACCEPT; ;
     break;}
 case 9:
-#line 105 "tmesh-input.y"
+#line 106 "../../tmesh/tmesh-input.y"
 { *_tmesh_input_parsed = yyvsp[0]; YYACCEPT; ;
     break;}
 case 10:
-#line 106 "tmesh-input.y"
+#line 107 "../../tmesh/tmesh-input.y"
 { *_tmesh_input_parsed = yyvsp[0]; YYACCEPT; ;
     break;}
 case 11:
-#line 107 "tmesh-input.y"
+#line 108 "../../tmesh/tmesh-input.y"
 { *_tmesh_input_parsed = yyvsp[0]; YYACCEPT; ;
     break;}
 case 12:
-#line 108 "tmesh-input.y"
+#line 109 "../../tmesh/tmesh-input.y"
 { YYABORT; ;
     break;}
 case 13:
-#line 110 "tmesh-input.y"
+#line 111 "../../tmesh/tmesh-input.y"
 { _tmesh_input_parsed->tmesh_parser_value_token = TMESH_TOKEN_UNDEF; YYACCEPT; ;
     break;}
 case 14:
-#line 115 "tmesh-input.y"
+#line 116 "../../tmesh/tmesh-input.y"
 { yyval = yyvsp[-1]; yyval.tmesh_parser_value_token = yyvsp[-2].tmesh_parser_value_token; ;
     break;}
 case 15:
-#line 119 "tmesh-input.y"
+#line 120 "../../tmesh/tmesh-input.y"
 { yyval = yyvsp[-1]; yyval.tmesh_parser_value_token = yyvsp[-2].tmesh_parser_value_token; ;
     break;}
 case 16:
-#line 124 "tmesh-input.y"
+#line 125 "../../tmesh/tmesh-input.y"
 { yyval = yyvsp[-1]; yyval.tmesh_parser_value_token = yyvsp[-2].tmesh_parser_value_token; ;
     break;}
 case 17:
-#line 129 "tmesh-input.y"
+#line 130 "../../tmesh/tmesh-input.y"
 { yyval = yyvsp[-1]; yyval.tmesh_parser_value_token = yyvsp[-2].tmesh_parser_value_token; ;
     break;}
 case 19:
-#line 137 "tmesh-input.y"
+#line 138 "../../tmesh/tmesh-input.y"
 {
   yyval = yyvsp[-2];
   yyval.tmesh_parser_value_strings[1] = yyvsp[-1].tmesh_parser_value_strings[0];
@@ -877,19 +878,19 @@ case 19:
 ;
     break;}
 case 20:
-#line 146 "tmesh-input.y"
+#line 147 "../../tmesh/tmesh-input.y"
 { yyval = yyvsp[-1]; yyval.tmesh_parser_value_token = yyvsp[-2].tmesh_parser_value_token; ;
     break;}
 case 21:
-#line 148 "tmesh-input.y"
+#line 149 "../../tmesh/tmesh-input.y"
 { yyval = yyvsp[-1]; yyval.tmesh_parser_value_token = TMESH_TOKEN_CONNECT; ;
     break;}
 case 22:
-#line 153 "tmesh-input.y"
+#line 154 "../../tmesh/tmesh-input.y"
 { yyval = yyvsp[-1]; yyval.tmesh_parser_value_token = yyvsp[-2].tmesh_parser_value_token; ;
     break;}
 case 23:
-#line 158 "tmesh-input.y"
+#line 159 "../../tmesh/tmesh-input.y"
 {
   yyval = yyvsp[-2];
   yyval.tmesh_parser_value_strings[1] = yyvsp[-1].tmesh_parser_value_strings[0];
@@ -897,19 +898,19 @@ case 23:
 ;
     break;}
 case 24:
-#line 167 "tmesh-input.y"
+#line 168 "../../tmesh/tmesh-input.y"
 { yyval = yyvsp[-1]; yyval.tmesh_parser_value_token = yyvsp[-2].tmesh_parser_value_token; ;
     break;}
 case 25:
-#line 172 "tmesh-input.y"
+#line 173 "../../tmesh/tmesh-input.y"
 { yyval = yyvsp[-1]; yyval.tmesh_parser_value_token = yyvsp[-2].tmesh_parser_value_token; ;
     break;}
 case 28:
-#line 182 "tmesh-input.y"
+#line 183 "../../tmesh/tmesh-input.y"
 { yyval.tmesh_parser_value_strings[0] = NULL; ;
     break;}
 case 29:
-#line 187 "tmesh-input.y"
+#line 188 "../../tmesh/tmesh-input.y"
 { 
   _tmesh_parser_argv_arg(&yyval.tmesh_parser_value_argvs[0], 
 			 yyvsp[0].tmesh_parser_value_pathname0, 
@@ -918,7 +919,7 @@ case 29:
 ;
     break;}
 case 30:
-#line 194 "tmesh-input.y"
+#line 195 "../../tmesh/tmesh-input.y"
 {
   yyval = yyvsp[-1]; 
   _tmesh_parser_argv_arg(&yyval.tmesh_parser_value_argvs[0], 
@@ -927,7 +928,7 @@ case 30:
 ;
     break;}
 case 31:
-#line 204 "tmesh-input.y"
+#line 205 "../../tmesh/tmesh-input.y"
 {
   _tmesh_parser_argv_arg(&yyval.tmesh_parser_value_argvs[0], 
 			 yyvsp[0].tmesh_parser_value_arg, 
@@ -935,7 +936,7 @@ case 31:
 ;
     break;}
 case 32:
-#line 210 "tmesh-input.y"
+#line 211 "../../tmesh/tmesh-input.y"
 { 
   yyval = yyvsp[-1]; 
   _tmesh_parser_argv_arg(&yyval.tmesh_parser_value_argvs[0], 
@@ -944,15 +945,15 @@ case 32:
 ;
     break;}
 case 33:
-#line 218 "tmesh-input.y"
+#line 219 "../../tmesh/tmesh-input.y"
 { _tmesh_scanner_in_args(); ;
     break;}
 case 34:
-#line 221 "tmesh-input.y"
+#line 222 "../../tmesh/tmesh-input.y"
 { _tmesh_scanner_in_args(); ;
     break;}
 case 35:
-#line 225 "tmesh-input.y"
+#line 226 "../../tmesh/tmesh-input.y"
 {
   if (yyvsp[-2].tmesh_parser_value_argvs[0].tmesh_parser_argv_argc > 1) {
     yyerror(_("expected 'at'"));
@@ -964,7 +965,7 @@ case 35:
 ;
     break;}
 case 36:
-#line 235 "tmesh-input.y"
+#line 236 "../../tmesh/tmesh-input.y"
 {
   yyval.tmesh_parser_value_argvs[0] = yyvsp[-4].tmesh_parser_value_argvs[0];
   yyval.tmesh_parser_value_argvs[1] = yyvsp[-2].tmesh_parser_value_argvs[0];
@@ -972,7 +973,7 @@ case 36:
 ;
     break;}
 case 37:
-#line 241 "tmesh-input.y"
+#line 242 "../../tmesh/tmesh-input.y"
 {
   yyval.tmesh_parser_value_argvs[0] = yyvsp[-2].tmesh_parser_value_argvs[0];
   yyval.tmesh_parser_value_argvs[1] = yyvsp[0].tmesh_parser_value_argvs[0];
@@ -980,7 +981,7 @@ case 37:
 ;
     break;}
 case 39:
-#line 251 "tmesh-input.y"
+#line 252 "../../tmesh/tmesh-input.y"
 { yyval.tmesh_parser_value_strings[0] = NULL; ;
     break;}
 }
@@ -1205,7 +1206,7 @@ yyerrhandle:
     }
   return 1;
 }
-#line 254 "tmesh-input.y"
+#line 255 "../../tmesh/tmesh-input.y"
 
 
 /* this adds a new argument to an argument vector: */

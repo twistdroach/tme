@@ -1,13 +1,13 @@
 #! /usr/local/bin/perl -w
 
-# $Id: m68k-opmap-make.pl,v 1.4 2003/06/27 20:42:31 fredette Exp $
+# $Id: m68k-opmap-make.pl,v 1.9 2005/05/14 19:15:37 fredette Exp $
 
 # m68k-opmap-make.pl - compiles the complete decoding of all legal
 # first-instruction-word values into the opcode map used by the C
 # decoder:
 
 #
-# Copyright (c) 2002, 2003 Matt Fredette
+# Copyright (c) 2002, 2003, 2005 Matt Fredette
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -43,6 +43,7 @@ $debug = 0;
 
 # to silence -w:
 undef($value);
+$debug = $debug;
 
 # emit our header:
 print <<"EOF;";
@@ -52,14 +53,32 @@ print <<"EOF;";
 #include "m68k-impl.h"
 EOF;
 
-# we begin with no submaps and no opcode maps:
-$submap_next = 0;
-$opcode_map_next = 0;
-%opcode_maps = ();
+# we start with no previous CPU and no root inits:
+#
+undef ($cpu_name_previous);
+$root_init_i_next = 0;
 
-# assuming an ILP32 machine, various sizeofs:
-$sizeof_opcode = 12;
-$sizeof_submap = 64 * 24;
+# opcode immediates:
+#
+%op_imm = ('0', 'ZERO',
+	   '1', 'ONE',
+	   '2', 'TWO',
+	   '3', 'THREE',
+	   '4', 'FOUR',
+	   '5', 'FIVE',
+	   '6', 'SIX',
+	   '7', 'SEVEN',
+	   '8', 'EIGHT',
+	   );
+
+# the instruction ordering hints:
+#
+@insn_i_to_func = split(/[\r\n\s]+/, <<'EOF;');
+EOF;
+for($insn_i = 0; $insn_i < @insn_i_to_func; $insn_i++) {
+    $func = $insn_i_to_func[$insn_i];
+    $func_to_insn_i{$func} = $insn_i;
+}
 
 # loop over standard input:
 for ($line = 1; defined($_ = <STDIN>); $line++) {
@@ -111,8 +130,22 @@ for ($line = 1; defined($_ = <STDIN>); $line++) {
 	# the first token is the pattern.  die if this pattern has already
 	# appeared:
 	$pattern = oct("0b".shift(@tokens));
-	die "stdin:$line: duplicate pattern of line $map_line[$pattern]\n"
-	    if (defined($map_line[$pattern]));
+	if (defined($map_line[$pattern])) {
+	    $func = $map_func[$pattern];
+
+	    # to allow for an earlier, more specific iset pattern
+	    # while still using very general iset patterns later,
+	    # simply add to the function name on the earlier, more
+	    # specific iset pattern, the number of asterixes for the
+	    # number of later general iset pattern expansions that
+	    # will collide with it.  these collisions will be ignored:
+	    #
+	    if ($func =~ /^(.*)\*$/) {
+		$map_func[$pattern] = $1;
+		next;
+	    }
+	    die "stdin:$line: duplicate pattern of line $map_line[$pattern]\n";
+	}
 	$map_line[$pattern] = $line;
 
 	# fill this map entry:
@@ -183,536 +216,446 @@ for ($line = 1; defined($_ = <STDIN>); $line++) {
 	}
 	print STDERR " found $unused unused $cpu_name patterns\n";
 
-	# loop over the root patterns to come up with the root map
-	# entry, the submap key and the functions list for each:
-	print STDERR "$PROG: making $cpu_name root map entries and submap keys...";
+	# start the opcode map initialization for this CPU.  if there
+	# is a previous CPU, call its initialization function first:
+	#
+	$opcode_map_init = '';
+	if (defined($cpu_name_previous)) {
+	    $opcode_map_init .= "\n  tme_m68k_opcodes_init_${cpu_name_previous}(opcodes);\n";
+	}
+	$opcode_map_init .= "\n";
+
+	# loop over the root patterns:
+	#
+	%param_to_local = ();
+	$local_next = 0;
+	undef (@root_init_calls);
+	$root_group_i_next = 0;
 	for ($root = 0; $root < 1024; $root++) {
 
-	    # get counts of the different map entry attribute values.
-	    # the most popular attribute values will get stored in the
-	    # root map entry, while the others will get set in submap
-	    # entries:
+	    # loop over the patterns under this root:
 	    #
-	    undef(%count_func);
-	    undef(%count_op0);
-	    undef(%count_op1);
-	    undef(%count_eax_size);
-	    undef(%count_imm);
+	    %param_to_submask = ();
+	    print STDERR "root $root\n" if ($debug);
 	    for ($sub = 0, $pattern = $root << 6; $sub < 64 ; $sub++, $pattern++) {
 
-		# the decoder specially cancels all attributes other
-		# than "function" when the function is "illegal", so
-		# don't count any of its attribute values.
+		# start the opcode parameters:
 		#
-		# otherwise, function, specop, and EA cycles go
-		# together, and immediate operand and immediate size
-		# go together:
+		$line = $map_line[$pattern];
+		@params = ();
+
+		# the opcode function.  NB that a memory-to-memory move
+		# generates the Y effective address after generating the
+		# normal EA, and that a nonmemory-to-memory move generates
+		# only the Y EA:
 		#
 		$func = $map_func[$pattern];
-		if ($func ne "illegal") {
-		    $specop = "un" if (!defined($specop = $specop{$func}));
-		    $func .= ".$specop";
-		    if ($map_eax_size[$pattern] eq "U") {
-			# a pattern that doesn't use the EA path can have
-			# any value for its opcode map entry cycles:
-			die "$PROG: pattern ".sprintf("%b", $pattern)." ($func) doesn't use the EA path but needs $map_eax_cycles[$pattern] cycles?\n"
-			    if ($map_eax_cycles[$pattern] ne "U");
-			$func .= ".any";
+		if ($func =~ /^movememtomem(\d+)$/) {
+		    $func = "move${1}";
+		    push (@params,
+			  'TME_M68K_OPCODE_EA_Y',
+			  'TME_M68K_OPCODE_SPECOP');
+		}
+		elsif ($func =~ /^movenonmemtomem(\d+)$/) {
+		    $func = "move${1}";
+		    push (@params,
+			  'TME_M68K_OPCODE_EA_Y');
+		}
+		$insn_i = $func_to_insn_i{$func};
+		if (!defined($insn_i)) {
+		    $insn_i = $func_to_insn_i{$func} = (@insn_i_to_func + 0);
+		    push (@insn_i_to_func, $func);
+		}
+		unshift(@params,
+			"TME_M68K_OPCODE_INSN($insn_i)");
+
+		# the two operands:
+		#
+		undef ($eax_size);
+		undef ($cycles);
+		for ($op_i = 0; $op_i < 2; $op_i++) {
+		    eval("\$op = \$map_op${op_i}[\$pattern];");
+
+		    # if this operand is a register:
+		    #
+		    if ($op =~ /^\%([ad][0-7])\.(\d+)/) {
+			($op, $op_size) = ($1, $2);
+			$op =~ tr/a-z/A-Z/;
+			if ($op_size == 16) {
+			    $op .= " << 1";
+			}
+			elsif ($op_size == 8) {
+			    $op .= " << 2";
+			}
+			$op = "tme_m68k_ireg_uint${op_size}(TME_M68K_IREG_${op})";
 		    }
-		    elsif ($map_eax_size[$pattern] eq "UNSIZED") {
-			# a pattern that uses the raw effective address
-			# must have UNDEF for its opcode map entry cycles:
-			die "$PROG: pattern ".sprintf("%b", $pattern)." ($func) takes the raw EA path but needs $map_eax_cycles[$pattern] cycles?\n"
-			    if ($map_eax_cycles[$pattern] ne "U");
-			$func .= ".un";
+
+		    # if this operand is the effective address:
+		    #
+		    elsif ($op eq "eax.32") {
+			$op = "_tme_m68k_ea_address";
+			$eax_size = $map_eax_size[$pattern];
+			$cycles = $map_eax_cycles[$pattern];
+			if ($eax_size ne 'UNSIZED') {
+			    die "$PROG: pattern ".sprintf("%016b", $pattern)." ($map_func[$pattern]) has a sized control EA\n";
+			}
+			if ($cycles ne 'U'
+			    && $cycles ne 'un') {
+			    die "$PROG: pattern ".sprintf("%016b", $pattern)." ($map_func[$pattern]) has cycles ($cycles) on a control EA\n";
+			}
+		    }
+
+		    # if this operand is an opcode immediate:
+		    #
+		    elsif ($op =~ /^imm(\d+)\.(\d+)/) {
+			($op, $op_size) = ($1, $2);
+			$op = $op_imm{$op};
+			if ($op_size == 16) {
+			    $op .= " << 1";
+			}
+			elsif ($op_size == 8) {
+			    $op .= " << 2";
+			}
+			$op = "tme_m68k_ireg_uint${op_size}(TME_M68K_IREG_${op})";
+		    }
+
+		    # if this operand is a memory buffer:
+		    #
+		    elsif ($op =~ /^mem([xy])\.(\d+)/) {
+			$op = "tme_m68k_ireg_mem${1}${2}";
+			$eax_size = $map_eax_size[$pattern];
+			$cycles = $map_eax_cycles[$pattern];
+			if ($eax_size eq 'UNSIZED') {
+			    die "$PROG: pattern ".sprintf("%016b", $pattern)." ($map_func[$pattern]) has an unsized EA\n";
+			}
+			if ($cycles eq 'U'
+			    || $cycles eq 'un') {
+			    die "$PROG: pattern ".sprintf("%016b", $pattern)." ($map_func[$pattern]) has no cycles on an EA\n";
+			}
+		    }
+
+		    elsif ($op ne 'U') {
+			die "$PROG: pattern ".sprintf("%016b", $pattern)." ($map_func[$pattern]) op${op_i} unknown: $op\n";
+		    }
+
+		    # if this operand is an immediate:
+		    #
+		    if ($map_imm_operand[$pattern] eq $op_i) {
+			if ($op ne 'U') {
+			    die "$PROG: pattern ".sprintf("%016b", $pattern)." ($map_func[$pattern]) op${op_i} is already $op\n";
+			}
+			$op_size = $map_imm_size[$pattern];
+			$op = 'TME_M68K_IREG_IMM32';
+			$imm_size = '16';
+			if ($op_size eq '8') {
+			    $op .= " << 2";
+			}
+			elsif ($op_size eq '16') {
+			    $op .= " << 1";
+			}
+			elsif ($op_size eq '16S32') {
+			    $op_size = '32';
+			}
+			elsif ($op_size eq '32') {
+			    $imm_size = '32';
+			}
+			else {
+			    die "$PROG: pattern ".sprintf("%016b", $pattern)." ($map_func[$pattern]) has bad immediate size $op_size\n";
+			}
+			$op = "tme_m68k_ireg_uint${op_size}(${op})";
+			push (@params, 
+			      'TME_M68K_OPCODE_IMM_'.$imm_size);
+		    }
+
+		    # if this operand is defined:
+		    #
+		    if ($op ne 'U') {
+			push (@params, 
+			      'TME_M68K_OPCODE_OP'
+			      .$op_i
+			      .'('.$op.')');
+		    }
+		}
+
+		# any EA operand:
+		#
+		if (defined($eax_size)
+		    && $eax_size ne 'U') {
+		    if ($eax_size eq 'UNSIZED') {
+			if ($cycles ne 'un'
+			    && $cycles ne 'U') {
+			    die "$PROG: pattern ".sprintf("%016b", $pattern)." ($map_func[$pattern]) has an unsized EA with $cycles cycles\n";
+			}
+			push (@params, "TME_M68K_OPCODE_EA_UNSIZED");
+		    }
+		    elsif ($eax_size eq '8'
+			   || $eax_size eq '16'
+			   || $eax_size eq '32') {
+			push (@params, "TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_${eax_size})");
 		    }
 		    else {
-			# otherwise, this pattern must have its specified
-			# value for its opcode map entry cycles:
-			die "$PROG: pattern ".sprintf("%b", $pattern)." ($func) uses the EA path at size $map_eax_size[$pattern] but needs $map_eax_cycles[$pattern] cycles?\n"
-			    if ($map_eax_cycles[$pattern] eq "U"
-				|| $map_eax_cycles[$pattern] eq "un");
-			$func .= ".".$map_eax_cycles[$pattern];
+			die "$PROG: pattern ".sprintf("%016b", $pattern)." ($map_func[$pattern]) has an $eax_size sized EA\n";
 		    }
-		    $map_func[$pattern] = $func;
-		    $count_op0{$map_op0[$pattern]}++;
-		    $count_op1{$map_op1[$pattern]}++;
-		    $count_eax_size{$map_eax_size[$pattern]}++;
-		    $count_imm{$map_imm_operand[$pattern].".".$map_imm_size[$pattern]}++;
-		}
-		$count_func{$func}++;
-	    }
-
-	    # a pattern that doesn't use the EA path can use the same
-	    # opcode map entry as a pattern that has the same function
-	    # but does use the EA path, because the former pattern
-	    # will have UNDEF for its eax size, which makes the cycles
-	    # member of the opcode map entry a don't care:
-	    #
-	    @funcs = (keys(%count_func));
-	    %funcs_rewrite = ();
-	    foreach $func (@funcs) {
-		@parts = split(/\./, $func);
-		if (@parts == 3
-		    && $parts[2] ne "any") {
-		    $func_rewrite = $parts[0].".".$parts[1].".any";
-		    if (defined($count_func{$func_rewrite})) {
-			$count_func{$func} += delete($count_func{$func_rewrite});
-			$funcs_rewrite{$func_rewrite} = $func;
+		    if ($cycles eq 'U'
+			|| $cycles eq 'un') {
+			# nothing to do
+			#
 		    }
-		}
-	    }
-	    for ($sub = 0, $pattern = $root << 6; $sub < 64 ; $sub++, $pattern++) {
-		$map_func[$pattern] = $func
-		    if (defined($func = $funcs_rewrite{$map_func[$pattern]}));
-	    }
-
-	    # sort the attributes:
-	    @funcs = (sort { ($count_func{$b} == $count_func{$a}
-			      ? $a cmp $b
-			      : $count_func{$b} <=> $count_func{$a}) } keys(%count_func));
-	    @op0s = (sort { ($count_op0{$b} == $count_op0{$a}
-			     ? $a cmp $b
-			     : $count_op0{$b} <=> $count_op0{$a}) } keys(%count_op0));
-	    @op1s = (sort { ($count_op1{$b} == $count_op1{$a}
-			     ? $a cmp $b
-			     : $count_op1{$b} <=> $count_op1{$a}) } keys(%count_op1));
-	    @eax_sizes = (sort { ($count_eax_size{$b} == $count_eax_size{$a}
-				  ? $a cmp $b
-				  : $count_eax_size{$b} <=> $count_eax_size{$a}) } keys(%count_eax_size));
-	    @imms = (sort { ($count_imm{$b} == $count_imm{$a}
-			     ? $a cmp $b
-			     : $count_imm{$b} <=> $count_imm{$a}) } keys(%count_imm));
-	    
-	    # make sure the attributes have at least undef in them.  for
-	    # all-illegal roots they would otherwise be empty:
-	    push(@op0s, "U"); $count_op0{"U"}++;
-	    push(@op1s, "U"); $count_op1{"U"}++;
-	    push(@eax_sizes, "U"); $count_eax_size{"U"}++;
-	    push(@imms, "U.U"); $count_imm{"U.U"}++;
-	    
-	    # display the attributes:
-	    if (1 && $debug) {
-		print STDERR "root $root:";
-		print STDERR "\n  funcs"; foreach (@funcs) { print STDERR " $_ ($count_func{$_})"}
-		print STDERR "\n  op0s"; foreach (@op0s) { print STDERR " $_ ($count_op0{$_})"}
-		print STDERR "\n  op1s"; foreach (@op1s) { print STDERR " $_ ($count_op1{$_})"}
-		print STDERR "\n  eax_sizes"; foreach (@eax_sizes) { print STDERR " $_ ($count_eax_size{$_})"}
-		print STDERR "\n  imms"; foreach (@imms) { print STDERR " $_ ($count_imm{$_})"}
-		print STDERR "\n";
-	    }
-
-	    # form the submap key.  this is a very long string
-	    # describing what a submap must do with attributes in
-	    # order to be associated with this root.  this string is
-	    # very long because it lists all attributes for the 64
-	    # subs under this root:
-	    #
-	    # this string really ends up being a regular expression,
-	    # and since the decoder specially cancels all attributes
-	    # when the function is "illegal", illegal can really take
-	    # any attributes, so wildcards are used:
-	    #
-	    @key = ();
-	    for ($sub = 0, $pattern = $root << 6; $sub < 64 ; $sub++, $pattern++) {
-		if ($map_func[$pattern] eq "illegal") {
-		    push(@key, '\S+');
-		    push(@key, '\S+');
-		    push(@key, '\S+');
-		    push(@key, '\S+');
-		}
-		else {
-
-		    # the op0 and op1 attributes can be anything for
-		    # patterns that don't use them ("U" for
-		    # undefined), because even if they are defined in
-		    # the submap or root, the instruction decoder does
-		    # nothing except pass them to the instruction
-		    # functions, which don't care.  so they can be
-		    # anything in the submap key:
-		    $_ = $map_op0[$pattern]; push(@key, ($_ eq "U" ? '\S+' : $_ eq $op0s[0] ? "U" : $_));
-		    $_ = $map_op1[$pattern]; push(@key, ($_ eq "U" ? '\S+' : $_ eq $op1s[0] ? "U" : $_));
-
-		    # however, the same is not true for the EA size
-		    # and immediate operand attributes.  if a pattern
-		    # doesn't use these attributes, they *must* be
-		    # undefined in the submap, so that any defined
-		    # attribute in the root is ignored - otherwise the
-		    # instruction decoder will do EA work and fetch
-		    # immediates when it isn't supposed to.  this
-		    # means that we have to introduce a
-		    # use-the-root-attribute value for those patterns
-		    # that *must* use the root attribute value.  we
-		    # use "X" to stand for this value:
-		    $_ = $map_eax_size[$pattern]; push(@key, ($_ eq $eax_sizes[0] ? "X" : $_));
-		    $_ = $map_imm_operand[$pattern].".".$map_imm_size[$pattern]; push(@key, ($_ eq $imms[0] ? "X" : $_));
-		}
-	    }
-	    $key = join(" ", @key);
-	    $root_key[$root] = $key;
-	    $root_funcs[$root] = join(",", @funcs);
-	    $root_op0[$root] = $op0s[0];
-	    $root_op1[$root] = $op1s[0];
-	    $root_eax_size[$root] = $eax_sizes[0];
-	    $imms[0] =~ /^(.*)\.(.*)$/;
-	    $root_imm_operand[$root] = $1;
-	    $root_imm_size[$root] = $2;
-	    undef($root_submap[$root]);
-	    print STDERR "  key $key\n" if (0 && $debug);
-	}
-	print STDERR " done\n";
-
-	# create submaps and opcode maps for the roots:
-	$submaps_new = $submap_next;
-	print STDERR "$PROG: creating $cpu_name submaps...";
-	for ($root = 0; $root < 1024; $root++) {
-    
-	    # get the function array and key for this root:
-	    @funcs = split(/,/, $root_funcs[$root]);
-	    $key = $root_key[$root];
-	    print STDERR "  root $root key $key\n" if (0 && $debug);
-    
-	    # calculate the additional memory cost of creating a new
-	    # submap for this root:
-	    $submap_best_cost = ($sizeof_submap
-				 # our opcode map:
-				 + (@funcs * $sizeof_opcode));
-    
-	    # check all of the existing submaps for a key match:
-	    undef($submap_best);
-	    $key =~ s/\./\\\./g;
-	    for ($submap = 0; $submap < $submap_next; $submap++) {
-		next unless ($submap_key[$submap] =~ /^$key$/);
-	
-		# get the opcode map indices array, and the size of
-		# the opcode map currently required by this submap:
-		@opcode_map_indices = split(/,/, $submap_opcode_map_indices[$submap]);
-		$opcode_map_size = $submap_opcode_map_size[$submap];
-	
-		# loop over the submap entries, seeing how the submap's opcode
-		# map indices would have to change to accomodate this root:
-		undef(@index_to_func);
-		undef(%func_to_new_index);
-		for ($sub = 0, $pattern = $root << 6; $sub < 64 ; $sub++, $pattern++) {
-		    $opcode_map_index = $opcode_map_indices[$sub];
-		    $func = $index_to_func[$opcode_map_index];
-		    if (!defined($func)) {
-			$index_to_func[$opcode_map_index] = $map_func[$pattern];
+		    elsif ($cycles eq 'ro') {
+			push (@params, 
+			      'TME_M68K_OPCODE_EA_READ');
 		    }
-		    elsif ($func ne $map_func[$pattern]) {
-			if (!defined($_ = $func_to_new_index{$map_func[$pattern]})) {
-			    $_ = $func_to_new_index{$func} = $opcode_map_size++;
-			    $index_to_func[$_] = $func;
-			}
-			$opcode_map_indices[$sub] = $_;
+		    elsif ($cycles eq 'rw') {
+			push (@params, 
+			      'TME_M68K_OPCODE_EA_READ',
+			      'TME_M68K_OPCODE_EA_WRITE');
+		    }
+		    elsif ($cycles eq 'wo') {
+			push (@params, 
+			      'TME_M68K_OPCODE_EA_WRITE');
+		    }
+		    else {
+			die "$PROG: pattern ".sprintf("%016b", $pattern)." ($map_func[$pattern]) has bad EA cycles\n";
 		    }
 		}
 
-		# a submap for an earlier CPU is off-limits unless we
-		# can use it without growing the opcode map it
-		# requires, since both the submap and the earlier
-		# CPU's opcode maps have already been generated:
-		next if ($submap < $submaps_new
-			 && $opcode_map_size > $submap_opcode_map_size[$submap]);
-	
-		# calculate the additional memory cost of reusing this
-		# submap for this root:
-		$submap_cost = 0;
-
-		# if the exact opcode map we would need doesn't
-		# already exist, we would have to create it:
-		$opcode_map_key = join(" ", @index_to_func);
-		$submap_cost += ($sizeof_opcode
-				 * $opcode_map_size)
-		    if (!defined($opcode_map{$opcode_map_key}));
-
-		# if we would grow the size of the opcode map required
-		# by this submap by N entries, that's N more opcodes
-		# for *each* root already using this submap:
-		$submap_cost += ($sizeof_opcode
-				 * ($submap_refcnt[$submap]
-				    * ($opcode_map_size
-				       - $submap_opcode_map_size[$submap])));
-
-		# if using this submap for this root is still better
-		# than any alternative, remember it and how we may
-		# want to change it:
-		if ($submap_cost < $submap_best_cost) {
-		    $submap_best = $submap;
-		    $submap_best_cost = $submap_cost;
-		    @submap_best_opcode_map_indices = @opcode_map_indices;
-		    $submap_best_opcode_map_size = $opcode_map_size;
-		}
-	    }
-    
-	    # if there is a best existing submap, make changes to it:
-	    if (defined($submap_best)) {
-		if ($submap_opcode_map_size[$submap_best] != $submap_best_opcode_map_size) {
-		    $submap_opcode_map_indices[$submap_best] = join(",", @submap_best_opcode_map_indices);
-		    $submap_opcode_map_size[$submap_best] = $submap_best_opcode_map_size;
-		    print STDERR "  submap $submap_best now funcs ".join(",", @funcs).", ($opcode_map_size) indices ".join(",", @opcode_map_indices)."\n"
-			if ($debug);
-		}
-	    }
-    
-	    # otherwise, create a new submap:
-	    else {
-	
-		# allocate a new submap number:
-		$submap_best = $submap_next++;
-	
-		# create the hash of function name to opcode map index:
-		undef(%func_to_index);
-		$opcode_map_size = 0;
-		foreach $func (@funcs) {
-		    $func_to_index{$func} = $opcode_map_size++;
-		}
-	
-		# now make the list of opcode map indices:
-		@opcode_map_indices = ();
-		for ($sub = 0, $pattern = $root << 6; $sub < 64 ; $sub++, $pattern++) {
-		    die "internal error - func $map_func[$pattern] missing from ".join(" ", @funcs)."\n"
-			if (!defined($func_to_index{$map_func[$pattern]}));
-		    push(@opcode_map_indices, $func_to_index{$map_func[$pattern]});
-		}
-	
-		# officially add this new submap:
-		$submap_opcode_map_indices[$submap_best] = join(",", @opcode_map_indices);
-		$submap_opcode_map_size[$submap_best] = $opcode_map_size;
-		$submap_key[$submap_best] = $root_key[$root];
-		print STDERR "  new submap $submap_best, funcs ".join(",", @funcs).", ($opcode_map_size) indices ".join(",", @opcode_map_indices)."\n"
-		    if ($debug);
-	    }
-    
-	    # note how reference counts have changed:
-	    $root_submap[$root] = $submap_best;
-	    $submap_refcnt[$submap_best]++;
-	    print STDERR "  refcnt on submap $submap_best now $submap_refcnt[$submap_best]\n" if ($debug);	    
-	}
-
-	# write out any newly created submaps:
-	$submaps = 0;
-	for ($submap = $submaps_new; $submap < $submap_next; $submap++) {
-	    next if ($submap_refcnt[$submap] == 0);
-	    $submaps++;
-
-	    print <<"EOF;";
-
-/* create submap $submap: */
-static struct _tme_m68k_decoder_submap *
-_tme_m68k_create_submap$submap(struct tme_m68k *ic)
-{
-  struct _tme_m68k_decoder_submap *submap, *submap_entry;
-  int entry_i;
-
-  /* allocate and initialize the submap: */
-  submap = tme_new(struct _tme_m68k_decoder_submap, 64);
-  submap_entry = submap;
-  for (entry_i = 0; entry_i < 64; entry_i++) {
-      submap_entry->_tme_m68k_decoder_submap_gen._tme_m68k_decoder_gen_operand0 = NULL;
-      submap_entry->_tme_m68k_decoder_submap_gen._tme_m68k_decoder_gen_operand1 = NULL;
-      submap_entry->_tme_m68k_decoder_submap_gen._tme_m68k_decoder_gen_eax_size = TME_M68K_SIZE_UNDEF;
-      submap_entry->_tme_m68k_decoder_submap_gen._tme_m68k_decoder_gen_imm_operand = TME_M68K_OPNUM_UNDEF;
-      submap_entry++;
-  }
-
-  /* fill the submap: */
-  submap_entry = submap;
-EOF;
-
-	    # get the submap key and opcode map indices and split them up:
-	    @key = split(' ', $submap_key[$submap]);
-	    @opcode_map_indices = split(/,/, $submap_opcode_map_indices[$submap]);
-
-	    # emit the code to initialize each submap entry:
-	    for ($sub = 0; $sub < 64 ; $sub++) {
-		print "\n  /* submap $submap sub $sub */\n";
-
-		# emit op0:
-		$op0 = &operand_final(shift(@key));
-		print "  submap_entry->_tme_m68k_decoder_submap_gen._tme_m68k_decoder_gen_operand0 = $op0;\n"
-		    if (defined($op0));
-
-		# emit op1:
-		$op1 = &operand_final(shift(@key));
-		print "  submap_entry->_tme_m68k_decoder_submap_gen._tme_m68k_decoder_gen_operand1 = $op1;\n"
-		    if (defined($op1));
-
-		# emit eax_size:
-		$eax_size = shift(@key);
-		$eax_size = "SUBMAP_X" if ($eax_size eq "X");
-		print "  submap_entry->_tme_m68k_decoder_submap_gen._tme_m68k_decoder_gen_eax_size = TME_M68K_SIZE_$eax_size;\n"
-		    if ($eax_size ne "U" && $eax_size ne '\S+');
-
-		# emit imm_size and imm_operand:
-		$_ = shift(@key);
-		if ($_ eq "X") {
-		    print "  submap_entry->_tme_m68k_decoder_submap_gen._tme_m68k_decoder_gen_imm_operand = TME_M68K_OPNUM_SUBMAP_X;\n";
-		}
-		elsif ($_ !~ /^U/ && $_ ne '\S+') {
-		    ($imm_operand, $imm_size) = (/^(\S+)\.(\S+)/);
-		    $imm_size = "16U8" if ($imm_size eq "8");
-		    print "  submap_entry->_tme_m68k_decoder_submap_gen._tme_m68k_decoder_gen_imm_operand = $imm_operand;\n";
-		    print "  submap_entry->_tme_m68k_decoder_submap_gen._tme_m68k_decoder_gen_imm_size = TME_M68K_SIZE_$imm_size;\n";
+		# any opcode specop:
+		#
+		$specop = $specop{$func};
+		if (defined($specop)) {
+		    if ($specop ne 'specop16'
+			&& $specop ne 'fpgen') {
+			die "$PROG: pattern ".sprintf("%016b", $pattern)." ($map_func[$pattern]) has a bad specop\n";
+		    }
+		    push (@params,
+			  "TME_M68K_OPCODE_SPECOP");
 		}
 		
-		# emit the opcode map index:
-		print "  (submap_entry++)->_tme_m68k_decoder_submap_opcode_map_index = $opcode_map_indices[$sub];\n";
-	    }
-
-	    # finish the function:
-	    print <<"EOF;";
-
-  /* done: */
-  return(submap);
-}
-EOF;
-	}
-
-	# for each root, according to the submap used, either use an
-	# existing opcode map or create a new opcode map:
-	$opcode_maps = 0;
-	for ($root = 0; $root < 1024; $root++) {
-
-	    # create the opcode map key:
-	    $submap = $root_submap[$root];
-	    @opcode_map_indices = split(/,/, $submap_opcode_map_indices[$submap]);
-	    $opcode_map_size = $submap_opcode_map_size[$submap];
-	    undef(@index_to_func);
-	    for ($sub = 0, $pattern = $root << 6; $sub < 64 ; $sub++, $pattern++) {
-		$opcode_map_index = $opcode_map_indices[$sub];
-		$func = $index_to_func[$opcode_map_index];
-		if (!defined($func)) {
-		    $index_to_func[$opcode_map_index] = $map_func[$pattern];
-		}
-		elsif ($func ne $map_func[$pattern]) {
-		    die "$PROG internal error: opcode map indices broken (root $root, submap $submap, sub $sub index $opcode_map_index needs to be $map_func[$pattern], but it's already $func)\n";
-		}
-	    }
-	    $opcode_map_key = join(" ", @index_to_func);
-
-	    # if the exact opcode map we need doesn't already exist,
-	    # create it:
-	    if (!defined($opcode_map = $opcode_maps{$opcode_map_key})) {
-		$opcode_map = $opcode_map_next++;
-		$opcode_maps{$opcode_map_key} = $opcode_map;
-		$opcode_maps++;
-    
-		print "\n";
-		print "/* opcode map for $cpu_name root $root (submap $submap): */\n";
-		print "static const struct _tme_m68k_opcode _tme_m68k_opcode_map${opcode_map}[$opcode_map_size] = {\n";
-		for ($map_i = 0; $map_i < $opcode_map_size; $map_i++) {
-		    @parts = split(/\./, $index_to_func[$map_i]);
-		    ($func, $specop, $cycles) = @parts;
-		    if ($func =~ /^(\S+)(nonmemtomem)(\d+)/
-			|| $func =~ /^(\S+)(memtomem)(\d+)/) {
-			$func = $1.$3;
-			$specop = $1.$2;
+		# each param has an associated submask - a 64-bit mask
+		# with a set bit for each sub in this root that needs
+		# that param.  for each param used by this pattern,
+		# set this sub's bit in the param's submask:
+		#
+		foreach $param (@params) {
+		    $_ = $param_to_submask{$param};
+		    if (!defined($_)) {
+			$_ = '0:0';
 		    }
-		    $specop = "undef" 
-			if (!defined($specop)
-			    || $specop eq "un");
-		    $specop =~ tr/a-z/A-Z/;
-		    $specop = "TME_M68K_SPECOP_$specop";
-		    if (!defined($cycles)
-			|| $cycles eq "un"
-			|| $cycles eq "any") {
-			$cycles = "TME_BUS_CYCLE_UNDEF";
-		    }
-		    elsif ($cycles eq "ro") {
-			$cycles = "TME_BUS_CYCLE_READ";
-		    }
-		    elsif ($cycles eq "wo") {
-			$cycles = "TME_BUS_CYCLE_WRITE";
-		    }
-		    elsif ($cycles eq "rw") {
-			$cycles = "TME_BUS_CYCLE_READ|TME_BUS_CYCLE_WRITE";
+		    ($submask_hi, $submask_lo) = split(/:/, $_);
+		    if ($sub > 31) {
+			$submask_hi |= (1 << ($sub & 31));
 		    }
 		    else {
-			die "$PROG error: bad cycles $cycles\n";
+			$submask_lo |= (1 << $sub);
 		    }
-		    print "  { tme_m68k_$func, $specop, $cycles },\n";
+		    $param_to_submask{$param} = "${submask_hi}:${submask_lo}";
 		}
-		print "};\n";
 	    }
-	    $root_opcode_map[$root] = $opcode_map;
+
+	    # within a root, params usually share submasks.  gather
+	    # the sets of params that share submasks into a hash
+	    # indexed by submask, and then sort those keys to get a
+	    # list of the submasks for the params passed to a root
+	    # initialization function:
+	    #
+	    undef(%submasks);
+	    foreach $param (sort(keys(%param_to_submask))) {
+		$submask = $param_to_submask{$param};
+		$submasks{$submask} .= "${param};";
+	    }
+	    @submasks = (sort(keys(%submasks)));
+
+	    # if this root hasn't changed since the previous CPU,
+	    # don't bother emitting anything for it - the previous
+	    # CPU's initialization will take care of it:
+	    #
+	    $root_key = '';
+	    foreach $submask (@submasks) {
+		$root_key .= "${submask} $submasks{$submask} %";
+	    }
+	    $_ = $root_key_previous[$root];
+	    if (defined($_)
+		&& $_ eq $root_key) {
+		next;
+	    }
+	    $root_key_previous[$root] = $root_key;
+
+	    # if a root initialization function doesn't already exist
+	    # for this submasks list:
+	    #
+	    $submasks = join(' ', @submasks);
+	    $root_init_i = $submasks_to_root_init_i{$submasks};
+	    if (!defined($root_init_i)) {
+
+		# create a new root initialization function:
+		#
+		$root_init_i = $submasks_to_root_init_i{$submasks} = $root_init_i_next++;
+		print "\n/* root init ${root_init_i}: */\n";
+		print "static void\n_tme_m68k_opcode_root_init_${root_init_i}(tme_uint32_t *root, const tme_uint32_t *params)\n{\n";
+
+		# loop over the subs:
+		#
+		for ($sub = 0; $sub < 64; $sub++) {
+
+		    # make a list of params for this sub:
+		    #
+		    @params = ();
+		    for ($param_i = 0; $param_i < @submasks; $param_i++) {
+			($submask_hi, $submask_lo) = split(/:/, $submasks[$param_i]);
+			if ((($sub > 31)
+			     ? $submask_hi
+			     : $submask_lo)
+			    & (1 << ($sub & 31))) {
+			    push (@params, "params[${param_i}]");
+			}
+		    }
+
+		    # add in this sub's parameters:
+		    #
+		    if (@params > 0) {
+			print "  root[${sub}] = ".join(' | ', @params).";\n";
+		    }
+		}
+		print "}\n";
+	    }
+	    print STDERR "root init ${root_init_i} submasks are $submasks\n" if ($debug);
+ 
+	    # loop over the parameters for the root initialization function:
+	    #
+	    @root_init_params = ();
+	    for ($param_i = 0; $param_i < @submasks; $param_i++) {
+
+		# get the params that this root needs to provide for
+		# this root initialization parameter, and store certain
+		# params in constant locals, to try to make compilation
+		# easier:
+		#
+		@params = split(/;/, $submasks{$submasks[$param_i]});
+		foreach $param (@params) {
+		    if ($param =~ /^TME_M68K_OPCODE_OP\d/) {
+			$local = $param_to_local{$param};
+			if (!defined($local)) {
+			    $local = $param_to_local{$param} = $local_next++;
+			    $opcode_map_init = "  const tme_uint32_t param${local} = $param;\n".$opcode_map_init;
+			}
+			$param = "param${local}";
+		    }
+		}
+
+		push (@root_init_params, join(' | ', @params));
+	    }
+
+	    # assume that the best place to initialize this root is at
+	    # the end of all current root initializations:
+	    #
+	    $root_init_call_best = $#root_init_calls;
+	    $root_init_call_best_score = 0;
+
+	    # loop over all current root initializations, tracking the
+	    # values that each leaves in params[], and finding the
+	    # current root initialization that leaves params[] closest
+	    # to what this root initialization needs:
+	    #
+	    undef (@params_state);
+	    for ($root_init_call = 0; 
+		 $root_init_call < @root_init_calls;
+		 $root_init_call++) {
+
+		# get this current root initialization, and update the params[] state:
+		#
+		($junk, $junk, @root_init_params_other) = split(/\#/, $root_init_calls[$root_init_call]);
+		splice(@params_state, 0, @root_init_params_other + 0, @root_init_params_other);
+
+		# score our closeness to this current root initialization's params[]:
+		#
+		$root_init_call_score = 0;
+		for ($param_i = 0; 
+		     $param_i < @params_state && $param_i < @root_init_params;
+		     $param_i++) {
+		    if ($params_state[$param_i] eq $root_init_params[$param_i]) {
+			$root_init_call_score++;
+		    }
+		}
+
+		# update the closest current root initialization:
+		#
+		if ($root_init_call_best_score <= $root_init_call_score) {
+		    $root_init_call_best_score = $root_init_call_score;
+		    $root_init_call_best = $root_init_call;
+		}
+	    }
+	    
+	    # add this root initialization to the list:
+	    #
+	    splice(@root_init_calls, $root_init_call_best + 1, 0,
+		   join("\#", $root, $root_init_i, @root_init_params));
 	}
-	print STDERR " created $submaps new submaps, $opcode_maps new opcode maps\n";
 
-	# write out the function that creates the root map:
-	print <<"EOF;";
+	# make the root initialization function calls:
+	#
+	undef (@params_state);
+	@root_init_group = ();
+	$root_init_i_group = -1;
+	for ($root_init_call = 0; 
+	     $root_init_call < @root_init_calls;
+	     $root_init_call++) {
 
-/* initializes the ${cpu_name} decoder map: */
-void
-_tme_${cpu_name}_decoder_map_init(struct tme_m68k *ic)
-{
-  struct _tme_m68k_decoder_root *root, *root_entry;
-  int entry_i;
-EOF;
+	    # get this next root:
+	    #
+	    ($root, $root_init_i, @root_init_params) = split(/\#/, $root_init_calls[$root_init_call]);
 
+	    # if this root uses a different init function than the
+	    # current group, flush this group and start a new one:
+	    #
+	    if ($root_init_i != $root_init_i_group) {
+		&root_init_group_flush();
+	    }
+
+	    # loop over this root's params:
+	    #
+	    for ($param_i = 0; $param_i < @root_init_params; $param_i++) {
+
+		# if this param doesn't already have the right value:
+		#
+		if (!defined($params_state[$param_i])
+		    || $params_state[$param_i] ne $root_init_params[$param_i]) {
+
+		    # flush the current group:
+		    #
+		    &root_init_group_flush();
+
+		    # set the new param value:
+		    #
+		    $opcode_map_init .= "  params[${param_i}] = ".$root_init_params[$param_i].";\n";
+		    $params_state[$param_i] = $root_init_params[$param_i];
+		}
+	    }
+
+	    # add this root to the current group:
+	    #
+	    push (@root_init_group, $root);
+	}
+
+	# flush the last group:
+	#
+	&root_init_group_flush();
+
+	# define the opcode map:
+	#
 	print "\n";
-	print "  /* the submaps used by this CPU: */\n";
-	undef(@submap_done);
-	for ($root = 0; $root < 1024; $root++) {
-	    $submap = $root_submap[$root];
-	    if (!$submap_done[$submap]) {
-		print "  struct _tme_m68k_decoder_submap *submap$submap = _tme_m68k_create_submap$submap(ic);\n";
-		$submap_done[$submap] = 1;
-	    }
-	}
-
-	print <<'EOF;';
-
-  /* allocate and initialize the root map: */
-  root = tme_new(struct _tme_m68k_decoder_root, 1024);
-  ic->_tme_m68k_decoder_root = root;
-  root_entry = root;
-  for (entry_i = 0; entry_i < 1024; entry_i++) {
-      root_entry->_tme_m68k_decoder_root_gen._tme_m68k_decoder_gen_operand0 = NULL;
-      root_entry->_tme_m68k_decoder_root_gen._tme_m68k_decoder_gen_operand1 = NULL;
-      root_entry->_tme_m68k_decoder_root_gen._tme_m68k_decoder_gen_eax_size = TME_M68K_SIZE_UNDEF;
-      root_entry->_tme_m68k_decoder_root_gen._tme_m68k_decoder_gen_imm_operand = TME_M68K_OPNUM_UNDEF;
-      root_entry++;
-  }
-  root_entry = root;
-EOF;
-
+	print "/* the ${cpu_name} opcode map: */\n";
+	print "tme_uint32_t tme_m68k_opcodes_${cpu_name}[65536];\n";
+	
+	# define the opcode map initialization function:
+	#
 	print "\n";
-	print "  /* fill the root map: */\n";
-	for ($root = 0; $root < 1024; $root++) {
-	    print "\n  /* root $root (base opcode ".sprintf("0x%04x", ($root << 6))."): */\n";
-    
-	    # emit op0:
-	    $op0 = &operand_final($root_op0[$root]);
-	    print "  root_entry->_tme_m68k_decoder_root_gen._tme_m68k_decoder_gen_operand0 = $op0;\n"
-		if (defined($op0));
-	    
-	    # emit op1:
-	    $op1 = &operand_final($root_op1[$root]);
-	    print "  root_entry->_tme_m68k_decoder_root_gen._tme_m68k_decoder_gen_operand1 = $op1;\n"
-		if (defined($op1));
-	    
-	    # emit eax_size:
-	    $eax_size = $root_eax_size[$root];
-	    print "  root_entry->_tme_m68k_decoder_root_gen._tme_m68k_decoder_gen_eax_size = TME_M68K_SIZE_$eax_size;\n"
-		if ($eax_size ne "U");
-	    
-	    # emit imm_size and imm_operand:
-	    $imm_operand = $root_imm_operand[$root];
-	    if ($imm_operand ne "U" && $imm_operand ne '\S+') {
-		$imm_size = $root_imm_size[$root];
-		$imm_size = "16U8" if ($imm_size eq "8");
-		print "  root_entry->_tme_m68k_decoder_root_gen._tme_m68k_decoder_gen_imm_operand = $imm_operand;\n";
-		print "  root_entry->_tme_m68k_decoder_root_gen._tme_m68k_decoder_gen_imm_size = TME_M68K_SIZE_$imm_size;\n";
-	    }
-	    
-	    # emit the submap and opcode map:
-	    print "  root_entry->_tme_m68k_decoder_root_submap = submap$root_submap[$root];\n";
-	    print "  (root_entry++)->_tme_m68k_decoder_root_opcode_map = _tme_m68k_opcode_map$root_opcode_map[$root];\n";
-	}
+	print "/* the ${cpu_name} opcode map initialization: */\n";
+	print "void\ntme_m68k_opcodes_init_${cpu_name}(tme_uint32_t *opcodes)\n{\n";
+	print "  tme_uint32_t params[64];\n";
+	print $opcode_map_init;
+	print "}\n";
 
-	# close the function:
-	print "\n}\n";
+	$cpu_name_previous = $cpu_name;
     }
 
     # anything else is an error:
@@ -722,38 +665,56 @@ EOF;
     }
 }
 
+print STDERR "$PROG: $root_init_i_next total root inits\n";
+
+# emit the insn array:
+#
+print "\n";
+print "/* the insn array: */\n";
+print "const _tme_m68k_insn tme_m68k_opcode_insns[] = {\n";
+print "  tme_m68k_".join(",\n  tme_m68k_", @insn_i_to_func)."\n";
+print "};\n\n";
+
 # done:
 exit(0);
 
-# this subroutine returns the final C version of an operand:
-sub operand_final {
-    local ($op) = @_;
+# this flushes the current group of root inits:
+#
+sub root_init_group_flush {
+    my ($root);
+    my ($root_group_i);
+    
+    # if there is only one root in this group:
+    #
+    if (@root_init_group == 1) {
+	$root = $root_init_group[0];
+	
+	$opcode_map_init .= "\n  /* root $root: */\n";
+	$opcode_map_init .= "  _tme_m68k_opcode_root_init_${root_init_i_group}(opcodes + ($root * 64), params);\n\n";
+    }
 
-    if ($op eq "U" || $op eq '\S+') {
-	undef($op);
-    }
-    elsif ($op =~ /^\%([ad][0-7])\.(\d+)/) {
-	($op, $op_size) = ($1, $2);
-	$op =~ tr/a-z/A-Z/;
-	if ($op_size == 16) {
-	    $op .= " << 1";
+    # if there are multiple roots in this group:
+    #
+    elsif (@root_init_group > 1) {
+	
+	# emit the group:
+	#
+	$root_group_i = $root_group_i_next++;
+	if ($root_group_i == 0) {
+	    $opcode_map_init = "  tme_uint16_t root_i;\n".$opcode_map_init;
 	}
-	elsif ($op_size == 8) {
-	    $op .= " << 2";
-	}
-	$op = "&ic->tme_m68k_ireg_uint${op_size}(TME_M68K_IREG_${op})";
+	$opcode_map_init = '  const tme_uint16_t root_group'.$root_group_i.'[] = {'.join(', ', @root_init_group)."};\n".$opcode_map_init;
+
+	# emit the group root init call:
+	#
+	$opcode_map_init .= "\n  /* roots ".join(', ', @root_init_group).": */\n";
+	$opcode_map_init .= "  for (root_i = 0; root_i < ".(@root_init_group + 0)."; root_i++) {\n";
+	$opcode_map_init .= "    _tme_m68k_opcode_root_init_${root_init_i_group}(opcodes + (root_group".$root_group_i."[root_i] * 64), params);\n";
+	$opcode_map_init .= "  }\n\n";
     }
-    elsif ($op eq "eax.32") {
-	$op = "&ic->_tme_m68k_ea_address";
-    }
-    elsif ($op =~ /^imm(\d+)\.(\d+)/) {
-	$op = "(tme_uint${2}_t *) &_tme_m68k_imm${2}[${1}]";
-    }
-    elsif ($op =~ /^mem[xy]\.(\d+)/) {
-	$op = "&ic->tme_m68k_ireg_memx${1}";
-    }
-    else {
-	die "$PROG fatal: unknown operand $op\n";
-    }
-    $op;
-}	
+
+    # initialize for the next group:
+    #
+    @root_init_group = ();
+    $root_init_i_group = $root_init_i;
+}

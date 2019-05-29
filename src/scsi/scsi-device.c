@@ -1,4 +1,4 @@
-/* $Id: scsi-device.c,v 1.3 2003/08/07 22:07:14 fredette Exp $ */
+/* $Id: scsi-device.c,v 1.4 2005/02/18 03:20:00 fredette Exp $ */
 
 /* scsi/scsi-device.c - implementation of generic SCSI device support: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: scsi-device.c,v 1.3 2003/08/07 22:07:14 fredette Exp $");
+_TME_RCSID("$Id: scsi-device.c,v 1.4 2005/02/18 03:20:00 fredette Exp $");
 
 /* includes: */
 #include <tme/scsi/scsi-device.h>
@@ -57,6 +57,10 @@ _tme_scsi_device_callout(struct tme_scsi_device *scsi_device,
   struct tme_scsi_connection *conn_scsi;
   int callouts, later_callouts;
   int rc;
+  tme_uint32_t events;
+  tme_uint32_t actions;
+  const struct tme_scsi_dma *dma;
+  struct tme_scsi_dma dma_buffer;
   
   /* add in any new callouts: */
   scsi_device->tme_scsi_device_callout_flags |= new_callouts;
@@ -93,6 +97,26 @@ _tme_scsi_device_callout(struct tme_scsi_device *scsi_device,
     /* if we need to call out a SCSI bus cycle: */
     if (callouts & TME_SCSI_DEVICE_CALLOUT_CYCLE) {
 
+      /* if the bus is busy: */
+      if (scsi_device->tme_scsi_device_control
+	  & TME_SCSI_SIGNAL_BSY) {
+
+	/* run a target information transfer phase DMA sequence: */
+	events = TME_SCSI_EVENT_NONE;
+	actions = TME_SCSI_ACTION_DMA_TARGET;
+	dma_buffer = scsi_device->tme_scsi_device_dma;
+	dma = &dma_buffer;
+      }
+
+      /* otherwise, the bus is not busy: */
+      else {
+
+	/* wait to be selected: */
+	events = TME_SCSI_EVENT_SELECTED | TME_SCSI_EVENT_IDS_SELF(TME_BIT(scsi_device->tme_scsi_device_id));
+	actions = TME_SCSI_ACTION_RESPOND_SELECTED;
+	dma = NULL;
+      }
+
       /* unlock the mutex: */
       tme_mutex_unlock(&scsi_device->tme_scsi_device_mutex);
       
@@ -102,14 +126,9 @@ _tme_scsi_device_callout(struct tme_scsi_device *scsi_device,
 	       (conn_scsi,
 		scsi_device->tme_scsi_device_control,
 		0,
-		((scsi_device->tme_scsi_device_control
-		  & TME_SCSI_SIGNAL_BSY)
-		 ? scsi_device->tme_scsi_device_sequence_info_dma_target
-		 : scsi_device->tme_scsi_device_sequence_wait_select_full),
-		((scsi_device->tme_scsi_device_control
-		  & TME_SCSI_SIGNAL_BSY)
-		 ? &scsi_device->tme_scsi_device_dma
-		 : NULL)))
+		events,
+		actions,
+		dma))
 	    : TME_OK);
 	
       /* lock the mutex: */
@@ -263,8 +282,9 @@ static int
 _tme_scsi_device_cycle(struct tme_scsi_connection *conn_scsi,
 		       tme_scsi_control_t control_new,
 		       tme_scsi_data_t data,
-		       const struct tme_scsi_sequence *sequence,
-		       struct tme_scsi_dma *dma)
+		       tme_uint32_t events,
+		       tme_uint32_t actions,
+		       const struct tme_scsi_dma *dma)
 {
   struct tme_scsi_device *scsi_device;
   int new_callouts;
@@ -316,6 +336,8 @@ _tme_scsi_device_cycle(struct tme_scsi_connection *conn_scsi,
 
     /* if we didn't transfer all of the bytes we wanted, something
        went wrong with the initiator - probably the bus was reset: */
+    assert (dma != NULL);
+    scsi_device->tme_scsi_device_dma = *dma;
     if (scsi_device->tme_scsi_device_dma.tme_scsi_dma_resid > 0) {
 
       /* return to the bus-free phase: */
@@ -401,7 +423,7 @@ _tme_scsi_device_cycle(struct tme_scsi_connection *conn_scsi,
 
 	  /* call out for the message: */
 	  (*scsi_device->tme_scsi_device_do_msg
-	   [TME_MAX(scsi_device->tme_scsi_device_msg[0],
+	   [TME_MIN(scsi_device->tme_scsi_device_msg[0],
 		    TME_SCSI_MSG_IDENTIFY)])
 	    (scsi_device,
 	     control_old,
@@ -678,17 +700,6 @@ tme_scsi_device_connection_make(struct tme_connection *conn,
     scsi_device->tme_scsi_device_connection
       = conn_scsi;
 
-    /* get the sequences that we need: */
-    scsi_device->tme_scsi_device_sequence_wait_select_full
-      = ((*conn_scsi->tme_scsi_connection_sequence_get)
-	 (conn_scsi,
-	  TME_SCSI_SEQUENCE_WAIT_SELECT_FULL,
-	  scsi_device->tme_scsi_device_id));
-    scsi_device->tme_scsi_device_sequence_info_dma_target
-      = ((*conn_scsi->tme_scsi_connection_sequence_get)
-	 (conn_scsi,
-	  TME_SCSI_SEQUENCE_INFO_DMA_TARGET));
-
     /* call out a SCSI bus cycle: */
     scsi_device->tme_scsi_device_control = 0;
     _tme_scsi_device_callout(scsi_device,
@@ -740,8 +751,6 @@ tme_scsi_device_connections_new(struct tme_element *element,
     /* fill in the SCSI connection: */
     conn_scsi->tme_scsi_connection_cycle
       = _tme_scsi_device_cycle;
-    conn_scsi->tme_scsi_connection_sequence_get
-      = NULL;
 
     /* return the connection side possibility: */
     *_conns = conn;

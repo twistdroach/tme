@@ -52,6 +52,7 @@ AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
+CFLAGS_NO_STRICT_ALIASING = @CFLAGS_NO_STRICT_ALIASING@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CXX = @CXX@
@@ -160,8 +161,8 @@ target_os = @target_os@
 target_vendor = @target_vendor@
 
 AUTOMAKE_OPTIONS = 1.4 gnu
-SUBDIRS = tme libltdl libtme generic ic machine host bus serial scsi tmesh
-EXTRA_DIST = modules
+SUBDIRS = tme libltdl libtme generic ic machine host bus serial scsi tmesh tools
+EXTRA_DIST = modules dist
 pkglib_DATA = tmeconfig.h
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -419,6 +420,9 @@ distdir: $(DISTFILES)
 	      || exit 1; \
 	  fi; \
 	done
+	$(MAKE) $(AM_MAKEFLAGS) \
+	  top_distdir="$(top_distdir)" distdir="$(distdir)" \
+	  dist-hook
 	-find $(distdir) -type d ! -perm -777 -exec chmod a+rwx {} \; -o \
 	  ! -type d ! -perm -444 -links 1 -exec chmod a+r {} \; -o \
 	  ! -type d ! -perm -400 -exec chmod a+r {} \; -o \
@@ -586,6 +590,11 @@ uninstall-info: uninstall-info-recursive
 	uninstall-info-recursive uninstall-pkglibDATA \
 	uninstall-recursive
 
+
+# target to hook into the distribution:
+#
+dist-hook:
+	find $(distdir)/dist -name CVS -a -exec rm -r {} ';' -a -prune
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:

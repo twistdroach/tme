@@ -1,4 +1,4 @@
-/* $Id: emulexmt02.c,v 1.2 2003/08/07 22:04:35 fredette Exp $ */
+/* $Id: emulexmt02.c,v 1.3 2005/02/17 13:42:44 fredette Exp $ */
 
 /* scsi/emulexmt02.c - Emulex MT-02 SCSI tape emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: emulexmt02.c,v 1.2 2003/08/07 22:04:35 fredette Exp $");
+_TME_RCSID("$Id: emulexmt02.c,v 1.3 2005/02/17 13:42:44 fredette Exp $");
 
 /* includes: */
 #include <tme/scsi/scsi-tape.h>
@@ -108,6 +108,7 @@ static _TME_SCSI_DEVICE_CDB_DECL(_tme_emulexmt02_cdb_request_sense)
   case 0xd: error = 0x14; break; /* BLOCK NOT FOUND */
   default: abort();
   }
+  sense->tme_scsi_device_sense_data[8] = error;
   
   /* the Emulex retry count: */
   sense->tme_scsi_device_sense_data[9] = 0x00;
@@ -131,6 +132,24 @@ static _TME_SCSI_DEVICE_CDB_DECL(_tme_emulexmt02_cdb_inquiry)
   memset(scsi_device->tme_scsi_device_data,
 	 0, 
 	 sizeof(scsi_device->tme_scsi_device_data));
+
+  /* The SunOS/sun3 4.1.1 tape bootblock will refuse to boot off of a
+     SCSI device unless the INQUIRY response indicates a tape (so
+     apparently it's impossible to install SunOS 4.1.1 on a real Sun3
+     from an Emulex tape).
+
+     Because we're lazy and don't want to implement tme-scsi-1 tape
+     yet, we just indicate that we're a tape.
+
+     However, this has some ramifications for NetBSD/sun2 1.6*, which
+     was rigged to specially match an all-bits-zero INQUIRY for an
+     Emulex tape.  To work around this, when running NetBSD/sun2 or
+     NetBSD/sun3 in the emulator, specify vendor EMULEX product "MT-02
+     QIC" in the tmesh configuration file, which will cause a regular,
+     full INQUIRY response to be sent, but with the specific vendor
+     and product so the right quirk entry gets matched: */
+  scsi_device->tme_scsi_device_data[0] = TME_SCSI_TYPE_TAPE;
+
   scsi_device->tme_scsi_device_dma.tme_scsi_dma_resid
     = 5;
   scsi_device->tme_scsi_device_dma.tme_scsi_dma_out
@@ -331,9 +350,13 @@ tme_scsi_tape_emulexmt02_init(struct tme_scsi_tape *scsi_tape)
   scsi_device = &scsi_tape->tme_scsi_tape_device;
 
   /* Emulex MT-02 boards don't really support the INQUIRY command: */
-  TME_SCSI_DEVICE_DO_CDB(scsi_device,
-			 TME_SCSI_CDB_INQUIRY,
-			 _tme_emulexmt02_cdb_inquiry);
+  /* XXX FIXME - this is a hack.  if the user has specified EMULEX
+     for the vendor name, don't override the INQUIRY handling: */
+  if (strcmp(scsi_device->tme_scsi_device_vendor, "EMULEX")) {
+    TME_SCSI_DEVICE_DO_CDB(scsi_device,
+			   TME_SCSI_CDB_INQUIRY,
+			   _tme_emulexmt02_cdb_inquiry);
+  }
 
   /* our type-specific connection function: */
   scsi_tape->tme_scsi_tape_connected
@@ -362,8 +385,8 @@ tme_scsi_tape_emulexmt02_init(struct tme_scsi_tape *scsi_tape)
 			 TME_SCSI_CDB_REQUEST_SENSE,
 			 _tme_emulexmt02_cdb_request_sense);
   TME_SCSI_DEVICE_DO_CDB(scsi_device,
-			 TME_SCSI_CDB_INQUIRY,
-			 _tme_emulexmt02_cdb_inquiry);
+			 TME_SCSI_CDB_TAPE_RESERVE,
+			 tme_scsi_device_cdb_illegal);
 
   return (TME_OK);
 }

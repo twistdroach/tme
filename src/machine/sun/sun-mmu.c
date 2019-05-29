@@ -1,4 +1,4 @@
-/* $Id: sun-mmu.c,v 1.4 2003/05/16 21:48:13 fredette Exp $ */
+/* $Id: sun-mmu.c,v 1.8 2005/02/17 13:26:57 fredette Exp $ */
 
 /* machine/sun/sun-mmu.c - classic Sun MMU emulation implementation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun-mmu.c,v 1.4 2003/05/16 21:48:13 fredette Exp $");
+_TME_RCSID("$Id: sun-mmu.c,v 1.8 2005/02/17 13:26:57 fredette Exp $");
 
 /* includes: */
 #include <tme/machine/sun.h>
@@ -51,7 +51,7 @@ struct tme_sun_mmu_tlb_set {
   struct tme_sun_mmu_tlb_set *tme_sun_mmu_tlb_set_next;
 
   /* the user's pointer into the TLB set: */
-  TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb **) tme_sun_mmu_tlb_set_pointer;
+  TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb *) tme_sun_mmu_tlb_set_pointer;
 
   /* the base of this TLB set: */
   struct tme_bus_tlb *tme_sun_mmu_tlb_set_base;
@@ -342,10 +342,14 @@ tme_sun_mmu_tlb_fill(void *_mmu, struct tme_bus_tlb *tlb,
   pmeg = mmu->tme_sun_mmu_pmegs + mmu->tme_sun_mmu_segment_map[segment_map_index];
   tlb_i = pmeg->tme_sun_mmu_pmeg_tlbs_head;
   tlb_old = pmeg->tme_sun_mmu_pmeg_tlbs[tlb_i];
-  if (tlb_old != NULL) {
+  if (tlb_old != NULL
+      && tlb_old != TME_ATOMIC_READ(struct tme_bus_tlb *, 
+				    tlb->tme_bus_tlb_backing_reservation)) {
     tme_bus_tlb_invalidate(tlb_old);
   }
-  pmeg->tme_sun_mmu_pmeg_tlbs[tlb_i] = tlb;
+  pmeg->tme_sun_mmu_pmeg_tlbs[tlb_i]
+    = TME_ATOMIC_READ(struct tme_bus_tlb *, 
+		      tlb->tme_bus_tlb_backing_reservation);
   pmeg->tme_sun_mmu_pmeg_tlbs_head = (tlb_i + 1) & (TME_SUN_MMU_PMEG_TLBS - 1);
 
   /* if this page is invalid, return the page-invalid cycle handler,
@@ -438,7 +442,8 @@ tme_sun_mmu_tlb_fill(void *_mmu, struct tme_bus_tlb *tlb,
   if (access == TME_SUN_MMU_PTE_PROT_RW) {
     pte->tme_sun_mmu_pte_flags |= TME_SUN_MMU_PTE_MOD;
   }
-  if (pte->tme_sun_mmu_pte_flags & TME_SUN_MMU_PTE_MOD) {
+  if (protection == TME_SUN_MMU_PTE_PROT_RW
+      && (pte->tme_sun_mmu_pte_flags & TME_SUN_MMU_PTE_MOD)) {
     tlb_virtual.tme_bus_tlb_cycles_ok |= TME_BUS_CYCLE_WRITE;
   }
   
@@ -502,7 +507,7 @@ tme_sun_mmu_tlbs_context_set(void *_mmu, tme_uint8_t context)
 int
 tme_sun_mmu_tlb_set_allocate(void *_mmu,
 			     unsigned int count, unsigned int sizeof_one, 
-			     TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb **) _tlbs)
+			     TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb *) _tlbs)
 {
   struct tme_sun_mmu *mmu;
   struct tme_bus_tlb *tlbs, *tlb;

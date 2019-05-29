@@ -1,4 +1,4 @@
-/* $Id: gtk-display.h,v 1.4 2003/10/16 02:48:23 fredette Exp $ */
+/* $Id: gtk-display.h,v 1.6 2005/04/30 15:20:26 fredette Exp $ */
 
 /* host/gtk/gtk-display.h - header file for GTK display support: */
 
@@ -37,7 +37,7 @@
 #define _HOST_GTK_GTK_DISPLAY_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: gtk-display.h,v 1.4 2003/10/16 02:48:23 fredette Exp $");
+_TME_RCSID("$Id: gtk-display.h,v 1.6 2005/04/30 15:20:26 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/fb.h>
@@ -45,6 +45,9 @@ _TME_RCSID("$Id: gtk-display.h,v 1.4 2003/10/16 02:48:23 fredette Exp $");
 #include <tme/generic/mouse.h>
 #include <tme/threads.h>
 #include <tme/hash.h>
+#ifndef G_ENABLE_DEBUG
+#define G_ENABLE_DEBUG (0)
+#endif /* !G_ENABLE_DEBUG */
 #include <gtk/gtk.h>
 
 /* macros: */
@@ -86,10 +89,6 @@ struct tme_gtk_screen {
   /* various menu item widgets: */
   GtkWidget *tme_gtk_screen_scale_default;
   GtkWidget *tme_gtk_screen_scale_half;
-
-  /* when connected to a monochrome framebuffer, this is all-bits-one
-     iff a zero pixel should be drawn as white: */
-  gushort tme_gtk_screen_mono_invert_mask;
 
   /* the GtkEventBox, GdkImage and GtkImage for the framebuffer: */
   GtkWidget *tme_gtk_screen_event_box;

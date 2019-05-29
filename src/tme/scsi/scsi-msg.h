@@ -1,4 +1,4 @@
-/* $Id: scsi-msg.h,v 1.1 2003/07/29 18:16:03 fredette Exp $ */
+/* $Id: scsi-msg.h,v 1.2 2005/02/18 02:18:43 fredette Exp $ */
 
 /* tme/scsi/scsi-msg.h - header file describing SCSI messages: */
 
@@ -37,7 +37,7 @@
 #define _TME_SCSI_SCSI_MSG_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: scsi-msg.h,v 1.1 2003/07/29 18:16:03 fredette Exp $");
+_TME_RCSID("$Id: scsi-msg.h,v 1.2 2005/02/18 02:18:43 fredette Exp $");
 
 /* includes: */
 #include <tme/scsi/scsi-device.h>
@@ -57,6 +57,7 @@ _TME_RCSID("$Id: scsi-msg.h,v 1.1 2003/07/29 18:16:03 fredette Exp $");
 #define TME_SCSI_MSG_PARITY_ERROR		(0x09)
 #define TME_SCSI_MSG_IDENTIFY			(0x80)
 #define  TME_SCSI_MSG_IDENTIFY_DISCONNECT	(0x40)
+#define  TME_SCSI_MSG_IDENTIFY_LUN_MASK		(0x07)
 
 /* this evaluates to nonzero iff this is a one-byte message: */
 #define TME_SCSI_MSG_IS_1(msg)			\

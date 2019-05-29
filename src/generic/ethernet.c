@@ -1,4 +1,4 @@
-/* $Id: ethernet.c,v 1.1 2003/05/02 17:10:50 fredette Exp $ */
+/* $Id: ethernet.c,v 1.2 2005/05/09 01:53:43 fredette Exp $ */
 
 /* generic/ethernet.c - generic ethernet implementation support: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: ethernet.c,v 1.1 2003/05/02 17:10:50 fredette Exp $");
+_TME_RCSID("$Id: ethernet.c,v 1.2 2005/05/09 01:53:43 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/ethernet.h>
@@ -172,7 +172,7 @@ tme_ethernet_chunks_copy(struct tme_ethernet_frame_chunk *chunks_dst,
       if (chunk_size_dst == 0
 	  && (chunk_dst = chunk_dst->tme_ethernet_frame_chunk_next) != NULL) {
 	chunk_bytes_dst = chunk_dst->tme_ethernet_frame_chunk_bytes;
-	chunk_size_dst = chunk_src->tme_ethernet_frame_chunk_bytes_count;
+	chunk_size_dst = chunk_dst->tme_ethernet_frame_chunk_bytes_count;
       }
     }
   }

@@ -1,4 +1,4 @@
-/* $Id: m68k-insns.c,v 1.9 2003/10/25 17:08:01 fredette Exp $ */
+/* $Id: m68k-insns.c,v 1.14 2005/03/23 11:53:02 fredette Exp $ */
 
 /* ic/m68k/m68k-insns.c - m68k instruction functions: */
 
@@ -36,7 +36,7 @@
 /* includes: */
 #include "m68k-impl.h"
 
-_TME_RCSID("$Id: m68k-insns.c,v 1.9 2003/10/25 17:08:01 fredette Exp $");
+_TME_RCSID("$Id: m68k-insns.c,v 1.14 2005/03/23 11:53:02 fredette Exp $");
 
 #define TME_M68K_STD_FLAGS \
 do { \
@@ -159,16 +159,26 @@ TME_M68K_INSN(tme_m68k_dbcc)
 }
 
 /* this cannot fault: */
-TME_M68K_INSN(tme_m68k_bcc)
+static void
+_tme_m68k_bcc(struct tme_m68k *ic, tme_int32_t disp)
 {
   if (TME_M68K_COND_TRUE(ic, TME_FIELD_EXTRACTU(TME_M68K_INSN_OPCODE, 8, 4))) {
-    TME_M68K_INSN_BRANCH(ic->tme_m68k_ireg_pc + 2 + TME_M68K_INSN_OP0(tme_uint32_t));
+    TME_M68K_INSN_BRANCH(ic->tme_m68k_ireg_pc + 2 + disp);
   }
   TME_M68K_INSN_OK;
 }
+TME_M68K_INSN(tme_m68k_bcc)
+{
+  _tme_m68k_bcc(ic, TME_EXT_S8_S32((tme_int8_t) TME_M68K_INSN_OPCODE));
+}
+TME_M68K_INSN(tme_m68k_bccl)
+{
+  _tme_m68k_bcc(ic, TME_M68K_INSN_OP0(tme_int32_t));
+}
     
 /* this can fault: */
-TME_M68K_INSN(tme_m68k_bsr)
+static void
+_tme_m68k_bsr(struct tme_m68k *ic, tme_int32_t disp)
 {
   TME_M68K_INSN_CANFAULT;
   tme_m68k_push32(ic, ic->tme_m68k_ireg_pc_next);
@@ -176,8 +186,16 @@ TME_M68K_INSN(tme_m68k_bsr)
      restarting here, because after this point, nothing can fault for
      the remainder of this instruction (the executor makes no stores
      on behalf of a bsr): */
-  TME_M68K_INSN_BRANCH(ic->tme_m68k_ireg_pc + 2 + TME_M68K_INSN_OP0(tme_uint32_t));
+  TME_M68K_INSN_BRANCH(ic->tme_m68k_ireg_pc + 2 + disp);
   TME_M68K_INSN_OK;
+}
+TME_M68K_INSN(tme_m68k_bsr)
+{
+  _tme_m68k_bsr(ic, TME_EXT_S8_S32((tme_int8_t) TME_M68K_INSN_OPCODE));
+}
+TME_M68K_INSN(tme_m68k_bsrl)
+{
+  _tme_m68k_bsr(ic, TME_M68K_INSN_OP0(tme_int32_t));
 }
 
 /* this can fault: */
@@ -195,13 +213,13 @@ TME_M68K_INSN(tme_m68k_pea)
 /* this cannot fault: */
 TME_M68K_INSN(tme_m68k_bkpt)
 {
-  TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_GROUP1_ILL);
+  TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_ILL);
 }
 
 /* this cannot fault: */
 TME_M68K_INSN(tme_m68k_illegal)
 {
-  TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_GROUP1_ILL);
+  TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_ILL);
 }
 
 /* this can fault: */
@@ -277,15 +295,16 @@ TME_M68K_INSN(tme_m68k_move_usp)
 TME_M68K_INSN(tme_m68k_trap)
 {
   ic->tme_m68k_ireg_pc = ic->tme_m68k_ireg_pc_next;
-  TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_GROUP2(32 + TME_FIELD_EXTRACTU(TME_M68K_INSN_OPCODE, 0, 4)));
+  TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_INST(TME_M68K_VECTOR_TRAP_0 + TME_FIELD_EXTRACTU(TME_M68K_INSN_OPCODE, 0, 4)));
 }
 
 /* this cannot fault: */
 TME_M68K_INSN(tme_m68k_trapv)
 {
   if (ic->tme_m68k_ireg_ccr & TME_M68K_FLAG_V) {
+    ic->tme_m68k_ireg_pc_last = ic->tme_m68k_ireg_pc;
     ic->tme_m68k_ireg_pc = ic->tme_m68k_ireg_pc_next;
-    TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_GROUP2(7));
+    TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_INST(TME_M68K_VECTOR_TRAP));
   }
   TME_M68K_INSN_OK;
 }
@@ -315,18 +334,27 @@ TME_M68K_INSN(tme_m68k_movec)
   int ireg;
   tme_uint32_t *creg;
   tme_uint32_t mask;
+  int illegal;
   TME_M68K_INSN_PRIV;
   /* in case we're reading the msp or isp and we're on that stack,
      this flushes %a7 to that register: */
   tme_m68k_change_sr(ic, ic->tme_m68k_ireg_sr);
   ireg = TME_M68K_IREG_D0 + TME_FIELD_EXTRACTU(TME_M68K_INSN_SPECOP, 12, 4);
   mask = 0xffffffff;
+  illegal = FALSE;
   switch (TME_FIELD_EXTRACTU(TME_M68K_INSN_SPECOP, 0, 12)) {
   case 0x000: creg = &ic->tme_m68k_ireg_sfc; mask = TME_M68K_FC_7; break;
   case 0x001: creg = &ic->tme_m68k_ireg_dfc; mask = TME_M68K_FC_7; break;
+  case 0x002: creg = &ic->tme_m68k_ireg_cacr; mask = 0x3; illegal = (ic->tme_m68k_type < TME_M68K_M68020); break;
   case 0x800: creg = &ic->tme_m68k_ireg_usp; break;
   case 0x801: creg = &ic->tme_m68k_ireg_vbr; break;
-  default: TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_GROUP1_ILL); creg = NULL;
+  case 0x802: creg = &ic->tme_m68k_ireg_caar; illegal = (ic->tme_m68k_type != TME_M68K_M68020); break;
+  case 0x803: creg = &ic->tme_m68k_ireg_msp; illegal = (ic->tme_m68k_type < TME_M68K_M68020); break;
+  case 0x804: creg = &ic->tme_m68k_ireg_isp; illegal = (ic->tme_m68k_type < TME_M68K_M68020); break;
+  default: illegal = TRUE; creg = NULL;
+  }
+  if (illegal) {
+    TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_ILL);
   }
   if (TME_M68K_INSN_OPCODE & TME_BIT(0)) {
     *creg = ic->tme_m68k_ireg_uint32(ireg) & mask;
@@ -355,8 +383,7 @@ TME_M68K_INSN(tme_m68k_reset)
   rc = (*conn_bus->tme_bus_signal)
     (conn_bus,
      (TME_BUS_SIGNAL_RESET
-      | TME_BUS_SIGNAL_LEVEL_ASSERTED
-      | TME_BUS_SIGNAL_EDGE));
+      | TME_BUS_SIGNAL_LEVEL_ASSERTED));
   assert (rc == TME_OK);
 
   /* XXX RESET is supposed to be asserted for 512 clocks, 
@@ -366,8 +393,7 @@ TME_M68K_INSN(tme_m68k_reset)
   rc = (*conn_bus->tme_bus_signal)
     (conn_bus,
      (TME_BUS_SIGNAL_RESET
-      | TME_BUS_SIGNAL_LEVEL_NEGATED
-      | TME_BUS_SIGNAL_EDGE));
+      | TME_BUS_SIGNAL_LEVEL_NEGATED));
   assert (rc == TME_OK);
   
   TME_M68K_INSN_OK;
@@ -452,7 +478,7 @@ TME_M68K_INSN(tme_m68k_stop)
 /* this cannot fault: */
 TME_M68K_INSN(tme_m68k_priv)
 {
-  TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_GROUP1_PRIV);
+  TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_PRIV);
 }
 
 /* this can fault: */
@@ -537,8 +563,9 @@ TME_M68K_INSN(tme_m68k_cmp2_chk2)
 	   : (uvalue < ulower || uvalue > uupper)) {
     ic->tme_m68k_ireg_ccr |= TME_M68K_FLAG_C;
     if (TME_M68K_INSN_OPCODE & TME_BIT(11)) {
+      ic->tme_m68k_ireg_pc_last = ic->tme_m68k_ireg_pc;
       ic->tme_m68k_ireg_pc = ic->tme_m68k_ireg_pc_next;
-      TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_GROUP2(6));
+      TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_INST(TME_M68K_VECTOR_CHK));
     }
   }
 
@@ -561,8 +588,9 @@ TME_M68K_INSN(tme_m68k_rtm)
 TME_M68K_INSN(tme_m68k_trapcc)
 {
   if (TME_M68K_COND_TRUE(ic, TME_FIELD_EXTRACTU(TME_M68K_INSN_OPCODE, 8, 4))) {
+    ic->tme_m68k_ireg_pc_last = ic->tme_m68k_ireg_pc;
     ic->tme_m68k_ireg_pc = ic->tme_m68k_ireg_pc_next;
-    TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_GROUP2(7));
+    TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_INST(TME_M68K_VECTOR_TRAP));
   }
   TME_M68K_INSN_OK;
 }
@@ -611,6 +639,7 @@ TME_M68K_INSN(tme_m68k_bfffo)
   tme_int32_t bf_offset;
   unsigned int bf_width;
   tme_uint32_t bf_value;
+  unsigned int bf_pos;
     
   /* get the bitfield offset from a data register or as an immediate: */
   specop = TME_M68K_INSN_SPECOP;
@@ -624,9 +653,14 @@ TME_M68K_INSN(tme_m68k_bfffo)
   /* get the bitfield value: */
   bf_value = tme_m68k_bitfield_read_unsigned(ic);
 
+  /* find the first set bit: */
+  for (bf_pos = 0, bf_value <<= (32 - bf_width);
+       bf_pos < bf_width && !(bf_value & 0x80000000);
+       bf_pos++, bf_value <<= 1);
+
   /* set the result: */
   ic->tme_m68k_ireg_uint32(TME_M68K_IREG_D0 + TME_FIELD_EXTRACTU(specop, 12, 3))
-    = bf_offset + bf_width - ffs((int) bf_value);
+    = bf_offset + bf_pos;
 
   TME_M68K_INSN_OK;
 }
@@ -754,6 +788,26 @@ TME_M68K_INSN(tme_m68k_unpk)
   }
 
   TME_M68K_INSN_OK;
+}
+
+/* these just redispatch into one of the multiply or divide insns: */
+TME_M68K_INSN(tme_m68k_mull)
+{
+  if (TME_M68K_INSN_SPECOP & TME_BIT(11)) {
+    tme_m68k_mulsl(ic, _op0, _op1);
+  }
+  else {
+    tme_m68k_mulul(ic, _op0, _op1);
+  }
+}
+TME_M68K_INSN(tme_m68k_divl)
+{
+  if (TME_M68K_INSN_SPECOP & TME_BIT(11)) {
+    tme_m68k_divsl(ic, _op0, _op1);
+  }
+  else {
+    tme_m68k_divul(ic, _op0, _op1);
+  }
 }
 
 #include "m68k-bus-auto.c"

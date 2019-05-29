@@ -1,4 +1,4 @@
-/* $Id: misc.h,v 1.1 2003/06/27 21:06:55 fredette Exp $ */
+/* $Id: misc.h,v 1.2 2004/01/09 03:14:36 fredette Exp $ */
 
 /* tme/misc.h - public header file for miscellaneous things: */
 
@@ -37,10 +37,23 @@
 #define _TME_MISC_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: misc.h,v 1.1 2003/06/27 21:06:55 fredette Exp $");
+_TME_RCSID("$Id: misc.h,v 1.2 2004/01/09 03:14:36 fredette Exp $");
 
 /* prototypes: */
 int tme_init _TME_P((void));
-char ** tme_misc_tokenize _TME_P((const char *, char comment, int *));
+char ** tme_misc_tokenize _TME_P((_tme_const char *, char comment, int *));
+#ifdef TME_HAVE_INT64_T
+#define _tme_unumber_t tme_uint64_t
+#define _tme_number_t tme_int64_t
+#else  /* !TME_HAVE_INT64_T */
+#define _tme_unumber_t tme_uint32_t
+#define _tme_number_t tme_int32_t
+#endif /* !TME_HAVE_INT64_T */
+_tme_unumber_t tme_misc_unumber_parse_any _TME_P((_tme_const char *, int *));
+_tme_number_t tme_misc_number_parse_any _TME_P((_tme_const char *, int *));
+_tme_unumber_t tme_misc_unumber_parse _TME_P((_tme_const char *, _tme_unumber_t));
+_tme_number_t tme_misc_number_parse _TME_P((_tme_const char *, _tme_number_t));
+#undef _tme_unumber_t
+#undef _tme_number_t
 
 #endif /* !_TME_MISC_H */

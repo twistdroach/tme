@@ -1,4 +1,4 @@
-/* $Id: sun-sc.c,v 1.3 2003/08/07 21:56:37 fredette Exp $ */
+/* $Id: sun-sc.c,v 1.6 2005/02/18 03:50:40 fredette Exp $ */
 
 /* bus/multibus/sun-sc.c - implementation of Sun `sc' SCSI Multibus board emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun-sc.c,v 1.3 2003/08/07 21:56:37 fredette Exp $");
+_TME_RCSID("$Id: sun-sc.c,v 1.6 2005/02/18 03:50:40 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -124,8 +124,9 @@ struct tme_sun_sc_cycle {
   tme_scsi_control_t tme_sun_sc_cycle_control;
   tme_scsi_data_t tme_sun_sc_cycle_data;
 
-  /* the SCSI sequence to run: */
-  const struct tme_scsi_sequence *tme_sun_sc_cycle_sequence;
+  /* the SCSI events to wait on, and the actions to take: */
+  tme_uint32_t tme_sun_sc_cycle_events;
+  tme_uint32_t tme_sun_sc_cycle_actions;
 
   /* a DMA structure needed: */
   struct tme_scsi_dma tme_sun_sc_cycle_dma;
@@ -158,10 +159,6 @@ struct tme_sun_sc {
 
   /* it's easiest to just model the card as a chunk of memory: */
   tme_uint8_t tme_sun_sc_card[TME_SUN_SC_SIZ_CARD];
-
-  /* the SCSI sequences: */
-  const struct tme_scsi_sequence *tme_sun_sc_sequence_info_dma_initiator;
-  const struct tme_scsi_sequence *tme_sun_sc_sequence_wait_change;
 
   /* the cycle ring buffer: */
   struct tme_sun_sc_cycle tme_sun_sc_cycles[TME_SUN_SC_CYCLE_RING_SIZE];
@@ -288,7 +285,8 @@ _tme_sun_sc_reg16_put(struct tme_sun_sc *sun_sc,
 /* this allocates the next cycle in the ring buffer: */
 struct tme_sun_sc_cycle *
 _tme_sun_sc_cycle_new(struct tme_sun_sc *sun_sc,
-		      const struct tme_scsi_sequence *sequence)
+		      tme_uint32_t events,
+		      tme_uint32_t actions)
 {
   int old_head;
   struct tme_sun_sc_cycle *sun_sc_cycle;
@@ -323,12 +321,12 @@ _tme_sun_sc_cycle_new(struct tme_sun_sc *sun_sc,
   sun_sc_cycle->tme_sun_sc_cycle_control
     = sun_sc_cycle_old->tme_sun_sc_cycle_control;
   sun_sc_cycle->tme_sun_sc_cycle_data
-    = ((sequence
-	== sun_sc->tme_sun_sc_sequence_info_dma_initiator)
+    = ((actions
+	== TME_SCSI_ACTION_DMA_INITIATOR)
        ? 0
        : sun_sc_cycle_old->tme_sun_sc_cycle_data);
-  sun_sc_cycle->tme_sun_sc_cycle_sequence
-    = sequence;
+  sun_sc_cycle->tme_sun_sc_cycle_events = events;
+  sun_sc_cycle->tme_sun_sc_cycle_actions = actions;
   /* XXX parity? */
   sun_sc_cycle->tme_sun_sc_cycle_dma.tme_scsi_dma_flags
     = TME_SCSI_DMA_8BIT;
@@ -366,7 +364,7 @@ _tme_sun_sc_bus_cycle_dma(struct tme_sun_sc *sun_sc,
     cycle_init.tme_bus_cycle_lane_routing
       = &tme_sun_sc_router[0];
     cycle_init.tme_bus_cycle_size 
-      = sizeof(tme_uint16_t);
+      = sizeof(tme_uint8_t);
   }
   
   assert (tlb->tme_bus_tlb_addr_shift == 0);
@@ -404,6 +402,7 @@ _tme_sun_sc_callout(struct tme_sun_sc *sun_sc, int new_callouts)
   struct tme_scsi_connection *conn_scsi;
   struct tme_bus_connection *conn_bus;
   struct tme_bus_tlb *tlb;
+  struct tme_bus_tlb tlb_local;
   int old_tail;
   struct tme_sun_sc_cycle *sun_sc_cycle;
   int callouts, later_callouts;
@@ -464,14 +463,18 @@ _tme_sun_sc_callout(struct tme_sun_sc *sun_sc, int new_callouts)
       tme_mutex_unlock(&sun_sc->tme_sun_sc_mutex);
       
       /* do the callout: */
+      /* XXX FIXME THREADS - this is not thread-safe, since we're
+	 passing values from (and pointers to) the non-local
+	 sun_sc_cycle: */
       rc = (conn_scsi != NULL
 	    ? ((*conn_scsi->tme_scsi_connection_cycle)
 	       (conn_scsi,
 		sun_sc_cycle->tme_sun_sc_cycle_control,
 		sun_sc_cycle->tme_sun_sc_cycle_data,
-		sun_sc_cycle->tme_sun_sc_cycle_sequence,
-		((sun_sc_cycle->tme_sun_sc_cycle_sequence
-		  == sun_sc->tme_sun_sc_sequence_info_dma_initiator)
+		sun_sc_cycle->tme_sun_sc_cycle_events,
+		sun_sc_cycle->tme_sun_sc_cycle_actions,
+		((sun_sc_cycle->tme_sun_sc_cycle_actions
+		  == TME_SCSI_ACTION_DMA_INITIATOR)
 		 ? &sun_sc_cycle->tme_sun_sc_cycle_dma
 		 : NULL)))
 	    : TME_OK);
@@ -488,8 +491,8 @@ _tme_sun_sc_callout(struct tme_sun_sc *sun_sc, int new_callouts)
       /* otherwise, this callout was successful.  if this cycle did
 	 not use the DMA initiator sequence, it either used no
 	 sequence or it used the wait_change sequence: */
-      else if (sun_sc_cycle->tme_sun_sc_cycle_sequence
-	       != sun_sc->tme_sun_sc_sequence_info_dma_initiator) {
+      else if (sun_sc_cycle->tme_sun_sc_cycle_actions
+	       != TME_SCSI_ACTION_DMA_INITIATOR) {
 
 	/* advance the tail pointer if it hasn't been advanced
 	   already: */
@@ -549,6 +552,10 @@ _tme_sun_sc_callout(struct tme_sun_sc *sun_sc, int new_callouts)
       tlb
 	= TME_ATOMIC_READ(struct tme_bus_tlb *,
 			  sun_sc->tme_sun_sc_dma_tlb);
+      
+      /* reserve this TLB entry: */
+      tme_bus_tlb_reserve(tlb, &tlb_local);
+      tlb = &tlb_local;
 
       /* unlock the mutex: */
       tme_mutex_unlock(&sun_sc->tme_sun_sc_mutex);
@@ -575,6 +582,9 @@ _tme_sun_sc_callout(struct tme_sun_sc *sun_sc, int new_callouts)
 	 DMA sequence: */
       else {
 
+	/* store the TLB entry: */
+	tme_bus_tlb_back(tlb);
+
 	/* get the number of bytes available in this TLB entry: */
 	avail
 	  = ((TME_ATOMIC_READ(tme_bus_addr_t,
@@ -594,13 +604,14 @@ _tme_sun_sc_callout(struct tme_sun_sc *sun_sc, int new_callouts)
 	/* allocate the new SCSI bus cycle: */
 	sun_sc_cycle
 	  = _tme_sun_sc_cycle_new(sun_sc,
-				  sun_sc->tme_sun_sc_sequence_info_dma_initiator);
+				  TME_SCSI_EVENT_NONE,
+				  TME_SCSI_ACTION_DMA_INITIATOR);
 
 	/* if this TLB entry allows fast transfers: */
 	emulator_off
 	  = ((cycle_type
 	      == TME_BUS_CYCLE_READ)
-	     ? tlb->tme_bus_tlb_emulator_off_read
+	     ? (tme_uint8_t *) tlb->tme_bus_tlb_emulator_off_read
 	     : tlb->tme_bus_tlb_emulator_off_write);
 	if (emulator_off
 	    != TME_EMULATOR_OFF_UNDEF) {
@@ -618,6 +629,7 @@ _tme_sun_sc_callout(struct tme_sun_sc *sun_sc, int new_callouts)
 	     read cycle into our internal DMA buffer: */
 	  if (cycle_type == TME_BUS_CYCLE_READ) {
 	    rc = _tme_sun_sc_bus_cycle_dma(sun_sc,
+					   /* XXX FIXME this is not thread-safe: */
 					   tlb,
 					   TME_BUS_CYCLE_READ,
 					   address,
@@ -674,8 +686,7 @@ _tme_sun_sc_callout(struct tme_sun_sc *sun_sc, int new_callouts)
 	   TME_BUS_SIGNAL_INT_UNSPEC
 	   | (int_asserted
 	      ? TME_BUS_SIGNAL_LEVEL_ASSERTED
-	      : TME_BUS_SIGNAL_LEVEL_NEGATED)
-	   | TME_BUS_SIGNAL_EDGE);
+	      : TME_BUS_SIGNAL_LEVEL_NEGATED));
 
 	/* lock our mutex: */
 	tme_mutex_lock(&sun_sc->tme_sun_sc_mutex);
@@ -697,6 +708,21 @@ _tme_sun_sc_callout(struct tme_sun_sc *sun_sc, int new_callouts)
   
   /* put in any later callouts, and clear that callouts are running: */
   sun_sc->tme_sun_sc_callout_flags = later_callouts;
+}
+
+/* the interrupt acknowledge function for the VME version: */
+static int
+_tme_sun_sc_intack(void *_sun_sc, unsigned int signal, int *_vector)
+{
+  struct tme_sun_sc *sun_sc;
+
+  /* recover our data structure: */
+  sun_sc = (struct tme_sun_sc *) _sun_sc;
+
+  /* return the interrupt vector: */
+  *_vector = sun_sc->tme_sun_sc_card[TME_SUN_SC_REG_INTVEC];
+
+  return (TME_OK);
 }
 
 /* the Sun sc bus cycle handler for the data and cmd_stat registers.
@@ -770,7 +796,8 @@ _tme_sun_sc_bus_cycle_data_reg(struct tme_sun_sc *sun_sc,
     /* XXX parity? */
     sun_sc_cycle
       = _tme_sun_sc_cycle_new(sun_sc,
-			      sun_sc->tme_sun_sc_sequence_info_dma_initiator);
+			      TME_SCSI_EVENT_NONE,
+			      TME_SCSI_ACTION_DMA_INITIATOR);
     sun_sc_cycle->tme_sun_sc_cycle_dma.tme_scsi_dma_resid
       = sizeof(sun_sc_cycle->tme_sun_sc_cycle_cmd_stat);
     sun_sc_cycle->tme_sun_sc_cycle_dma.tme_scsi_dma_in
@@ -826,7 +853,8 @@ _tme_sun_sc_bus_cycle_data_reg(struct tme_sun_sc *sun_sc,
 	       data_new));
       sun_sc_cycle
 	= _tme_sun_sc_cycle_new(sun_sc,
-				sun_sc->tme_sun_sc_sequence_wait_change);
+				TME_SCSI_EVENT_BUS_CHANGE,
+				TME_SCSI_ACTION_NONE);
       sun_sc_cycle->tme_sun_sc_cycle_data
 	= data_new;
       new_callouts
@@ -1004,7 +1032,8 @@ _tme_sun_sc_bus_cycle_icr(void *_sun_sc,
 	 except possibly for RST: */
       sun_sc_cycle
 	= _tme_sun_sc_cycle_new(sun_sc,
-				sun_sc->tme_sun_sc_sequence_wait_change);
+				TME_SCSI_EVENT_BUS_CHANGE,
+				TME_SCSI_ACTION_NONE);
       sun_sc_cycle->tme_sun_sc_cycle_control
 	= ((icr_new
 	    & TME_SUN_SC_ICR_RESET)
@@ -1022,7 +1051,8 @@ _tme_sun_sc_bus_cycle_icr(void *_sun_sc,
       /* make a new cycle that sets the new state of SEL: */
       sun_sc_cycle
 	= _tme_sun_sc_cycle_new(sun_sc,
-				sun_sc->tme_sun_sc_sequence_wait_change);
+				TME_SCSI_EVENT_BUS_CHANGE,
+				TME_SCSI_ACTION_NONE);
       sun_sc_cycle->tme_sun_sc_cycle_control
 	= ((sun_sc_cycle->tme_sun_sc_cycle_control
 	    & ~TME_SCSI_SIGNAL_SEL)
@@ -1235,8 +1265,9 @@ static int
 _tme_sun_sc_scsi_cycle(struct tme_scsi_connection *conn_scsi,
 		       tme_scsi_control_t control,
 		       tme_scsi_data_t data,
-		       _tme_const struct tme_scsi_sequence *sequence,
-		       struct tme_scsi_dma *dma)
+		       tme_uint32_t events_triggered,
+		       tme_uint32_t actions_taken,
+		       const struct tme_scsi_dma *dma)
 {
   struct tme_sun_sc *sun_sc;
   struct tme_sun_sc_cycle *sun_sc_cycle;
@@ -1307,8 +1338,11 @@ do {						\
     = &sun_sc->tme_sun_sc_cycles[sun_sc->tme_sun_sc_cycle_tail];
 
   /* if the last SCSI cycle was for a DMA sequence: */
-  if (sun_sc_cycle->tme_sun_sc_cycle_sequence
-      == sun_sc->tme_sun_sc_sequence_info_dma_initiator) {
+  if (sun_sc_cycle->tme_sun_sc_cycle_actions
+      == TME_SCSI_ACTION_DMA_INITIATOR) {
+
+    /* copy in the finished DMA structure: */
+    sun_sc_cycle->tme_sun_sc_cycle_dma = *dma;
 
     /* if the last SCSI cycle was for a genuine DMA sequence (as opposed
        to a DMA sequence to transfer the cmd_stat register), update the
@@ -1351,6 +1385,7 @@ do {						\
 	  && (tlb->tme_bus_tlb_emulator_off_write
 	      == TME_EMULATOR_OFF_UNDEF)) {
 	rc = _tme_sun_sc_bus_cycle_dma(sun_sc,
+				       /* XXX FIXME this is not thread-safe: */
 				       tlb,
 				       TME_BUS_CYCLE_WRITE,
 				       address,
@@ -1419,7 +1454,8 @@ do {						\
   else {
     sun_sc_cycle
       = _tme_sun_sc_cycle_new(sun_sc,
-			      sun_sc->tme_sun_sc_sequence_wait_change);
+			      TME_SCSI_EVENT_BUS_CHANGE,
+			      TME_SCSI_ACTION_NONE);
     new_callouts
       |= TME_SUN_SC_CALLOUT_CYCLE;
   }
@@ -1506,16 +1542,6 @@ _tme_sun_sc_connection_make_scsi(struct tme_connection *conn,
     /* save our connection: */
     sun_sc->tme_sun_sc_scsi_connection = conn_scsi_other;
 
-    /* get the sequences that we need: */
-    sun_sc->tme_sun_sc_sequence_info_dma_initiator
-      = ((*conn_scsi_other->tme_scsi_connection_sequence_get)
-	 (conn_scsi_other,
-	  TME_SCSI_SEQUENCE_INFO_DMA_INITIATOR));
-    sun_sc->tme_sun_sc_sequence_wait_change
-      = ((*conn_scsi_other->tme_scsi_connection_sequence_get)
-	 (conn_scsi_other,
-	  TME_SCSI_SEQUENCE_WAIT_CHANGE));
-
     /* call out a cycle that asserts no signals and runs the
        wait-change sequence.  this also fully-initializes
        this cycle - _tme_sun_sc_cycle_new copies the previous
@@ -1523,7 +1549,8 @@ _tme_sun_sc_connection_make_scsi(struct tme_connection *conn,
        starts the chain of well-initialized cycles: */       
     sun_sc_cycle
       = _tme_sun_sc_cycle_new(sun_sc,
-			      sun_sc->tme_sun_sc_sequence_wait_change);
+			      TME_SCSI_EVENT_BUS_CHANGE,
+			      TME_SCSI_ACTION_NONE);
     sun_sc_cycle->tme_sun_sc_cycle_control
       = 0;
     sun_sc_cycle->tme_sun_sc_cycle_data
@@ -1596,7 +1623,6 @@ _tme_sun_sc_connections_new(struct tme_element *element,
 
     /* fill in the SCSI connection: */
     conn_scsi->tme_scsi_connection_cycle = _tme_sun_sc_scsi_cycle;
-    conn_scsi->tme_scsi_connection_sequence_get = NULL;
 
     /* return the connection side possibility: */
     *_conns = conn;
@@ -1611,13 +1637,17 @@ TME_ELEMENT_SUB_NEW_DECL(tme_bus_multibus,sun_sc) {
   struct tme_sun_sc *sun_sc;
   int arg_i;
   int usage;
+  int vme;
 
   /* check our arguments: */
   usage = 0;
   arg_i = 1;
+  vme = FALSE;
   for (;;) {
 
-    if (0) {
+    if (TME_ARG_IS(args[arg_i], "vme")) {
+      vme = TRUE;
+      arg_i++;
     }
 
     /* if we ran out of arguments: */
@@ -1639,7 +1669,7 @@ TME_ELEMENT_SUB_NEW_DECL(tme_bus_multibus,sun_sc) {
 
   if (usage) {
     tme_output_append_error(_output, 
-			    "%s %s",
+			    "%s %s [ vme ]",
 			    _("usage:"),
 			    args[0]);
     return (EINVAL);
@@ -1655,6 +1685,9 @@ TME_ELEMENT_SUB_NEW_DECL(tme_bus_multibus,sun_sc) {
   sun_sc->tme_sun_sc_device.tme_bus_device_element = element;
   sun_sc->tme_sun_sc_device.tme_bus_device_tlb_fill = _tme_sun_sc_tlb_fill;
   sun_sc->tme_sun_sc_device.tme_bus_device_address_last = TME_SUN_SC_SIZ_CARD - 1;
+  if (vme) {
+    sun_sc->tme_sun_sc_device.tme_bus_device_intack = _tme_sun_sc_intack;
+  }
 
   /* fill the element: */
   element->tme_element_private = sun_sc;

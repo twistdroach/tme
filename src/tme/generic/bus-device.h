@@ -1,4 +1,4 @@
-/* $Id: bus-device.h,v 1.6 2003/07/29 18:10:47 fredette Exp $ */
+/* $Id: bus-device.h,v 1.7 2004/04/30 12:11:36 fredette Exp $ */
 
 /* tme/generic/bus-device.h - header file for generic bus device support: */
 
@@ -37,7 +37,7 @@
 #define _TME_GENERIC_BUS_DEVICE_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: bus-device.h,v 1.6 2003/07/29 18:10:47 fredette Exp $");
+_TME_RCSID("$Id: bus-device.h,v 1.7 2004/04/30 12:11:36 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -69,12 +69,64 @@ struct tme_bus_device {
 
   /* the bus TLB entry filler: */
   int (*tme_bus_device_tlb_fill) _TME_P((void *, struct tme_bus_tlb *, tme_bus_addr_t, unsigned int));
+
+  /* the device lock and unlock functions: */
+  void (*tme_bus_device_lock) _TME_P((void *, unsigned int));
+  void (*tme_bus_device_unlock) _TME_P((void *, unsigned int));
+
+  /* the bus master TLB entry hasher: */
+  struct tme_bus_tlb *(*tme_bus_device_tlb_hash) _TME_P((void *, tme_bus_addr_t, unsigned int));
+
+  /* the bus master bus router: */
+  _tme_const tme_bus_lane_t *tme_bus_device_router;
 };
+
+/* globals: */
+
+/* the 16-bit big-endian bus master bus router: */
+extern _tme_const tme_bus_lane_t tme_bus_device_router_16eb[];
+
+/* the 16-bit little-endian bus master bus router: */
+extern _tme_const tme_bus_lane_t tme_bus_device_router_16el[];
+
+/* the 32-bit big-endian bus master bus router: */
+extern _tme_const tme_bus_lane_t tme_bus_device_router_32eb[];
+
+/* the 32-bit little-endian bus master bus router: */
+extern _tme_const tme_bus_lane_t tme_bus_device_router_32el[];
 
 /* prototypes: */
 int tme_bus_device_connection_score _TME_P((struct tme_connection *, unsigned int *));
 int tme_bus_device_connection_make _TME_P((struct tme_connection *, unsigned int));
 int tme_bus_device_connection_break _TME_P((struct tme_connection *, unsigned int));
 int tme_bus_device_connections_new _TME_P((struct tme_element *, _tme_const char * _tme_const *, struct tme_connection **, char **));
+
+/* the 16-bit bus master DMA read function: */
+int tme_bus_device_dma_read_16 _TME_P((struct tme_bus_device *,
+                                       tme_bus_addr_t,
+                                       tme_bus_addr_t,
+                                       tme_uint8_t *,
+				       unsigned int));
+
+/* the 16-bit bus master DMA write function: */
+int tme_bus_device_dma_write_16 _TME_P((struct tme_bus_device *,
+                                       tme_bus_addr_t,
+                                       tme_bus_addr_t,
+                                       _tme_const tme_uint8_t *,
+				       unsigned int));
+
+/* the 32-bit bus master DMA read function: */
+int tme_bus_device_dma_read_32 _TME_P((struct tme_bus_device *,
+                                       tme_bus_addr_t,
+                                       tme_bus_addr_t,
+                                       tme_uint8_t *,
+				       unsigned int));
+
+/* the 32-bit bus master DMA write function: */
+int tme_bus_device_dma_write_32 _TME_P((struct tme_bus_device *,
+                                       tme_bus_addr_t,
+                                       tme_bus_addr_t,
+                                       _tme_const tme_uint8_t *,
+				       unsigned int));
 
 #endif /* !_TME_GENERIC_BUS_DEVICE_H */

@@ -1,4 +1,4 @@
-/* $Id: scsi-tape.c,v 1.3 2003/10/16 02:48:25 fredette Exp $ */
+/* $Id: scsi-tape.c,v 1.4 2005/02/18 03:00:30 fredette Exp $ */
 
 /* scsi/scsi-tape.c - implementation of SCSI tape emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: scsi-tape.c,v 1.3 2003/10/16 02:48:25 fredette Exp $");
+_TME_RCSID("$Id: scsi-tape.c,v 1.4 2005/02/18 03:00:30 fredette Exp $");
 
 /* includes: */
 #include <tme/scsi/scsi-tape.h>
@@ -467,7 +467,7 @@ _TME_SCSI_DEVICE_CDB_DECL(tme_scsi_tape_cdb_inquiry)
     = ((scsi_device->tme_scsi_device_luns
 	& TME_BIT(lun))
        ? TME_SCSI_LUN_PRESENT
-       : TME_SCSI_LUN_NOT_PRESENT);
+       : TME_SCSI_LUN_UNSUPPORTED);
 
   /* the device type qualifier: */
   inquiry.tme_scsi_device_inquiry_type_qualifier = 0x00;
@@ -476,9 +476,9 @@ _TME_SCSI_DEVICE_CDB_DECL(tme_scsi_tape_cdb_inquiry)
   inquiry.tme_scsi_device_inquiry_lun_removable = TRUE;
 
   /* the various standards versions: */
-  inquiry.tme_scsi_device_inquiry_std_ansi = 2;
-  inquiry.tme_scsi_device_inquiry_std_ecma = 2;
-  inquiry.tme_scsi_device_inquiry_std_iso = 2;
+  inquiry.tme_scsi_device_inquiry_std_ansi = 1;
+  inquiry.tme_scsi_device_inquiry_std_ecma = 1;
+  inquiry.tme_scsi_device_inquiry_std_iso = 1;
 
   /* the response format: */
   inquiry.tme_scsi_device_response_format = TME_SCSI_FORMAT_CCS;
@@ -488,8 +488,9 @@ _TME_SCSI_DEVICE_CDB_DECL(tme_scsi_tape_cdb_inquiry)
     = tme_scsi_device_make_inquiry_data(scsi_device,
 					&inquiry);
   scsi_device->tme_scsi_device_dma.tme_scsi_dma_resid
-    = (data
-       - scsi_device->tme_scsi_device_dma.tme_scsi_dma_out);
+    = TME_MIN((data
+	       - scsi_device->tme_scsi_device_dma.tme_scsi_dma_out),
+	      scsi_device->tme_scsi_device_cdb[4]);
   
   /* finish the command: */
   tme_scsi_device_target_do_dsmf(scsi_device,

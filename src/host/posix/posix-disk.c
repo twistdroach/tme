@@ -1,4 +1,4 @@
-/* $Id: posix-disk.c,v 1.3 2003/10/16 03:02:11 fredette Exp $ */
+/* $Id: posix-disk.c,v 1.4 2005/02/17 12:42:20 fredette Exp $ */
 
 /* host/posix/posix-disk.c - implementation of disks on a POSIX system: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: posix-disk.c,v 1.3 2003/10/16 03:02:11 fredette Exp $");
+_TME_RCSID("$Id: posix-disk.c,v 1.4 2005/02/17 12:42:20 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/disk.h>
@@ -679,6 +679,9 @@ TME_ELEMENT_SUB_NEW_DECL(tme_host_posix,disk) {
   int buffers;
   struct stat statbuf;
   tme_uint8_t *block;
+#ifdef HAVE_MMAP
+  int page_size;
+#endif /* HAVE_MMAP */
   struct tme_posix_disk *posix_disk;
   struct tme_posix_disk_buffer *buffer, **_prev;
   int arg_i;
@@ -799,8 +802,10 @@ TME_ELEMENT_SUB_NEW_DECL(tme_host_posix,disk) {
   }
 
   /* if this is a character device, determine its block size: */
-  statbuf.st_blksize = 1;
   if (S_ISCHR(statbuf.st_mode)) {
+
+    /* the block size must be at least one: */
+    statbuf.st_blksize = TME_MAX(statbuf.st_blksize, 1);
 
     /* allocate space for the block: */
     block = tme_new(tme_uint8_t, statbuf.st_blksize);
@@ -841,6 +846,14 @@ TME_ELEMENT_SUB_NEW_DECL(tme_host_posix,disk) {
       return (EINVAL);
     }
   }
+
+#ifdef HAVE_MMAP
+  /* if we're mmapping, the block size must be at least the page size: */
+  for (page_size = getpagesize();
+       page_size < statbuf.st_blksize;
+       page_size <<= 1);
+  statbuf.st_blksize = page_size;
+#endif /* HAVE_MMAP */
 
   /* start the disk structure: */
   posix_disk = tme_new0(struct tme_posix_disk, 1);

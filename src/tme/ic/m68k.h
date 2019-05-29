@@ -1,4 +1,4 @@
-/* $Id: m68k.h,v 1.4 2003/05/16 21:48:15 fredette Exp $ */
+/* $Id: m68k.h,v 1.6 2005/02/18 02:52:02 fredette Exp $ */
 
 /* tme/ic/m68k.h - public header file for Motorola 68k emulation */
 
@@ -37,7 +37,7 @@
 #define _TME_IC_M68K_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: m68k.h,v 1.4 2003/05/16 21:48:15 fredette Exp $");
+_TME_RCSID("$Id: m68k.h,v 1.6 2005/02/18 02:52:02 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -119,7 +119,6 @@ struct tme_m68k_tlb {
 #define tme_m68k_tlb_linear_first tme_m68k_tlb_bus_tlb.tme_bus_tlb_addr_first
 #define tme_m68k_tlb_linear_last tme_m68k_tlb_bus_tlb.tme_bus_tlb_addr_last
 #define tme_m68k_tlb_bus_rwlock tme_m68k_tlb_bus_tlb.tme_bus_tlb_rwlock
-#define tme_m68k_tlb_bus_wrlock_on_read tme_m68k_tlb_bus_tlb.tme_bus_tlb_wrlock_on_read
 #define tme_m68k_tlb_addr_offset tme_m68k_tlb_bus_tlb.tme_bus_tlb_addr_offset
 #define tme_m68k_tlb_addr_shift tme_m68k_tlb_bus_tlb.tme_bus_tlb_addr_shift
 #define tme_m68k_tlb_emulator_off_read tme_m68k_tlb_bus_tlb.tme_bus_tlb_emulator_off_read
@@ -141,6 +140,9 @@ struct tme_m68k_bus_connection {
   /* the m68k TLB entry filler: */
   int (*tme_m68k_bus_tlb_fill) _TME_P((struct tme_m68k_bus_connection *, struct tme_m68k_tlb *,
 				       unsigned int, tme_uint32_t, unsigned int));
+
+  /* the m68k m6888x enabler: */
+  int (*tme_m68k_bus_m6888x_enable) _TME_P((struct tme_m68k_bus_connection *, int));
 };
 
 /* globals: */

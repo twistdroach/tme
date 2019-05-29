@@ -1,4 +1,4 @@
-/* $Id: sun.h,v 1.3 2003/05/05 23:08:13 fredette Exp $ */
+/* $Id: sun.h,v 1.7 2005/04/30 15:07:26 fredette Exp $ */
 
 /* tme/machine/sun.h - public header file for Sun emulation: */
 
@@ -37,7 +37,7 @@
 #define _TME_MACHINE_SUN_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun.h,v 1.3 2003/05/05 23:08:13 fredette Exp $");
+_TME_RCSID("$Id: sun.h,v 1.7 2005/04/30 15:07:26 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -47,6 +47,20 @@ _TME_RCSID("$Id: sun.h,v 1.3 2003/05/05 23:08:13 fredette Exp $");
 
 /* the size of the classic Sun IDPROM: */
 #define TME_SUN_IDPROM_SIZE	(32)
+
+/* the size of a classic Sun z8530: */
+#define TME_SUN_Z8530_SIZE	(8)
+
+/* classic Sun z8530 socket: */
+#define TME_SUN_Z8530_SOCKET_INIT { \
+  TME_Z8530_SOCKET_0, /* the socket version */ \
+  4, /* the bus address of channel A */ \
+  0, /* the bus address of channel B */ \
+  0, /* within each channel, the offset of the csr register */ \
+  2, /* within each channel, the offset of the data register */ \
+  3, /* the system bus byte lane the chip is wired to (D31-D24, may be overridden) */ \
+  (9600 * 512) /* the clock rate provided to the chip: */ \
+}
 
 /* classic two-level Sun MMU protections: */
 #define TME_SUN_MMU_PTE_PROT_MASK	(0x3)
@@ -130,6 +144,18 @@ unsigned short tme_sun_mmu_segmap_get _TME_P((void *, tme_uint8_t, tme_uint32_t)
 unsigned short tme_sun_mmu_tlb_fill _TME_P((void *, struct tme_bus_tlb *, tme_uint8_t, tme_uint32_t, unsigned short));
 void tme_sun_mmu_tlbs_invalidate _TME_P((void *));
 void tme_sun_mmu_tlbs_context_set _TME_P((void *, tme_uint8_t));
-int tme_sun_mmu_tlb_set_allocate _TME_P((void *, unsigned int, unsigned int, TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb **)));
+int tme_sun_mmu_tlb_set_allocate _TME_P((void *, unsigned int, unsigned int, TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb *)));
+
+/* onboard Intel Ethernet support: */
+int tme_sun_obie _TME_P((struct tme_element *, _tme_const char * _tme_const *, char **));
+
+/* bwtwo support: */
+int tme_sun_bwtwo _TME_P((struct tme_element *, _tme_const char * _tme_const *, char **));
+
+/* si support: */
+int tme_sun_si _TME_P((struct tme_element *, _tme_const char * _tme_const *, char **));
+
+/* cgtwo support: */
+int tme_sun_cgtwo _TME_P((struct tme_element *, _tme_const char * _tme_const *, char **));
 
 #endif /* !_TME_MACHINE_SUN_H */

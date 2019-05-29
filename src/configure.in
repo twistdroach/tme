@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 
-dnl $Id: configure.in,v 1.10 2003/10/16 02:50:37 fredette Exp $
+dnl $Id: configure.in,v 1.16 2005/05/15 01:24:11 fredette Exp $
 
 dnl Copyright (c) 2001, 2003 Matt Fredette
 dnl All rights reserved.
@@ -34,7 +34,7 @@ dnl POSSIBILITY OF SUCH DAMAGE.
 dnl Checks that we are given a good source directory.
 AC_INIT(ic/m68k/m68k-impl.h)
 AC_CANONICAL_SYSTEM
-AM_INIT_AUTOMAKE(tme, 0.2)
+AM_INIT_AUTOMAKE(tme, 0.4)
 
 dnl Write configuration out to config.h through config.h.in.
 AM_CONFIG_HEADER(config.h)
@@ -48,17 +48,26 @@ AC_PROG_MAKE_SET
 
 dnl Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS(unistd.h stdio.h memory.h stdarg.h)
+AC_CHECK_HEADERS(unistd.h stdio.h memory.h stdarg.h limits.h float.h)
 AC_CHECK_HEADERS(sys/ioctl.h sys/sockio.h sys/socketio.h net/if_dl.h ioctls.h)
+AC_CHECK_HEADERS(sys/bswap.h)
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_BIGENDIAN
 AC_C_CONST
 AC_C_INLINE
+AC_C_VOLATILE
+AC_C_LONG_DOUBLE
 AC_TYPE_SIZE_T
+AC_TYPE_SIGNAL
 AC_CHECK_SIZEOF(long, 4)
 AC_CHECK_SIZEOF(int, 4)
 AC_CHECK_SIZEOF(short, 2)
+AC_CHECK_SIZEOF(float, 4)
+AC_CHECK_SIZEOF(double, 8)
+if test $ac_cv_c_long_double = yes; then
+  AC_CHECK_SIZEOF(long double, 12)
+fi
 if test $ac_cv_sizeof_int != 4 && test $ac_cv_sizeof_long != 4; then
   AC_MSG_ERROR([can't find a 32-bit type])
 fi
@@ -70,12 +79,51 @@ AC_CHECK_ALIGNOF(16)
 AC_CHECK_SHIFTMAX(8)
 AC_CHECK_SHIFTMAX(16)
 AC_CHECK_SHIFTMAX(32)
+AC_CHECK_SHIFTSIGNED(8)
+AC_CHECK_SHIFTSIGNED(16)
+AC_CHECK_SHIFTSIGNED(32)
+AC_CHECK_FLOAT_FORMAT(float)
+AC_CHECK_FLOAT_LIMITS(float, FLT_MAX/FLT_MIN)
+AC_CHECK_FLOAT_FORMAT(double)
+AC_CHECK_FLOAT_LIMITS(double, DBL_MAX/DBL_MIN)
+if test $ac_cv_c_long_double = yes; then
+  AC_CHECK_FLOAT_FORMAT(long double)
+  AC_CHECK_FLOAT_LIMITS(long double, LDBL_MAX/LDBL_MIN)
+fi
 AC_SYS_SOCKADDR_SA_LEN
 
 dnl Checks for library functions and prototypes.
 AC_PROG_GCC_TRADITIONAL
 AC_FUNC_MEMCMP
 AC_FUNC_MMAP
+AC_CHECK_FUNC_LONG(bswap16, [
+  unsigned int x;
+
+  x = bswap16(0x1122);
+], [ 
+#ifdef HAVE_SYS_BSWAP_H
+#include <sys/bswap.h>
+#endif
+])
+AC_CHECK_FUNC_LONG(bswap32, [
+  unsigned int x;
+
+  x = bswap32(0x11223344);
+], [ 
+#ifdef HAVE_SYS_BSWAP_H
+#include <sys/bswap.h>
+#endif
+])
+AC_CHECK_FUNC_LONG(isinff, 
+[
+  float x;
+  int y;
+
+  x = 1;
+  y = isinff(x);
+], [
+#include <math.h>
+], -lm)
 
 dnl Checks for perl.
 AC_PATH_PROGS(PERL, perl4.036 perl4 perl perl5, no)
@@ -131,8 +179,10 @@ TME_FB_XLAT_DST=
 area_smallest=0
 area_largest=0
 
-# if TME_DISPLAYS is set, characterize those given displays:
-for dst_key in ${TME_DISPLAYS}; do
+# if --with-tme-host-displays is given, characterize those given displays:
+AC_ARG_WITH(tme-host-displays,
+[  --with-tme-host-displays=DISPLAYS  support host displays with these display formats])
+for dst_key in ${with_tme_host_displays}; do
 
   dnl Make brackets safe to use.
   changequote(<<, >>)dnl
@@ -171,10 +221,12 @@ if test "x${DISPLAY}" != x && xdpyinfo >/dev/null 2>&1; then
     bitmap_pad=`echo ${bitmap_info} | sed -e 's/\([0-9][0-9]*\), *\([LM]\)SBFirst, *\([0-9][0-9]*\).*/\3/'`
   bitmap_order=`echo ${bitmap_order} | tr A-Z a-z`
 
-  # get the format this display uses for images at its greatest depth:
+  # get the format this display uses for images at its default depth.  we
+  # assume that the root window is at the default depth:
   pixmap_order=`xdpyinfo | grep 'image byte order'`
   pixmap_order=`echo ${pixmap_order} | sed -e 's/.*image byte order: *\([LM]\)SBFirst.*/\1/' | tr A-Z a-z`
-  pixmap_depth=1
+  pixmap_depth=`xwininfo -root | grep 'Depth:'`
+  pixmap_depth=`echo ${pixmap_depth} | sed -e 's/.*Depth: *\([0-9][0-9]*\).*/\1/'`
   pixmap_infos=`xdpyinfo | grep bits_per_pixel | tr '\n' %`
   save_IFS=$IFS
   IFS=%
@@ -184,17 +236,17 @@ if test "x${DISPLAY}" != x && xdpyinfo >/dev/null 2>&1; then
     this_pixmap_depth=`echo ${pixmap_info} | sed -e 's/.*depth \([0-9][0-9]*\), *bits_per_pixel \([0-9][0-9]*\), *scanline_pad \([0-9][0-9]*\).*/\1/'`
      this_pixmap_bipp=`echo ${pixmap_info} | sed -e 's/.*depth \([0-9][0-9]*\), *bits_per_pixel \([0-9][0-9]*\), *scanline_pad \([0-9][0-9]*\).*/\2/'`
       this_pixmap_pad=`echo ${pixmap_info} | sed -e 's/.*depth \([0-9][0-9]*\), *bits_per_pixel \([0-9][0-9]*\), *scanline_pad \([0-9][0-9]*\).*/\3/'`
-    if test `expr ${pixmap_depth} \< ${this_pixmap_depth}` = 1; then
-      pixmap_depth=${this_pixmap_depth}
+    if test "x${this_pixmap_depth}" = "x${pixmap_depth}"; then
       pixmap_bipp=${this_pixmap_bipp}
       pixmap_pad=${this_pixmap_pad}
+      break
     fi
   done
   IFS=$save_IFS
 
   # if this display's greatest depth is one, we use its
   # bitmap format:
-  if test $pixmap_depth = 1; then
+  if test "x${pixmap_bipp}" = x; then
     pixmap_bipp=1
     pixmap_pad=${bitmap_pad}
 
@@ -206,12 +258,12 @@ if test "x${DISPLAY}" != x && xdpyinfo >/dev/null 2>&1; then
       changequote([, ])dnl
       AC_MSG_WARN([the X display ${DISPLAY} is monochrome and needs bitmaps with a bit order that the generic code doesn't support])
       changequote(<<, >>)dnl
-      pixmap_depth=0
+      pixmap_bipp=
     fi
   fi
 
   # if this display seems usable:
-  if test ${pixmap_depth} != 0; then
+  if test "x${pixmap_bipp}" != x; then
 
     # check the dimensions of all screens on this display:
     dimensions=`xdpyinfo | grep dimensions | tr '\n' %`
@@ -232,17 +284,60 @@ if test "x${DISPLAY}" != x && xdpyinfo >/dev/null 2>&1; then
     done
     IFS=$save_IFS
 
+    # assume an unknown set of masks and an unknown mapping type:
+    dst_masks=_r0x0_g0x0_b0x0
+    dst_map=
+    value_visual=", unknown visual"
+
+    # if the depth is greater than one:
+    if test "x${pixmap_depth}" != 1; then
+
+	# we assume that the root window uses the default visual:
+	visual=`xwininfo -root | grep 'Visual Class:' | sed -e 's/^  *Visual Class: *\([A-Za-z][A-Za-z]*\).*$/\1/'`
+
+	# get any primary masks for this visual:
+	case "x${visual}" in
+	xDirectColor | xTrueColor)
+	    dst_masks=`xdpyinfo | $EGREP '(visual id|class|blue masks):' | $EGREP -C1 $visual | grep 'blue masks' | head -1`
+	    dst_masks=`echo ${dst_masks} | sed -e 's/^.*blue masks:  *\(.*\)/\1/'`
+	    value_visual=", rgb masks ${dst_masks}"
+	    dst_masks=`echo ${dst_masks} | sed -e 's/^/_r/' -e 's/, /_g/' -e 's/, /_b/'`
+	    ;;
+	xStaticGray | xGrayScale | xStaticColor | xPseudoColor)	
+	    dst_masks=
+	    value_visual=", no subfields"
+	    ;;
+	*) ;;
+	esac
+
+	# get the mapping type for this visual:
+	case "x${visual}" in
+	xStaticGray | xStaticColor | xPseudoColor)
+	    dst_map="ml"
+	    ;;
+	xDirectColor)
+	    dst_map="mi"
+	    value_visual="${value_visual}, indexed"
+	    ;;
+	xGrayScale | xTrueColor)
+	    dst_map="ml"
+	    value_visual="${value_visual}, linear"
+	    ;;
+	*) ;;
+	esac
+    fi
+
     dnl Make brackets the quote characters again.
     changequote([, ])dnl
 
     # finish the characterization:
-    if test ${pixmap_bipp} = ${pixmap_depth}; then
+    if test "x${pixmap_bipp}" = "x${pixmap_depth}"; then
       value=
     else
       value=" (${pixmap_bipp} bits per pixel)"
     fi
-    AC_MSG_RESULT([${pixmap_depth}-bit${value} ${pixmap_order}sb-first images with ${pixmap_pad}-bit padding])
-    dst_key="d${pixmap_depth}b${pixmap_bipp}s0p${pixmap_pad}o${pixmap_order}"
+    AC_MSG_RESULT([${pixmap_depth}-bit${value} ${pixmap_order}sb-first images with ${pixmap_pad}-bit padding${value_visual}])
+    dst_key="d${pixmap_depth}b${pixmap_bipp}s0p${pixmap_pad}o${pixmap_order}${dst_map}${dst_masks}"
     
     # add in this destination display key:
     if echo " ${TME_FB_XLAT_DST} " | grep " ${dst_key} " > /dev/null 2>&1; then :; else
@@ -255,7 +350,7 @@ AC_SUBST(TME_FB_XLAT_DST)
 dnl Configures for the system(s) to emulate.
 systems=all
 if echo " ${systems} " | grep ' all ' > /dev/null 2>&1; then
-  systems="sun2"
+  systems="sun2 sun3"
 fi
 TME_MACHINE_SUBDIRS=
 TME_IC_SUBDIRS=
@@ -273,9 +368,17 @@ for system in $systems; do
     # the sun2:
     sun2)
 	machines="sun sun2"
-	ics="m68k am9513 mm58167 z8530"
+	ics="m68k am9513 mm58167 z8530 i825x6"
 	buses="multibus"
 	fb_xlats="1152x900d1b1s0p32om"
+	;;
+
+    # the sun3:
+    sun3)
+	machines="sun sun3"
+	ics="m68k isil7170 z8530 i825x6 ieee754 ncr5380"
+	buses="multibus"
+	fb_xlats="1152x900d1b1s0p32om 1152x900d8b8s0p32ommi8 1152x900d1b1s0p32omccmi8"
 	;;
 
     *)
@@ -395,18 +498,27 @@ AC_SUBST(TME_PREOPEN)
 dnl Configure debugging and/or warnings.
 AC_ARG_ENABLE(debug,
 [  --disable-debug         don't compile debuggable libraries and programs (default=do)],
-[ ], [enable_debug=yes])
+[ ], [enable_debug=no])
 if test "x$enable_debug" = "xyes"; then
   CFLAGS="${CFLAGS-} -g -O0"
   CXXFLAGS="${CXXFLAGS-} -g3 -O0"
+else
+  CPPFLAGS="${CPPFLAGS-} -DTME_NO_LOG -DTME_NO_DEBUG_LOCKS -DTME_NO_AUDIT_ATOMICS -DNDEBUG"
 fi
 AC_ARG_ENABLE(warnings,
 [  --disable-warnings      don't compile with warnings turned on (default=do)],
 [ ], [enable_warnings=yes])
 if test "x$enable_warnings" = "xyes" -a "x$GCC" = "xyes"; then
-  CFLAGS="${CFLAGS-} -Wall -Werror"
+  CFLAGS="${CFLAGS-} -Wundef -Wall -Werror"
   CXXFLAGS="${CXXFLAGS-} -W"
 fi
+
+dnl Some code isn't alias-clean.
+CFLAGS_NO_STRICT_ALIASING=
+if test "x$GCC" = "xyes"; then
+  CFLAGS_NO_STRICT_ALIASING=" -fno-strict-aliasing"
+fi
+AC_SUBST(CFLAGS_NO_STRICT_ALIASING)
 
 dnl Generate tmeconfig.h.  The whether-to-generate logic is cribbed 
 dnl from glib-1.2.1's configure.in.
@@ -452,6 +564,8 @@ TMEEOF
   (for word in HAVE_ TIME_ PROTO_ ALIGNOF_ SIZEOF_ WORDS_BIGENDIAN; do \
     grep $word config.h | sed 's/#define[ 	]\{1,\}/&_TME_/' ; \
   done) | sort | uniq >> ${outfile}-tmp
+  grep FLOAT_FORMAT config.h | \
+    sed 's/#define[ 	]\{1,\}\([A-Za-z0-9_]\{1,\}\)[ 	]\{1,\}\([A-Za-z0-9_]\{1,\}\)/#define TME_\1 TME_FLOAT_FORMAT_\2/' >> ${outfile}-tmp
   echo '#define TME_RELEASE_MAJOR (' \
     `echo $VERSION | sed -e 's,^\([0-9][0-9]*\)\.[0-9][0-9]*$,\1,'` ')' >> ${outfile}-tmp
   echo '#define TME_RELEASE_MINOR (' \
@@ -511,9 +625,11 @@ AC_OUTPUT(Makefile
 	  libtme/Makefile
 	  ic/Makefile
 	  ic/m68k/Makefile
+	  ic/ieee754/Makefile
 	  machine/Makefile
 	  machine/sun/Makefile
 	  machine/sun2/Makefile
+	  machine/sun3/Makefile
           host/Makefile
           host/posix/Makefile
           host/bsd/Makefile
@@ -523,5 +639,6 @@ AC_OUTPUT(Makefile
           serial/Makefile
           scsi/Makefile
           generic/Makefile
-	  tmesh/Makefile)
+	  tmesh/Makefile
+	  tools/Makefile)
 

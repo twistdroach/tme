@@ -1,4 +1,4 @@
-/* $Id: gtk-keyboard.c,v 1.6 2003/10/16 02:48:23 fredette Exp $ */
+/* $Id: gtk-keyboard.c,v 1.8 2005/05/14 18:04:22 fredette Exp $ */
 
 /* host/gtk/gtk-keyboard.c - GTK keyboard support: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: gtk-keyboard.c,v 1.6 2003/10/16 02:48:23 fredette Exp $");
+_TME_RCSID("$Id: gtk-keyboard.c,v 1.8 2005/05/14 18:04:22 fredette Exp $");
 
 /* includes: */
 #include "gtk-display.h"
@@ -368,6 +368,7 @@ _tme_gtk_keyboard_key_event(GtkWidget *widget,
   /* unlock the mutex: */
   tme_mutex_unlock(&display->tme_gtk_display_mutex);
 
+  /* don't process this event any further: */
   return (TRUE);
 }
 
@@ -403,7 +404,7 @@ _tme_gtk_keyboard_lookup(struct tme_keyboard_connection *conn_keyboard,
 	       _("cannot generate keysym '%s' directly%s"),
 	       keysym_bad->tme_gtk_keysym_bad_string,
 	       (keysym_bad->tme_keysym_bad_flags   
-		!= TME_KEYBOARD_LOOKUP_FLAG_OK_DIRECT
+		== TME_KEYBOARD_LOOKUP_FLAG_OK_DIRECT
 		? ""
 		: _(", or through a macro"))));
 
@@ -706,14 +707,14 @@ _tme_gtk_keyboard_attach(struct tme_gtk_screen *screen)
 		     "enter_notify_event",
 		     GTK_SIGNAL_FUNC(_tme_gtk_display_enter_focus),
 		     NULL);
-  gtk_signal_connect(GTK_OBJECT(screen->tme_gtk_screen_event_box),
-		     "key_press_event",
-		     GTK_SIGNAL_FUNC(_tme_gtk_keyboard_key_event), 
-		     screen);
-  gtk_signal_connect(GTK_OBJECT(screen->tme_gtk_screen_event_box),
-		     "key_release_event",
-		     GTK_SIGNAL_FUNC(_tme_gtk_keyboard_key_event), 
-		     screen);
+  gtk_signal_connect_after(GTK_OBJECT(screen->tme_gtk_screen_event_box),
+			   "key_press_event",
+			   GTK_SIGNAL_FUNC(_tme_gtk_keyboard_key_event), 
+			   screen);
+  gtk_signal_connect_after(GTK_OBJECT(screen->tme_gtk_screen_event_box),
+			   "key_release_event",
+			   GTK_SIGNAL_FUNC(_tme_gtk_keyboard_key_event), 
+			   screen);
 
   /* the event box can focus, and have it grab the focus now: */
   GTK_WIDGET_SET_FLAGS(screen->tme_gtk_screen_event_box, GTK_CAN_FOCUS);

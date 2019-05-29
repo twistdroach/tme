@@ -1,4 +1,4 @@
-/* $Id: bus-device.c,v 1.7 2003/07/29 18:19:12 fredette Exp $ */
+/* $Id: bus-device.c,v 1.8 2004/04/30 12:11:35 fredette Exp $ */
 
 /* generic/bus-device.c - implementation of a generic bus device support: */
 
@@ -34,10 +34,13 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: bus-device.c,v 1.7 2003/07/29 18:19:12 fredette Exp $");
+_TME_RCSID("$Id: bus-device.c,v 1.8 2004/04/30 12:11:35 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
+
+/* include the automatically-generated bus-device functions: */
+#include "bus-device-auto.c"
 
 /* this scores a connection: */
 int

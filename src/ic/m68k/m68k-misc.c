@@ -1,4 +1,4 @@
-/* $Id: m68k-misc.c,v 1.15 2003/10/25 17:08:01 fredette Exp $ */
+/* $Id: m68k-misc.c,v 1.23 2005/03/23 12:42:56 fredette Exp $ */
 
 /* ic/m68k/m68k-misc.c - miscellaneous things for the m68k emulator: */
 
@@ -36,18 +36,7 @@
 /* includes: */
 #include "m68k-impl.h"
 
-_TME_RCSID("$Id: m68k-misc.c,v 1.15 2003/10/25 17:08:01 fredette Exp $");
-
-/* small immediates: */
-const tme_uint32_t _tme_m68k_imm32[9] = {
-  0, 1, 2, 3, 4, 5, 6, 7, 8
-};
-const tme_uint16_t _tme_m68k_imm16[9] = {
-  0, 1, 2, 3, 4, 5, 6, 7, 8
-};
-const tme_uint8_t _tme_m68k_imm8[9] = {
-  0, 1, 2, 3, 4, 5, 6, 7, 8
-};
+_TME_RCSID("$Id: m68k-misc.c,v 1.23 2005/03/23 12:42:56 fredette Exp $");
 
 /* the memory buffer read and write functions: */
 #if TME_M68K_SIZE_8 != 1
@@ -99,17 +88,16 @@ _tme_m68k_bus_signal(struct tme_bus_connection *conn_bus, unsigned int signal)
   ic = conn_bus->tme_bus_connection.tme_connection_element->tme_element_private;
 
   /* take out the level and edge: */
-  level_edge = signal & (TME_BUS_SIGNAL_LEVEL_MASK
-			 | TME_BUS_SIGNAL_EDGE);
-  signal &= ~(TME_BUS_SIGNAL_LEVEL_MASK
-	      | TME_BUS_SIGNAL_EDGE);
+  level_edge = signal;
+  signal = TME_BUS_SIGNAL_WHICH(signal);
+  level_edge ^= signal;
 
   /* lock the external mutex: */
   tme_mutex_lock(&ic->tme_m68k_external_mutex);
 
   /* on the falling edge of HALT or RESET, halt the processor: */
-  if (level_edge == (TME_BUS_SIGNAL_LEVEL_ASSERTED
-		     | TME_BUS_SIGNAL_EDGE)
+  if (((level_edge & TME_BUS_SIGNAL_LEVEL_MASK)
+       == TME_BUS_SIGNAL_LEVEL_ASSERTED)
       && (signal == TME_BUS_SIGNAL_HALT
 	  || signal == TME_BUS_SIGNAL_RESET)) {
     ic->tme_m68k_external_halt = TRUE;
@@ -117,8 +105,8 @@ _tme_m68k_bus_signal(struct tme_bus_connection *conn_bus, unsigned int signal)
 
   /* on the rising edge of RESET, reset the processor: */
   else if (signal == TME_BUS_SIGNAL_RESET
-	   && level_edge == (TME_BUS_SIGNAL_LEVEL_NEGATED
-			     | TME_BUS_SIGNAL_EDGE)) {
+	   && ((level_edge & TME_BUS_SIGNAL_LEVEL_MASK)
+	       == TME_BUS_SIGNAL_LEVEL_NEGATED)) {
     ic->tme_m68k_external_reset = TRUE;
   }
 
@@ -141,6 +129,23 @@ _tme_m68k_bus_signal(struct tme_bus_connection *conn_bus, unsigned int signal)
   return (TME_OK);
 }
 
+/* this enables or disables an m6888x: */
+static int
+_tme_m6888x_enable(struct tme_m68k_bus_connection *conn_m68k, int enabled)
+{
+  struct tme_m68k *ic;
+
+  /* recover our IC: */
+  ic = conn_m68k->tme_m68k_bus_connection.tme_bus_connection.tme_connection_element->tme_element_private;
+
+  /* NB: we're lazy here and don't bother locking the external mutex: */
+  if (ic->tme_m68k_fpu_type == TME_M68K_FPU_NONE) {
+    return (ENXIO);
+  }
+  ic->tme_m68k_fpu_enabled = enabled;
+  return (TME_OK);
+}
+
 /* our interrupt handler: */
 static int
 _tme_m68k_bus_interrupt(struct tme_m68k_bus_connection *conn_m68k, unsigned int ipl)
@@ -155,6 +160,12 @@ _tme_m68k_bus_interrupt(struct tme_m68k_bus_connection *conn_m68k, unsigned int 
 
   /* set the interrupt line: */
   ic->tme_m68k_external_ipl = ipl;
+
+  /* if the IPL has dropped below the NMI level, the next transition
+     to that level will cause an NMI: */
+  if (ipl < TME_M68K_IPL_NMI) {
+    ic->tme_m68k_external_ipl_previous_nmi = FALSE;
+  }
 
   /* unlock the external mutex: */
   tme_mutex_unlock(&ic->tme_m68k_external_mutex);
@@ -178,7 +189,7 @@ tme_m68k_external_check(struct tme_m68k *ic, tme_uint32_t internal_exceptions)
   if (ic->tme_m68k_external_reset) {
     ic->tme_m68k_external_reset = FALSE;
     tme_mutex_unlock(&ic->tme_m68k_external_mutex);
-    tme_m68k_exception(ic, TME_M68K_EXCEPTION_GROUP0_RESET);
+    tme_m68k_exception(ic, TME_M68K_EXCEPTION_RESET);
   }
 
   /* if an external halt has been requested, halt: */
@@ -196,8 +207,15 @@ tme_m68k_external_check(struct tme_m68k *ic, tme_uint32_t internal_exceptions)
   if (ic->_tme_m68k_mode != TME_M68K_MODE_HALT
       && ipl >= TME_M68K_IPL_MIN
       && ipl <= TME_M68K_IPL_MAX
-      && (ipl == TME_M68K_IPL_NMI
+      && ((ipl == TME_M68K_IPL_NMI
+	   && !ic->tme_m68k_external_ipl_previous_nmi)
 	  || ipl > TME_M68K_FLAG_IPM(ic->tme_m68k_ireg_sr))) {
+    
+    /* if this is an NMI, prevent it from being repeatedly accepted: */
+    if (ipl == TME_M68K_IPL_NMI) {
+      ic->tme_m68k_external_ipl_previous_nmi = TRUE;
+    }
+
     tme_mutex_unlock(&ic->tme_m68k_external_mutex);
     
     /* acknowledge the interrupt and get the vector: */
@@ -210,16 +228,16 @@ tme_m68k_external_check(struct tme_m68k *ic, tme_uint32_t internal_exceptions)
 
     /* if the interrupt acknowledge failed, this is a spurious interrupt: */
     if (rc == ENOENT) {
-      vector = 24;
+      vector = TME_M68K_VECTOR_SPURIOUS;
     }
 
     /* if no vector is given, use the autovector: */
     else if (vector == TME_BUS_INTERRUPT_VECTOR_UNDEF) {
-      vector = 24 + ipl;
+      vector = TME_M68K_VECTOR_SPURIOUS + ipl;
     }
 
     /* dispatch the exceptions: */
-    tme_m68k_exception(ic, internal_exceptions | TME_M68K_EXCEPTION_GROUP1_INT(ipl, vector));
+    tme_m68k_exception(ic, internal_exceptions | TME_M68K_EXCEPTION_INT(ipl, vector));
   }
 
   /* if there are internal exceptions to process, do so: */
@@ -296,6 +314,11 @@ _tme_m68k_generic_tlb_fill(struct tme_m68k_bus_connection *conn_m68k,
   /* recover our IC: */
   ic = conn_m68k->tme_m68k_bus_connection.tme_bus_connection.tme_connection_element->tme_element_private;
 
+  /* this m68k implementation never fills TLB entries on the stack, so
+     a TLB entry reserves itself.  this also means that we don't have
+     to call tme_bus_tlb_back() after the fill: */
+  tme_bus_tlb_reserve(&tlb->tme_m68k_tlb_bus_tlb, &tlb->tme_m68k_tlb_bus_tlb);
+
   /* call the generic bus TLB filler: */
   (ic->_tme_m68k_bus_generic->tme_bus_tlb_fill)
     (ic->_tme_m68k_bus_generic,
@@ -328,7 +351,8 @@ _tme_m68k_connection_score(struct tme_connection *conn, unsigned int *_score)
     /* this must be a bus, and not another m68k chip: */
   case TME_CONNECTION_BUS_M68K:
     if (conn_bus->tme_bus_tlb_set_allocate != NULL
-	&& conn_m68k->tme_m68k_bus_tlb_fill != NULL) {
+	&& conn_m68k->tme_m68k_bus_tlb_fill != NULL
+	&& conn_m68k->tme_m68k_bus_m6888x_enable == NULL) {
       score = 10;
     }
     break;
@@ -410,6 +434,7 @@ static int
 _tme_m68k_connection_break(struct tme_connection *conn, unsigned int state)
 {
   abort();
+  return (0);
 }
 
 /* this makes new connection sides: */
@@ -444,6 +469,7 @@ _tme_m68k_connections_new(struct tme_element *element, const char * const *args,
   /* full in the m68k bus connection: */
   conn_m68k->tme_m68k_bus_interrupt = _tme_m68k_bus_interrupt;
   conn_m68k->tme_m68k_bus_tlb_fill = NULL;
+  conn_m68k->tme_m68k_bus_m6888x_enable = _tme_m6888x_enable;
 
   /* add this connection to the set of possibilities: */
   *_conns = conn;
@@ -476,15 +502,47 @@ int
 tme_m68k_new(struct tme_m68k *ic, const char * const *args, const void *extra, char **_output)
 {
   struct tme_element *element;
+  int arg_i;
+  int usage;
 
-  /* we take no arguments: */
-  if (args[1] != NULL) {
-    tme_output_append_error(_output,
-			    "%s %s, %s %s",
-			    args[1],
-			    _("unexpected"),
+  /* check our arguments: */
+  arg_i = 1;
+  usage = FALSE;
+  for (;;) {
+    
+    if (0) {
+
+    }
+
+    /* if we've run out of arguments: */
+    else if (args[arg_i + 0] == NULL) {
+      break;
+    }
+
+    /* this is either a bad argument or an FPU argument: */
+    else {
+
+      /* if this is not an FPU argument: */
+      if (!tme_m68k_fpu_new(ic, args, &arg_i, &usage, _output)) {
+	tme_output_append_error(_output,
+				"%s %s, ",
+				args[arg_i],
+				_("unexpected"));
+	usage = TRUE;
+      }
+      
+      if (usage) {
+	break;
+      }
+    }
+  }
+
+  if (usage) {
+    tme_output_append_error(_output, 
+			    "%s %s",
 			    _("usage:"),
 			    args[0]);
+    tme_m68k_fpu_usage(_output);
     tme_free(ic);
     return (EINVAL);
   }
@@ -517,9 +575,26 @@ tme_m68k_new(struct tme_m68k *ic, const char * const *args, const void *extra, c
 
   /* calculate the instruction burst size: */
   /* XXX TBD: */
-  ic->_tme_m68k_instruction_burst = 20;
+  ic->_tme_m68k_instruction_burst = 200;
   ic->_tme_m68k_instruction_burst_remaining
     = ic->_tme_m68k_instruction_burst;
+
+  /* set the status register T bits mask: */
+  ic->_tme_m68k_sr_mask_t
+    = (TME_M68K_FLAG_T1
+       | ((ic->tme_m68k_type >= TME_M68K_M68020)
+	  * TME_M68K_FLAG_T0));
+
+  /* initialize the small immediates: */
+  ic->tme_m68k_ireg_uint32(TME_M68K_IREG_ZERO) = 0;
+  ic->tme_m68k_ireg_uint32(TME_M68K_IREG_ONE) = 1;
+  ic->tme_m68k_ireg_uint32(TME_M68K_IREG_TWO) = 2;
+  ic->tme_m68k_ireg_uint32(TME_M68K_IREG_THREE) = 3;
+  ic->tme_m68k_ireg_uint32(TME_M68K_IREG_FOUR) = 4;
+  ic->tme_m68k_ireg_uint32(TME_M68K_IREG_FIVE) = 5;
+  ic->tme_m68k_ireg_uint32(TME_M68K_IREG_SIX) = 6;
+  ic->tme_m68k_ireg_uint32(TME_M68K_IREG_SEVEN) = 7;
+  ic->tme_m68k_ireg_uint32(TME_M68K_IREG_EIGHT) = 8;
 
   /* force the processor to be halted: */
   ic->_tme_m68k_mode = TME_M68K_MODE_HALT;
@@ -539,11 +614,14 @@ tme_m68k_do_reset(struct tme_m68k *ic)
   /* force the VBR to zero: */
   ic->tme_m68k_ireg_vbr = 0;
 
+  /* clear the E and F bits in the CACR: */
+  ic->tme_m68k_ireg_cacr = 0;
+
   /* force supervisor mode, interrupts disabled: */
   tme_m68k_change_sr(ic, TME_M68K_FLAG_S | (7 << 8));
 
   /* load the initial SSP and PC: */
-  ic->_tme_m68k_ea_function_code = TME_M68K_FC_SD;
+  ic->_tme_m68k_ea_function_code = TME_M68K_FC_SP;
   ic->_tme_m68k_ea_address = 0;
   tme_m68k_read_mem32(ic, TME_M68K_IREG_A7);
   ic->_tme_m68k_ea_address += sizeof(ic->tme_m68k_ireg_a7);
@@ -551,6 +629,9 @@ tme_m68k_do_reset(struct tme_m68k *ic)
 
   /* clear all exceptions: */
   ic->_tme_m68k_exceptions = 0;
+
+  /* reset the FPU: */
+  tme_m68k_fpu_reset(ic);
 
   /* start execution: */
   ic->_tme_m68k_mode = TME_M68K_MODE_EXECUTION;
@@ -587,13 +668,16 @@ tme_m68k_go_slow(const struct tme_m68k *ic)
 	  || (linear_pc & 1)
 
 	  /* there must be no tracing: */
-	  || TME_M68K_FLAG_T(ic->tme_m68k_ireg_sr) != 0);
+	  || (ic->tme_m68k_ireg_sr & ic->_tme_m68k_sr_mask_t) != 0);
 }
 
 /* this redispatches: */
 void
 tme_m68k_redispatch(struct tme_m68k *ic)
 {
+#ifdef _TME_M68K_STATS
+  ic->tme_m68k_stats.tme_m68k_stats_redispatches++;
+#endif /* _TME_M68K_STATS */
   longjmp(ic->_tme_m68k_dispatcher, 1);
 }
 
@@ -607,12 +691,27 @@ tme_m68k_tlb_fill(struct tme_m68k *ic, struct tme_m68k_tlb *tlb,
   tme_uint32_t external_address;
   struct tme_bus_tlb tlb_internal;
   
+#ifdef _TME_M68K_STATS
+  if (function_code == TME_M68K_FC_UP
+      || function_code == TME_M68K_FC_SP) {
+    ic->tme_m68k_stats.tme_m68k_stats_itlb_fill++;
+  }
+  else {
+    ic->tme_m68k_stats.tme_m68k_stats_dtlb_fill++;
+  }
+#endif /* _TME_M68K_STATS */
+
   /* when emulating a CPU with a 16-bit bus, only 24 bits of address
      are external: */
   external_address = linear_address;
   if (ic->_tme_m68k_bus_16bit) {
     external_address &= 0x00ffffff;
   }
+
+  /* this m68k implementation never fills TLB entries on the stack, so
+     a TLB entry reserves itself.  this also means that we don't have
+     to call tme_bus_tlb_back() after the fill: */
+  tme_bus_tlb_reserve(&tlb->tme_m68k_tlb_bus_tlb, &tlb->tme_m68k_tlb_bus_tlb);
 
   /* fill the TLB entry: */
   (*ic->_tme_m68k_bus_connection->tme_m68k_bus_tlb_fill)
@@ -643,9 +742,9 @@ tme_m68k_exception(struct tme_m68k *ic, tme_uint32_t new_exceptions)
 
   /* if the set of new exceptions includes a group zero exception: */
   if (new_exceptions & 
-      (TME_M68K_EXCEPTION_GROUP0_RESET
-       | TME_M68K_EXCEPTION_GROUP0_AERR
-       | TME_M68K_EXCEPTION_GROUP0_BERR)) {
+      (TME_M68K_EXCEPTION_RESET
+       | TME_M68K_EXCEPTION_AERR
+       | TME_M68K_EXCEPTION_BERR)) {
     
     /* there must be only one exception - you cannot trigger a group 0
        exception simultaneously with any other group 0, 1, or 2
@@ -653,7 +752,7 @@ tme_m68k_exception(struct tme_m68k *ic, tme_uint32_t new_exceptions)
     assert((new_exceptions & (new_exceptions - 1)) == 0);
     
     /* if this is a reset exception, it clears all other exceptions: */
-    if (new_exceptions == TME_M68K_EXCEPTION_GROUP0_RESET) {
+    if (new_exceptions == TME_M68K_EXCEPTION_RESET) {
       ic->_tme_m68k_exceptions = 0;
     }
 
@@ -661,9 +760,12 @@ tme_m68k_exception(struct tme_m68k *ic, tme_uint32_t new_exceptions)
        already processing a group 0 exception, this is a
        double fault, and the processor enters the halted state: */
     else if (ic->_tme_m68k_exceptions &
-	     (TME_M68K_EXCEPTION_GROUP0_RESET
-	      | TME_M68K_EXCEPTION_GROUP0_AERR
-	      | TME_M68K_EXCEPTION_GROUP0_BERR)) {
+	     (TME_M68K_EXCEPTION_RESET
+	      | TME_M68K_EXCEPTION_AERR
+	      | TME_M68K_EXCEPTION_BERR)) {
+      tme_log(TME_M68K_LOG_HANDLE(ic), 0, TME_OK,
+	      (TME_M68K_LOG_HANDLE(ic),
+	       _("double fault, processor halted")));
       ic->_tme_m68k_mode = TME_M68K_MODE_HALT;
       TME_M68K_SEQUENCE_START;
       tme_m68k_redispatch(ic);
@@ -686,33 +788,39 @@ tme_m68k_exception(struct tme_m68k *ic, tme_uint32_t new_exceptions)
 void
 tme_m68k_change_sr(struct tme_m68k *ic, tme_uint16_t sr)
 {
+  tme_uint16_t flags_mode;
+
+  /* only recognize the M bit on a 68020 or better: */
+  flags_mode = (TME_M68K_FLAG_S
+		| ((ic->tme_m68k_type >= TME_M68K_M68020)
+		   * TME_M68K_FLAG_M));
   
   /* save %a7 in the proper stack pointer control register: */
-  switch (ic->tme_m68k_ireg_sr & (TME_M68K_FLAG_S | TME_M68K_FLAG_M)) {
+  switch (ic->tme_m68k_ireg_sr & flags_mode) {
   case 0:
   case TME_M68K_FLAG_M:
     ic->tme_m68k_ireg_usp = ic->tme_m68k_ireg_a7;
     break;
   case TME_M68K_FLAG_S:
-    ic->tme_m68k_ireg_msp = ic->tme_m68k_ireg_a7;
+    ic->tme_m68k_ireg_isp = ic->tme_m68k_ireg_a7;
     break;
   case (TME_M68K_FLAG_S | TME_M68K_FLAG_M):
-    ic->tme_m68k_ireg_isp = ic->tme_m68k_ireg_a7;
+    ic->tme_m68k_ireg_msp = ic->tme_m68k_ireg_a7;
     break;
   }
 
   /* load %a7 from the proper stack pointer control register: */
   ic->tme_m68k_ireg_sr = sr;
-  switch (ic->tme_m68k_ireg_sr & (TME_M68K_FLAG_S | TME_M68K_FLAG_M)) {
+  switch (ic->tme_m68k_ireg_sr & flags_mode) {
   case 0:
   case TME_M68K_FLAG_M:
     ic->tme_m68k_ireg_a7 = ic->tme_m68k_ireg_usp;
     break;
   case TME_M68K_FLAG_S:
-    ic->tme_m68k_ireg_a7 = ic->tme_m68k_ireg_msp;
+    ic->tme_m68k_ireg_a7 = ic->tme_m68k_ireg_isp;
     break;
   case (TME_M68K_FLAG_S | TME_M68K_FLAG_M):
-    ic->tme_m68k_ireg_a7 = ic->tme_m68k_ireg_isp;
+    ic->tme_m68k_ireg_a7 = ic->tme_m68k_ireg_msp;
     break;
   }
 }
@@ -727,7 +835,7 @@ tme_m68k_exception_process_start(struct tme_m68k *ic, unsigned int ipl)
      T, and update I: */
   if (!TME_M68K_SEQUENCE_RESTARTING) {
     ic->tme_m68k_ireg_shadow_sr = ic->tme_m68k_ireg_sr;
-    sr = (ic->tme_m68k_ireg_sr | TME_M68K_FLAG_S) & ~(0x3 << 14);
+    sr = (ic->tme_m68k_ireg_sr | TME_M68K_FLAG_S) & ~ic->_tme_m68k_sr_mask_t;
     if (ipl > TME_M68K_IPL_NONE) {
       assert(ipl == TME_M68K_IPL_NMI
 	     || ipl > TME_M68K_FLAG_IPM(sr));
@@ -757,51 +865,176 @@ tme_m68k_exception_process_finish(struct tme_m68k *ic, tme_uint8_t format, tme_u
 
   /* do a bus cycle to read the vector into the program counter: */
   if (!TME_M68K_SEQUENCE_RESTARTING) {
-    ic->_tme_m68k_ea_function_code = TME_M68K_FC_SD; /* XXX is this right? */
+    ic->_tme_m68k_ea_function_code = TME_M68K_FC_SD;
     ic->_tme_m68k_ea_address = ic->tme_m68k_ireg_vbr + vector_offset;
   }
   tme_m68k_read_mem32(ic, TME_M68K_IREG_PC);
 }
 
-/* common m68k exception processing: */
+/* common m68000 and m68010 exception processing: */
 void
-tme_m68k_exception_process(struct tme_m68k *ic)
+tme_m68000_exception_process(struct tme_m68k *ic)
 {
   tme_uint32_t exceptions;
+  tme_uint8_t vector;
 
   /* get the set of exceptions.  we must have no group 0 exceptions: */
   exceptions = ic->_tme_m68k_exceptions;
-  assert((exceptions & (TME_M68K_EXCEPTION_GROUP0_RESET
-			| TME_M68K_EXCEPTION_GROUP0_AERR
-			| TME_M68K_EXCEPTION_GROUP0_BERR)) == 0);
+  assert((exceptions & (TME_M68K_EXCEPTION_RESET
+			| TME_M68K_EXCEPTION_AERR
+			| TME_M68K_EXCEPTION_BERR)) == 0);
 
   /* these if statements are ordered to implement the priority
      relationship between the different exceptions as outlined in 
      the 68000 user's manual (pp 93 in my copy): */
   
-  if (TME_M68K_EXCEPTION_IS_GROUP2(exceptions)) {
+  if (TME_M68K_EXCEPTION_IS_INST(exceptions)) {
     tme_m68k_exception_process_start(ic, 0);
-    tme_m68k_exception_process_finish(ic, TME_M68K_FORMAT_0, TME_M68K_EXCEPTION_IS_GROUP2(exceptions));
+    tme_m68k_exception_process_finish(ic, TME_M68K_FORMAT_0, TME_M68K_EXCEPTION_IS_INST(exceptions));
   }
   
-  if (exceptions & TME_M68K_EXCEPTION_GROUP1_TRACE) {
+  if (exceptions & TME_M68K_EXCEPTION_TRACE) {
     tme_m68k_exception_process_start(ic, 0);
-    tme_m68k_exception_process_finish(ic, TME_M68K_FORMAT_0, 0x09);
+    tme_m68k_exception_process_finish(ic, TME_M68K_FORMAT_0, TME_M68K_VECTOR_TRACE);
   }
   
-  if (TME_M68K_EXCEPTION_IS_GROUP1_INT(exceptions)) {
-    tme_m68k_exception_process_start(ic, TME_M68K_EXCEPTION_IS_GROUP1_INT(exceptions));
-    tme_m68k_exception_process_finish(ic, TME_M68K_FORMAT_0, TME_M68K_EXCEPTION_GROUP1_INT_VEC(exceptions));
+  if (TME_M68K_EXCEPTION_IS_INT(exceptions)) {
+    tme_m68k_exception_process_start(ic, TME_M68K_EXCEPTION_IS_INT(exceptions));
+    tme_m68k_exception_process_finish(ic, TME_M68K_FORMAT_0, TME_M68K_EXCEPTION_INT_VEC(exceptions));
   }
   
-  if (exceptions & TME_M68K_EXCEPTION_GROUP1_ILL) {
+  if (exceptions & TME_M68K_EXCEPTION_ILL) {
+    if (TME_FIELD_EXTRACTU(ic->_tme_m68k_insn_opcode, 12, 4) == 0xa) {
+      vector = TME_M68K_VECTOR_LINE_A;
+    }
+    else if (TME_FIELD_EXTRACTU(ic->_tme_m68k_insn_opcode, 12, 4) == 0xf) {
+      vector = TME_M68K_VECTOR_LINE_F;
+    }
+    else {
+      vector = TME_M68K_VECTOR_ILL;
+    }
     tme_m68k_exception_process_start(ic, 0);
-    tme_m68k_exception_process_finish(ic, TME_M68K_FORMAT_0, 0x04);
+    tme_m68k_exception_process_finish(ic, TME_M68K_FORMAT_0, vector);
   }
   
-  if (exceptions & TME_M68K_EXCEPTION_GROUP1_PRIV) {
+  if (exceptions & TME_M68K_EXCEPTION_PRIV) {
     tme_m68k_exception_process_start(ic, 0);
-    tme_m68k_exception_process_finish(ic, TME_M68K_FORMAT_0, 0x08);
+    tme_m68k_exception_process_finish(ic, TME_M68K_FORMAT_0, TME_M68K_VECTOR_TRACE);
+  }
+  
+  /* we have processed all exceptions - resume execution: */
+  ic->_tme_m68k_exceptions = 0;
+  ic->_tme_m68k_mode = TME_M68K_MODE_EXECUTION;
+  TME_M68K_SEQUENCE_START;
+  tme_m68k_redispatch(ic);
+}
+
+/* common m68020 and later exception processing: */
+void
+tme_m68020_exception_process(struct tme_m68k *ic)
+{
+  tme_uint32_t exceptions;
+  tme_uint8_t vector;
+  struct {
+    tme_uint16_t tme_m68k_fmt1_sr;
+    tme_uint16_t tme_m68k_fmt1_pc_hi;
+    tme_uint16_t tme_m68k_fmt1_pc_lo;    
+    tme_uint16_t tme_m68k_fmt1_vector_offset;
+  } fmt1;
+
+  /* get the set of exceptions.  we must have no group 0 or 1
+     exceptions: */
+  exceptions = ic->_tme_m68k_exceptions;
+  assert((exceptions & (TME_M68K_EXCEPTION_RESET
+			| TME_M68K_EXCEPTION_AERR
+			| TME_M68K_EXCEPTION_BERR)) == 0);
+
+  /* these if statements are ordered to implement the priority
+     relationship between the different exceptions as outlined in 
+     the 68020 user's manual (pp 144 in my copy): */
+  
+  /* group 2 exceptions: */
+  if (TME_M68K_EXCEPTION_IS_INST(exceptions)) {
+    tme_m68k_exception_process_start(ic, 0);
+
+    /* get the vector number: */
+    vector = TME_M68K_EXCEPTION_IS_INST(exceptions);
+
+    /* of the group 2 exceptions, only the Format Error and TRAP #N
+       exceptions generate a format 0 stack frame.  the RTE mode code
+       and the TRAP instruction code are expected to have left
+       ic->tme_m68k_ireg_pc as the PC they want stacked: */
+    if (vector == TME_M68K_VECTOR_FORMAT
+	|| (TME_M68K_VECTOR_TRAP_0 <= vector
+	    && vector < (TME_M68K_VECTOR_TRAP_0 + 16))) {
+      tme_m68k_exception_process_finish(ic, TME_M68K_FORMAT_0, vector);
+    }
+
+    /* all other group 2 exceptions generate a format 2 stack frame.
+       all code that can signal this exception is expected to have
+       left ic->tme_m68k_ireg_pc *and* ic->tme_m68k_ireg_pc_last as
+       the PCs they want stacked: */
+    else {
+      
+      /* stack the program counter of the instruction that caused the exception: */
+      tme_m68k_push32(ic, ic->tme_m68k_ireg_pc_last);
+
+      /* finish with a format 2 stack frame: */
+      tme_m68k_exception_process_finish(ic, TME_M68K_FORMAT_2, vector);
+    }
+  }
+
+  /* group 3 exceptions: */
+  if (exceptions & TME_M68K_EXCEPTION_ILL) {
+    if (TME_FIELD_EXTRACTU(ic->_tme_m68k_insn_opcode, 12, 4) == 0xa) {
+      vector = TME_M68K_VECTOR_LINE_A;
+    }
+    else if (TME_FIELD_EXTRACTU(ic->_tme_m68k_insn_opcode, 12, 4) == 0xf) {
+      vector = TME_M68K_VECTOR_LINE_F;
+    }
+    else {
+      vector = TME_M68K_VECTOR_ILL;
+    }
+    tme_m68k_exception_process_start(ic, 0);
+    tme_m68k_exception_process_finish(ic, TME_M68K_FORMAT_0, vector);
+  }
+  if (exceptions & TME_M68K_EXCEPTION_PRIV) {
+    tme_m68k_exception_process_start(ic, 0);
+    tme_m68k_exception_process_finish(ic, TME_M68K_FORMAT_0, TME_M68K_VECTOR_PRIV);
+  }
+
+  /* group 4.1 exceptions: */
+  if (exceptions & TME_M68K_EXCEPTION_TRACE) {
+    tme_m68k_exception_process_start(ic, 0);
+    tme_m68k_push32(ic, ic->tme_m68k_ireg_pc_last);
+    tme_m68k_exception_process_finish(ic, TME_M68K_FORMAT_2, TME_M68K_VECTOR_TRACE);
+  }
+  
+  /* group 4.2 exceptions: */
+  if (TME_M68K_EXCEPTION_IS_INT(exceptions)) {
+    tme_m68k_exception_process_start(ic, TME_M68K_EXCEPTION_IS_INT(exceptions));
+    tme_m68k_exception_process_finish(ic, TME_M68K_FORMAT_0, TME_M68K_EXCEPTION_INT_VEC(exceptions));
+
+    /* if the M-bit is set: */
+    if (ic->tme_m68k_ireg_sr & TME_M68K_FLAG_M) {
+
+      /* make the throwaway four-word stack frame (format 1): */
+      fmt1.tme_m68k_fmt1_vector_offset = tme_htobe_u16((TME_M68K_FORMAT_1 << 12) | (TME_M68K_EXCEPTION_INT_VEC(exceptions) << 2));
+      fmt1.tme_m68k_fmt1_pc_lo = tme_htobe_u16((ic->tme_m68k_ireg_pc >>  0) & 0xffff);
+      fmt1.tme_m68k_fmt1_pc_hi = tme_htobe_u16((ic->tme_m68k_ireg_pc >> 16) & 0xffff);
+      fmt1.tme_m68k_fmt1_sr = tme_htobe_u16(ic->tme_m68k_ireg_sr);
+
+      /* store the throwaway four-word stack frame on the interrupt stack: */
+      if (!TME_M68K_SEQUENCE_RESTARTING) {
+	ic->_tme_m68k_ea_function_code = TME_M68K_FC_SD;
+	ic->_tme_m68k_ea_address = ic->tme_m68k_ireg_isp - sizeof(fmt1);
+      }
+      tme_m68k_write_mem(ic, (tme_uint8_t *) &fmt1, sizeof(fmt1));
+
+      /* move to the interrupt stack: */
+      ic->tme_m68k_ireg_isp -= sizeof(fmt1);
+      tme_m68k_change_sr(ic, ic->tme_m68k_ireg_sr & ~TME_M68K_FLAG_M);
+    }
   }
   
   /* we have processed all exceptions - resume execution: */
@@ -817,21 +1050,29 @@ tme_m68k_rte_start(struct tme_m68k *ic)
 {
 
   /* set up to read from the stack frame: */
-  ic->_tme_m68k_ea_function_code = TME_M68K_FC_SD;
-  ic->_tme_m68k_ea_address = ic->tme_m68k_ireg_a7;
+  if (!TME_M68K_SEQUENCE_RESTARTING) {
+    ic->_tme_m68k_ea_function_code = TME_M68K_FC_SD;
+    ic->_tme_m68k_ea_address = ic->tme_m68k_ireg_a7;
+  }
 
   /* read the stacked status register: */
   tme_m68k_read_mem16(ic, TME_M68K_IREG_SHADOW_SR);
-  ic->_tme_m68k_ea_address += sizeof(ic->tme_m68k_ireg_shadow_sr);
+  if (!TME_M68K_SEQUENCE_RESTARTING) {
+    ic->_tme_m68k_ea_address += sizeof(ic->tme_m68k_ireg_shadow_sr);
+  }
 
   /* read the stacked PC: */
   tme_m68k_read_mem32(ic, TME_M68K_IREG_PC_NEXT);
-  ic->_tme_m68k_ea_address += sizeof(ic->tme_m68k_ireg_pc_next);
+  if (!TME_M68K_SEQUENCE_RESTARTING) {
+    ic->_tme_m68k_ea_address += sizeof(ic->tme_m68k_ireg_pc_next);
+  }
 
   /* read the stacked format/offset word, unless this is a 68000: */
   if (ic->tme_m68k_type != TME_M68K_M68000) {
     tme_m68k_read_mem16(ic, TME_M68K_IREG_FORMAT_OFFSET);
-    ic->_tme_m68k_ea_address += sizeof(ic->tme_m68k_ireg_format_offset);
+    if (!TME_M68K_SEQUENCE_RESTARTING) {
+      ic->_tme_m68k_ea_address += sizeof(ic->tme_m68k_ireg_format_offset);
+    }
   }
   else {
     ic->tme_m68k_ireg_format_offset = 0;
@@ -1141,8 +1382,9 @@ tme_m68k_group0_hook_fast(struct tme_m68k *ic)
 
   /* fill the instruction buffer and increase the transfer count
      as if the slow executor had been doing the fetching: */
+  /* NB that this breaks const: */
   tlb = TME_ATOMIC_READ(struct tme_m68k_tlb *, ic->_tme_m68k_itlb);
-  raw = tlb->tme_m68k_tlb_emulator_off_read + ic->tme_m68k_ireg_pc;
+  raw = (tme_uint8_t *) (tlb->tme_m68k_tlb_emulator_off_read + ic->tme_m68k_ireg_pc);
   tme_m68k_insn_buffer_xfer(ic, raw, 0, 0);
 }
 
@@ -1232,9 +1474,10 @@ tme_m68k_bitfield_offset(struct tme_m68k *ic, int adjust)
 
     /* calculate the effective address offset and adjust the bitfield
        offset to be nonnegative: */
-    bf_ea_offset = ((bf_offset < 0)
-		    ? ((bf_offset + 1) / 8) - 1
-		    : bf_offset / 8);
+    bf_ea_offset = ((bf_offset < 0
+		     ? (bf_offset - 7)
+		     : bf_offset)
+		    / 8);
     bf_offset &= 7;
 
     /* if this is our first call to this function for this instruction
@@ -1260,11 +1503,11 @@ tme_m68k_bitfield_width(struct tme_m68k *ic)
   specop = ic->_tme_m68k_insn_specop;
   if (specop & TME_BIT(5)) {
     bf_width = ic->tme_m68k_ireg_uint32(TME_M68K_IREG_D0 + TME_FIELD_EXTRACTU(specop, 0, 3));
+    bf_width &= 31;
   }
   else {
     bf_width = TME_FIELD_EXTRACTU(specop, 0, 5);
   }
-  bf_width &= 31;
   if (bf_width == 0) bf_width = 32;
   return (bf_width);
 }
@@ -1284,7 +1527,7 @@ _tme_m68k_bitfield_read(struct tme_m68k *ic, int is_signed)
   bf_width = tme_m68k_bitfield_width(ic);
 
   /* if this expression is > 32, in a register this means the bitfield
-     wraps, and in memory this means the bitfield is 5-bytes wide: */
+     wraps, and in memory this means the bitfield covers 5 bytes: */
   shift = (bf_offset + bf_width);
 
   /* if this bitfield is in a register (EA mode field is zero): */
@@ -1307,14 +1550,17 @@ _tme_m68k_bitfield_read(struct tme_m68k *ic, int is_signed)
   /* otherwise, this bitfield is in memory: */
   else {
 
+    /* this instruction can fault: */
+    ic->_tme_m68k_mode_flags |= TME_M68K_EXECUTION_INST_CANFAULT;
+
     /* read in the bytes covering the bitfield: */
     bf_bytes = (tme_uint8_t *) &ic->tme_m68k_ireg_memx32;
-    tme_m68k_read_mem(ic, bf_bytes, (bf_offset + bf_width + 7) >> 3);
+    tme_m68k_read_mem(ic, bf_bytes, (bf_offset + bf_width + 7) / 8);
 
     /* get the raw 32-bit word containing the bitfield: */
     bf_value = tme_betoh_u32(ic->tme_m68k_ireg_memx32);
 
-    /* if this bitfield is 5 bytes wide, shift in the part from the fifth byte
+    /* if this bitfield covers 5 bytes, shift in the part from the fifth byte
        (actually in memy32!) on the right: */
     if (shift > 32) {
       shift -= 32;
@@ -1328,12 +1574,12 @@ _tme_m68k_bitfield_read(struct tme_m68k *ic, int is_signed)
   bf_value >>= shift;
 
   /* mask the value: */
-  bf_value &= TME_BIT(bf_width) - 1;
+  bf_value &= (0xffffffffUL >> (32 - bf_width));
 
   /* if this is a signed value, sign-extend it: */
   if (is_signed
       && (bf_value & TME_BIT(bf_width - 1))) {
-    bf_value |= (0xffffffff ^ (TME_BIT(bf_width) - 1));
+    bf_value |= (0xffffffffUL << (bf_width - 1));
   }
 
   /* all bitfield instructions that read the bitfield set the flags: */
@@ -1375,8 +1621,11 @@ tme_m68k_bitfield_write_unsigned(struct tme_m68k *ic, tme_uint32_t bf_value, int
   bf_width = tme_m68k_bitfield_width(ic);
 
   /* if this expression is > 32, in a register this means the bitfield
-     wraps, and in memory this means the bitfield is 5-bytes wide: */
+     wraps, and in memory this means the bitfield covers 5 bytes: */
   shift = (bf_offset + bf_width);
+
+  /* mask the value: */
+  bf_value &= (0xffffffffUL >> (32 - bf_width));
 
   /* if we're supposed to, set the flags: */
   if (set_flags
@@ -1389,9 +1638,6 @@ tme_m68k_bitfield_write_unsigned(struct tme_m68k *ic, tme_uint32_t bf_value, int
 				? 0
 				: TME_M68K_FLAG_Z));
   }
-
-  /* mask the value: */
-  bf_value &= TME_BIT(bf_width) - 1;
 
   /* if this bitfield is in a register (EA mode field is zero): */
   if (TME_FIELD_EXTRACTU(ic->_tme_m68k_insn_opcode, 3, 3) == 0) {
@@ -1412,21 +1658,24 @@ tme_m68k_bitfield_write_unsigned(struct tme_m68k *ic, tme_uint32_t bf_value, int
     /* update the register: */
     shift = (32 - (bf_offset + bf_width));
     ic->tme_m68k_ireg_uint32(ireg) = ((ic->tme_m68k_ireg_uint32(ireg)
-				       & ((TME_BIT(bf_width) - 1) << shift))
+				       & ~((0xffffffffUL >> (32 - bf_width)) << shift))
 				      | (bf_value << shift));
   }
 
   /* otherwise, this bitfield is in memory: */
   else {
 
+    /* this instruction can fault: */
+    ic->_tme_m68k_mode_flags |= TME_M68K_EXECUTION_INST_CANFAULT;
+
     /* read in the bytes covering the bitfield if we haven't yet: */
     bf_bytes = (tme_uint8_t *) &ic->tme_m68k_ireg_memx32;
-    count = (bf_offset + bf_width + 7) >> 3;
+    count = (bf_offset + bf_width + 7) / 8;
     if (first_memory) {
       tme_m68k_read_mem(ic, bf_bytes, count);
     }
 
-    /* if this bitfield is 5 bytes wide, put the part for the fifth
+    /* if this bitfield covers 5 bytes, put the part for the fifth
        byte (actually in memy32!) in on the left: */
     if (shift > 32) {
       shift -= 32;
@@ -1444,7 +1693,7 @@ tme_m68k_bitfield_write_unsigned(struct tme_m68k *ic, tme_uint32_t bf_value, int
       shift = (32 - (bf_offset + bf_width));
       ic->tme_m68k_ireg_memx32 =
 	tme_htobe_u32((tme_betoh_u32(ic->tme_m68k_ireg_memx32)
-		       & ((TME_BIT(bf_width) - 1) << shift))
+		       & ~((0xffffffffUL >> (32 - bf_width)) << shift))
 		      | (bf_value << shift));
     }
 
@@ -1542,9 +1791,8 @@ tme_m68k_dump(struct tme_m68k *ic)
   
   /* dump out instruction decoding information: */
   fprintf(stderr, "\n");
-  fprintf(stderr, "opcode = 0x%04x  specop = 0x%04x  specop2 = 0x%04x\n",
+  fprintf(stderr, "opcode = 0x%04x  specop = 0x%04x\n",
 	  ic->_tme_m68k_insn_opcode,
-	  ic->_tme_m68k_insn_specop,
-	  ic->_tme_m68k_insn_specop2);
+	  ic->_tme_m68k_insn_specop);
 }
 #endif /* 1 */

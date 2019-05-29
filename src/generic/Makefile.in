@@ -83,6 +83,7 @@ AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
+CFLAGS_NO_STRICT_ALIASING = @CFLAGS_NO_STRICT_ALIASING@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CXX = @CXX@
@@ -204,6 +205,7 @@ libtme_generic_la_SOURCES = bus.c \
 	disk.c \
 	tape.c \
 	mouse.c \
+	float.c \
 	keyboard.c
 
 libtme_generic_la_LDFLAGS = -version-info 0:0:0
@@ -213,7 +215,12 @@ tme_generic_la_SOURCES = bus-el.c
 tme_generic_la_LDFLAGS = -module -version-info 0:0:0
 tme_generic_la_LIBADD = libtme-generic.la
 
-EXTRA_DIST = fb-xlat-auto.sh
+EXTRA_DIST = fb-xlat-auto.sh \
+	float-auto.sh \
+	float-auto.c \
+	bus-device-auto.sh \
+	bus-device-auto.c
+
 subdir = generic
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = $(top_builddir)/config.h
@@ -222,7 +229,8 @@ LTLIBRARIES = $(lib_LTLIBRARIES) $(pkglib_LTLIBRARIES)
 
 libtme_generic_la_LIBADD =
 am_libtme_generic_la_OBJECTS = bus.lo bus-device.lo serial.lo \
-	ethernet.lo fb.lo scsi.lo disk.lo tape.lo mouse.lo keyboard.lo
+	ethernet.lo fb.lo scsi.lo disk.lo tape.lo mouse.lo float.lo \
+	keyboard.lo
 libtme_generic_la_OBJECTS = $(am_libtme_generic_la_OBJECTS)
 tme_generic_la_DEPENDENCIES = libtme-generic.la
 am_tme_generic_la_OBJECTS = bus-el.lo
@@ -234,9 +242,10 @@ am__depfiles_maybe = depfiles
 @AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/bus-device.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/bus-el.Plo ./$(DEPDIR)/bus.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/disk.Plo ./$(DEPDIR)/ethernet.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/fb.Plo ./$(DEPDIR)/keyboard.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/mouse.Plo ./$(DEPDIR)/scsi.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/serial.Plo ./$(DEPDIR)/tape.Plo
+@AMDEP_TRUE@	./$(DEPDIR)/fb.Plo ./$(DEPDIR)/float.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/keyboard.Plo ./$(DEPDIR)/mouse.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/scsi.Plo ./$(DEPDIR)/serial.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/tape.Plo
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) \
@@ -330,6 +339,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/disk.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ethernet.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fb.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/float.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/keyboard.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mouse.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scsi.Plo@am__quote@
@@ -566,6 +576,20 @@ fb-xlat-auto.c: fb-xlat-auto.sh
 
 # fb.lo depends on fb-xlat-auto.c:
 fb.lo: fb-xlat-auto.c
+
+# target to make float-auto.c:
+float-auto.c: float-auto.sh
+	$(SHELL) $(srcdir)/float-auto.sh > $@
+
+# float.lo depends on float-auto.c:
+float.lo: float-auto.c
+
+# target to make bus-device-auto.c:
+bus-device-auto.c: bus-device-auto.sh
+	$(SHELL) $(srcdir)/bus-device-auto.sh > $@
+
+# bus-device.lo depends on bus-device-auto.c:
+bus-device.lo: bus-device-auto.c
 
 # this automake include file must be included in all directories that
 # build modules.  it updates the modules index that will be installed

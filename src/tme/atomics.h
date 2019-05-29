@@ -1,4 +1,4 @@
-/* $Id: atomics.h,v 1.2 2003/04/29 16:10:55 fredette Exp $ */
+/* $Id: atomics.h,v 1.3 2005/02/17 12:37:26 fredette Exp $ */
 
 /* tme/atomics.h - header file for atomically-updated values: */
 
@@ -37,7 +37,7 @@
 #define _TME_ATOMICS_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: atomics.h,v 1.2 2003/04/29 16:10:55 fredette Exp $");
+_TME_RCSID("$Id: atomics.h,v 1.3 2005/02/17 12:37:26 fredette Exp $");
 
 /* includes: */
 #include <tme/threads.h>
@@ -50,9 +50,9 @@ _TME_RCSID("$Id: atomics.h,v 1.2 2003/04/29 16:10:55 fredette Exp $");
 #ifdef TME_NO_AUDIT_ATOMICS
 
 /* no-audit atomic variables: */
-#define TME_ATOMIC(typ, var) typ var
+#define TME_ATOMIC(typ, var) typ _tme_volatile var
 #define TME_ATOMIC_POINTER(ptr) (ptr)
-#define TME_ATOMIC_POINTER_TYPE(typ) typ
+#define TME_ATOMIC_POINTER_TYPE(typ) typ _tme_volatile *
 #define TME_ATOMIC_WRITE(typ, var, rvalue)	\
   (var = (rvalue))
 #define TME_ATOMIC_READ(typ, var)		\
@@ -61,13 +61,13 @@ _TME_RCSID("$Id: atomics.h,v 1.2 2003/04/29 16:10:55 fredette Exp $");
 #else  /* !TME_NO_AUDIT_ATOMICS */
 
 /* auditable atomic variables: */
-#define TME_ATOMIC(typ, var) struct { unsigned long __atomic_junk; typ __atomic_value; } var
+#define TME_ATOMIC(typ, var) struct { unsigned long __atomic_junk; typ _tme_volatile __atomic_value; } var
 #define TME_ATOMIC_POINTER(ptr) ((unsigned long *) (ptr))
 #define TME_ATOMIC_POINTER_TYPE(typ) unsigned long *
 #define TME_ATOMIC_WRITE(typ, var, rvalue)	\
-  (*((typ *) (((unsigned long *) &(var)) + 1)) = (rvalue))
+  (*((typ _tme_volatile *) (((unsigned long *) &(var)) + 1)) = (rvalue))
 #define TME_ATOMIC_READ(typ, var)		\
-  (*((typ *) (((unsigned long *) &(var)) + 1)))
+  (*((typ _tme_volatile *) (((unsigned long *) &(var)) + 1)))
 
 #endif /* !TME_NO_AUDIT_ATOMICS */
 

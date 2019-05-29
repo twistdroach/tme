@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# $Id: m68k-misc-auto.sh,v 1.7 2003/05/10 15:19:00 fredette Exp $
+# $Id: m68k-misc-auto.sh,v 1.10 2005/04/30 15:19:45 fredette Exp $
 
 # ic/m68k/m68k-misc-auto.sh - automatically generates C code 
 # for miscellaneous m68k emulation support:
@@ -77,12 +77,15 @@ if $header; then
 	done
     done
 
-    # the current and next program counter:
+    # the current, next, and last program counter:
     echo "#define TME_M68K_IREG_PC		(${ireg32_next})"
     echo "#define tme_m68k_ireg_pc		tme_m68k_ireg_uint32(TME_M68K_IREG_PC)"
     ireg32_next=`expr ${ireg32_next} + 1`
     echo "#define TME_M68K_IREG_PC_NEXT		(${ireg32_next})"
     echo "#define tme_m68k_ireg_pc_next		tme_m68k_ireg_uint32(TME_M68K_IREG_PC_NEXT)"
+    ireg32_next=`expr ${ireg32_next} + 1`
+    echo "#define TME_M68K_IREG_PC_LAST		(${ireg32_next})"
+    echo "#define tme_m68k_ireg_pc_last		tme_m68k_ireg_uint32(TME_M68K_IREG_PC_LAST)"
     ireg32_next=`expr ${ireg32_next} + 1`
     
     # the status register and ccr:
@@ -110,14 +113,34 @@ if $header; then
     done
 
     # the control registers:
-    for reg in usp isp msp sfc dfc vbr; do
+    for reg in usp isp msp sfc dfc vbr cacr caar; do
 	capreg=`echo $reg | tr a-z A-Z`
 	echo "#define TME_M68K_IREG_${capreg}		(${ireg32_next})"
 	echo "#define tme_m68k_ireg_${reg}		tme_m68k_ireg_uint32(TME_M68K_IREG_${capreg})"
 	ireg32_next=`expr ${ireg32_next} + 1`
     done
 
+    # this is the count of variable 32-bit registers:
     echo "#define TME_M68K_IREG32_COUNT		(${ireg32_next})"
+
+    # the immediate register.  there are actually three 32-bit
+    # registers in a row, to allow the fpgen specop to fetch up to a
+    # 96-bit immediate:
+    echo "#define TME_M68K_IREG_IMM32		(${ireg32_next})"
+    echo "#define tme_m68k_ireg_imm32		tme_m68k_ireg_uint32(TME_M68K_IREG_IMM32)"
+    ireg32_next=`expr ${ireg32_next} + 1`
+
+    # the effective address register:
+    echo "#define TME_M68K_IREG_EA		(${ireg32_next})"
+    echo "#define tme_m68k_ireg_ea		tme_m68k_ireg_uint32(TME_M68K_IREG_EA)"
+    ireg32_next=`expr ${ireg32_next} + 1`
+
+    # the constant registers:
+    for reg in zero one two three four five six seven eight; do
+	capreg=`echo $reg | tr a-z A-Z`
+	echo "#define TME_M68K_IREG_${capreg}		(${ireg32_next})"
+	ireg32_next=`expr ${ireg32_next} + 1`
+    done
 fi
 
 # emit the flags->conditions mapping.  note that the nesting of the
@@ -248,12 +271,21 @@ if $header; then
 				echo "/* on all hosts, this fetches a ${size}-bit ${un}signed value for the slow executor: */"
 				echo "#undef _TME_M68K_EXECUTE_FETCH_${capsign}${size}"
 				echo "#define _TME_M68K_EXECUTE_FETCH_${capsign}${size}(v) \\"
-				echo "  (v) = (tme_${sign}int${size}_t) tme_m68k_fetch${size}(ic, linear_pc); \\"
+				echo "  /* we update the instruction buffer fetch total and sizes values \\"
+				echo "     before we do the actual fetch, because we may transfer a few \\"
+				echo "     bytes and then fault.  without this, those few bytes wouldn't get \\"
+				echo "     saved in the exception stack frame by tme_m68k_insn_buffer_xfer(), \\"
+				echo "     because it wouldn't know about the fetch.  later, when the \\"
+				echo "     instruction would be resumed, tme_m68k_fetch${size}() won't refetch \\"
+				echo "     them, because it knows they've already been fetched and thinks \\"
+				echo "     they're still in the instruction buffer: */ \\"
+				echo "  ic->_tme_m68k_insn_buffer_fetch_total += sizeof(tme_${sign}int${size}_t); \\"
 				if test ${size} = 16; then
-				    echo "  insn_fetch_sizes <<= 1; \\"
+				    echo "  ic->_tme_m68k_insn_buffer_fetch_sizes <<= 1; \\"
 				else
-				    echo "  insn_fetch_sizes = (insn_fetch_sizes << 1) | 1; \\"
+				    echo "  ic->_tme_m68k_insn_buffer_fetch_sizes = (ic->_tme_m68k_insn_buffer_fetch_sizes << 1) | 1; \\"
 				fi
+				echo "  (v) = (tme_${sign}int${size}_t) tme_m68k_fetch${size}(ic, linear_pc); \\"
 				echo "  linear_pc += sizeof(tme_${sign}int${size}_t)"
 			    fi
 			    continue

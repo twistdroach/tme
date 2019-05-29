@@ -1,4 +1,4 @@
-/* $Id: ethernet.h,v 1.2 2003/05/09 13:12:01 fredette Exp $ */
+/* $Id: ethernet.h,v 1.3 2004/04/30 01:46:01 fredette Exp $ */
 
 /* tme/generic/ethernet.h - header file for generic ethernet support: */
 
@@ -37,7 +37,7 @@
 #define _TME_GENERIC_ETHERNET_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: ethernet.h,v 1.2 2003/05/09 13:12:01 fredette Exp $");
+_TME_RCSID("$Id: ethernet.h,v 1.3 2004/04/30 01:46:01 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -47,8 +47,14 @@ _TME_RCSID("$Id: ethernet.h,v 1.2 2003/05/09 13:12:01 fredette Exp $");
 /* the size of an address: */
 #define TME_ETHERNET_ADDR_SIZE		(6)
 
+/* the size of a length field: */
+#define TME_ETHERNET_LENGTH_SIZE	(2)
+
 /* the size of a CRC: */
 #define TME_ETHERNET_CRC_SIZE		(4)
+
+/* the size of an Ethernet header: */
+#define TME_ETHERNET_HEADER_SIZE	(TME_ETHERNET_ADDR_SIZE + TME_ETHERNET_ADDR_SIZE + TME_ETHERNET_LENGTH_SIZE)
 
 /* the minimum and maximum sizes of an Ethernet frame, including the
    complete header and CRC: */

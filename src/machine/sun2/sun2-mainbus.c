@@ -1,4 +1,4 @@
-/* $Id: sun2-mainbus.c,v 1.13 2003/07/31 01:43:13 fredette Exp $ */
+/* $Id: sun2-mainbus.c,v 1.16 2005/02/17 13:32:05 fredette Exp $ */
 
 /* machine/sun2/sun2-mainbus.c - implementation of Sun 2 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun2-mainbus.c,v 1.13 2003/07/31 01:43:13 fredette Exp $");
+_TME_RCSID("$Id: sun2-mainbus.c,v 1.16 2005/02/17 13:32:05 fredette Exp $");
 
 /* includes: */
 #include "sun2-impl.h"
@@ -104,19 +104,17 @@ _tme_sun2_bus_signal(struct tme_bus_connection *conn_bus_raiser, unsigned int si
   /* recover our sun2: */
   sun2 = (struct tme_sun2 *) conn_bus_raiser->tme_bus_connection.tme_connection_element->tme_element_private;
 
-  /* take out the level and edge.  all of our signals are active low: */
+  /* see whether the signal is asserted or negated: */
   signal_asserted = TRUE;
   switch (signal & TME_BUS_SIGNAL_LEVEL_MASK) {
-  case TME_BUS_SIGNAL_LEVEL_LOW: 
-  case TME_BUS_SIGNAL_LEVEL_ASSERTED:
-    break;
-  case TME_BUS_SIGNAL_LEVEL_HIGH: 
   case TME_BUS_SIGNAL_LEVEL_NEGATED:
     signal_asserted = FALSE;
+  case TME_BUS_SIGNAL_LEVEL_ASSERTED:
     break;
+  default:
+    abort();
   }
-  signal &= ~(TME_BUS_SIGNAL_LEVEL_MASK
-	      | TME_BUS_SIGNAL_EDGE);
+  signal = TME_BUS_SIGNAL_WHICH(signal);
 
   /* dispatch on the signal: */
 
@@ -132,7 +130,7 @@ _tme_sun2_bus_signal(struct tme_bus_connection *conn_bus_raiser, unsigned int si
 
   /* an interrupt signal: */
   else if (TME_BUS_SIGNAL_IS_INT(signal)) {
-    ipl = TME_BUS_SIGNAL_WHICH_INT(signal);
+    ipl = TME_BUS_SIGNAL_INDEX_INT(signal);
     if (ipl >= TME_M68K_IPL_MIN
 	&& ipl <= TME_M68K_IPL_MAX) {
       
@@ -468,7 +466,7 @@ _tme_sun2_connections_new(struct tme_element *element, const char * const *args,
       which_bus = TME_SUN2_BUS_OBIO;
     }
 
-    if (sun2->tme_sun2_obio == NULL) {
+    if (sun2->tme_sun2_obmem == NULL) {
       tme_output_append(&free_buses, " obmem");
     }
     if (TME_ARG_IS(args[1], "obmem")) {
@@ -495,7 +493,7 @@ _tme_sun2_connections_new(struct tme_element *element, const char * const *args,
 	which_bus = TME_SUN2_BUS_MBIO;
       }
       
-      if (sun2->tme_sun2_mbio == NULL) {
+      if (sun2->tme_sun2_mbmem == NULL) {
 	tme_output_append(&free_buses, " mbmem");
       }
       if (TME_ARG_IS(args[1], "mbmem")) {
@@ -689,11 +687,11 @@ TME_ELEMENT_SUB_NEW_DECL(tme_machine_sun2,clock) {
 
   /* Timer 1 is connected to the bus as ipl 7 (inverted): */
   socket.tme_am9513_socket_counter_signals[0] = 
-    TME_BUS_SIGNAL_INT(7) | TME_BUS_SIGNAL_LEVEL_INVERTED;
+    TME_BUS_SIGNAL_INT(7) | (TME_BUS_SIGNAL_LEVEL_ASSERTED ^ TME_BUS_SIGNAL_LEVEL_HIGH);
 
   /* Timer 2 is connected to the bus as ipl 5 (inverted): */
   socket.tme_am9513_socket_counter_signals[1] = 
-    TME_BUS_SIGNAL_INT(5) | TME_BUS_SIGNAL_LEVEL_INVERTED;
+    TME_BUS_SIGNAL_INT(5) | (TME_BUS_SIGNAL_LEVEL_ASSERTED ^ TME_BUS_SIGNAL_LEVEL_HIGH);
 
   /* Timer 3 is connected to the bus as ???: */
   socket.tme_am9513_socket_counter_signals[2] = TME_BUS_SIGNAL_ABORT;
@@ -728,20 +726,19 @@ TME_ELEMENT_SUB_NEW_DECL(tme_machine_sun2,tod) {
 
 /* this creates a new Sun-2 z8530: */
 TME_ELEMENT_SUB_NEW_DECL(tme_machine_sun2,zs) {
-  struct tme_z8530_socket socket;
+  struct tme_z8530_socket socket = TME_SUN_Z8530_SOCKET_INIT;
   char *sub_args[2];
 
-  /* create the z8530 socket: */
-  socket.tme_z8530_socket_version = TME_Z8530_SOCKET_0;
-  socket.tme_z8530_socket_address_chan_a = 4;
-  socket.tme_z8530_socket_address_chan_b = 0;
-  socket.tme_z8530_socket_offset_csr = 0;
-  socket.tme_z8530_socket_offset_data = 2;
+  /* override the least lane in the z8530 socket: */
   socket.tme_z8530_socket_port_least_lane = 1; /* D15-D8 */
-  socket.tme_z8530_socket_pclk = (9600 * 512);
 
   /* create the z8530: */
   sub_args[0] = "tme/ic/z8530";
   sub_args[1] = NULL;
   return (tme_element_new(element, (const char * const *) sub_args, &socket, _output));
+}
+
+/* this creates a new Sun-2 bwtwo: */
+TME_ELEMENT_SUB_NEW_DECL(tme_machine_sun2,bwtwo) {
+  return (tme_sun_bwtwo(element, args, _output));
 }

@@ -6,11 +6,47 @@
 /* Define to the minimum alignment, in bytes, of int32_t. */
 #undef ALIGNOF_INT32_T
 
+/* Define to the floating point format of a double. */
+#undef FLOAT_FORMAT_DOUBLE
+
+/* Define to the floating point format of a float. */
+#undef FLOAT_FORMAT_FLOAT
+
+/* Define to the floating point format of a long double. */
+#undef FLOAT_FORMAT_LONG_DOUBLE
+
+/* Define to the maximum value of a double. */
+#undef FLOAT_MAX_DOUBLE
+
+/* Define to the maximum value of a float. */
+#undef FLOAT_MAX_FLOAT
+
+/* Define to the maximum value of a long double. */
+#undef FLOAT_MAX_LONG_DOUBLE
+
+/* Define to the minimum value of a double. */
+#undef FLOAT_MIN_DOUBLE
+
+/* Define to the minimum value of a float. */
+#undef FLOAT_MIN_FLOAT
+
+/* Define to the minimum value of a long double. */
+#undef FLOAT_MIN_LONG_DOUBLE
+
 /* Define if you have AF_LINK. */
 #undef HAVE_AF_LINK
 
+/* Define if you have bswap16(). */
+#undef HAVE_BSWAP16
+
+/* Define if you have bswap32(). */
+#undef HAVE_BSWAP32
+
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
+
+/* Define to 1 if you have the <float.h> header file. */
+#undef HAVE_FLOAT_H
 
 /* Define to 1 if you have the `getpagesize' function. */
 #undef HAVE_GETPAGESIZE
@@ -23,6 +59,16 @@
 
 /* Define to 1 if you have the <ioctls.h> header file. */
 #undef HAVE_IOCTLS_H
+
+/* Define if you have isinff(). */
+#undef HAVE_ISINFF
+
+/* Define to 1 if you have the <limits.h> header file. */
+#undef HAVE_LIMITS_H
+
+/* Define to 1 if long double works and has more range or precision than
+   double. */
+#undef HAVE_LONG_DOUBLE
 
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
@@ -53,6 +99,9 @@
 
 /* Define to 1 if you have the <string.h> header file. */
 #undef HAVE_STRING_H
+
+/* Define to 1 if you have the <sys/bswap.h> header file. */
+#undef HAVE_SYS_BSWAP_H
 
 /* Define to 1 if you have the <sys/ioctl.h> header file. */
 #undef HAVE_SYS_IOCTL_H
@@ -90,6 +139,9 @@
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
+/* Define as the return type of signal handlers (`int' or `void'). */
+#undef RETSIGTYPE
+
 /* Define to the maximum shift count for a int16_t. */
 #undef SHIFTMAX_INT16_T
 
@@ -99,11 +151,29 @@
 /* Define to the maximum shift count for a int8_t. */
 #undef SHIFTMAX_INT8_T
 
+/* Define if all right shifts of int16_t are arithmetic. */
+#undef SHIFTSIGNED_INT16_T
+
+/* Define if all right shifts of int32_t are arithmetic. */
+#undef SHIFTSIGNED_INT32_T
+
+/* Define if all right shifts of int8_t are arithmetic. */
+#undef SHIFTSIGNED_INT8_T
+
+/* The size of a `double', as computed by sizeof. */
+#undef SIZEOF_DOUBLE
+
+/* The size of a `float', as computed by sizeof. */
+#undef SIZEOF_FLOAT
+
 /* The size of a `int', as computed by sizeof. */
 #undef SIZEOF_INT
 
 /* The size of a `long', as computed by sizeof. */
 #undef SIZEOF_LONG
+
+/* The size of a `long double', as computed by sizeof. */
+#undef SIZEOF_LONG_DOUBLE
 
 /* The size of a `short', as computed by sizeof. */
 #undef SIZEOF_SHORT
@@ -130,3 +200,7 @@
 
 /* Define to `unsigned' if <sys/types.h> does not define. */
 #undef size_t
+
+/* Define to empty if the keyword `volatile' does not work. Warning: valid
+   code using `volatile' can become incorrect without. Disable with care. */
+#undef volatile

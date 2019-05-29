@@ -1,4 +1,4 @@
-/* $Id: scsi.h,v 1.1 2003/07/29 18:12:29 fredette Exp $ */
+/* $Id: scsi.h,v 1.2 2005/02/18 03:05:49 fredette Exp $ */
 
 /* tme/generic/scsi.h - header file for generic SCSI support: */
 
@@ -37,7 +37,7 @@
 #define _TME_GENERIC_SCSI_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: scsi.h,v 1.1 2003/07/29 18:12:29 fredette Exp $");
+_TME_RCSID("$Id: scsi.h,v 1.2 2005/02/18 03:05:49 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -57,6 +57,33 @@ _TME_RCSID("$Id: scsi.h,v 1.1 2003/07/29 18:12:29 fredette Exp $");
 #define TME_SCSI_SIGNAL_RST		TME_BIT(8)
 #define TME_SCSI_SIGNAL_DBP		TME_BIT(9)
 #define TME_SCSI_SIGNAL_DBP1		TME_BIT(10)
+
+/* this evaluates to nonzero if only one of the bits in mask is set in data: */
+#define _TME_SCSI_ID_SET(ids, data)		\
+  (((data) & (ids)) != 0 && (((data) & (ids)) & (((data) & (ids)) - 1)) == 0)
+
+/* "In all systems, the target shall determine that it is selected
+   when SEL and its SCSI ID bit are true and BSY and I/O are false for
+   at least a bus settle delay." */
+#define TME_SCSI_ID_SELECTED(ids, control, data)\
+  ((((control)					\
+     & (TME_SCSI_SIGNAL_BSY			\
+	| TME_SCSI_SIGNAL_SEL			\
+	| TME_SCSI_SIGNAL_I_O))			\
+    == TME_SCSI_SIGNAL_SEL)			\
+   && _TME_SCSI_ID_SET(ids, data))
+
+/* "The initiator shall determine that it is reselected when SEL, I/O,
+   and its SCSI ID bit are true and BSY is false for at least a bus
+   settle delay." */
+#define TME_SCSI_ID_RESELECTED(ids, control, data)\
+  ((((control)					\
+     & (TME_SCSI_SIGNAL_BSY			\
+	| TME_SCSI_SIGNAL_SEL			\
+	| TME_SCSI_SIGNAL_I_O))			\
+    == (TME_SCSI_SIGNAL_SEL			\
+	| TME_SCSI_SIGNAL_I_O))			\
+   && _TME_SCSI_ID_SET(ids, data))
 
 /* this gets the current SCSI bus information transfer phase from a
    set of control signals: */
@@ -84,27 +111,38 @@ _TME_RCSID("$Id: scsi.h,v 1.1 2003/07/29 18:12:29 fredette Exp $");
 #define  TME_SCSI_DMA_16BIT		(0x01)
 #define TME_SCSI_DMA_PARITY		(0x04)
 
-/* the SCSI data signal routing: */
-#define TME_SCSI_DATA_OUT_IMM		(0)
-#define TME_SCSI_DATA_OUT_DMA		(1)
-#define TME_SCSI_DATA_OUT_DMA_ADVANCE	(2)
-#define TME_SCSI_DATA_IN_DMA		(3)
-#define TME_SCSI_DATA_IN_DMA_ADVANCE	(4)
+/* the SCSI events: */
+#define TME_SCSI_EVENT_NONE				(0)
+#define  TME_SCSI_EVENT_IDS_SELF(ids)			(ids)
+#define  TME_SCSI_EVENT_IDS_WHICH(event)		((event) & 0xffff)
+#define TME_SCSI_EVENT_SELECTED				(TME_BIT(16))
+#define TME_SCSI_EVENT_RESELECTED			(TME_BIT(17))
+#define TME_SCSI_EVENT_BUS_FREE				(TME_BIT(18))
+#define TME_SCSI_EVENT_BUS_CHANGE			(TME_BIT(19))
+#define TME_SCSI_EVENT_BUS_RESET			(TME_BIT(20))
 
-/* the predefined SCSI sequence types: */
-#define TME_SCSI_SEQUENCE_ARBITRATE_HALF		(1)
-#define TME_SCSI_SEQUENCE_ARBITRATE_FULL		(2)
-#define TME_SCSI_SEQUENCE_SELECT			(3)
-#define TME_SCSI_SEQUENCE_RESELECT			(4)
-#define TME_SCSI_SEQUENCE_ARBITRATE_SELECT		(5)
-#define TME_SCSI_SEQUENCE_ARBITRATE_RESELECT		(6)
-#define TME_SCSI_SEQUENCE_INFO_DMA_INITIATOR		(7)
-#define TME_SCSI_SEQUENCE_INFO_DMA_TARGET		(8)
-#define TME_SCSI_SEQUENCE_WAIT_SELECT_HALF		(9)
-#define TME_SCSI_SEQUENCE_WAIT_SELECT_FULL		(10)
-#define TME_SCSI_SEQUENCE_WAIT_SELECT_OR_RESELECT_HALF	(11)
-#define TME_SCSI_SEQUENCE_WAIT_SELECT_OR_RESELECT_FULL	(12)
-#define TME_SCSI_SEQUENCE_WAIT_CHANGE			(13)
+/* the SCSI actions.  these are deliberately ordered such that actions
+   that have to be taken earlier have a larger value than those that
+   have to be taken later: */
+#define TME_SCSI_ACTION_NONE				(0)
+#define  TME_SCSI_ACTION_ID_SELF(id)			((id) << 0)
+#define  TME_SCSI_ACTION_ID_SELF_WHICH(actions)		(((actions) >> 0) & 0xf)
+#define  TME_SCSI_ACTION_ID_OTHER(id)			((id) << 4)
+#define  TME_SCSI_ACTION_ID_OTHER_WHICH(actions)	(((actions) >> 4) & 0xf)
+#define TME_SCSI_ACTION_DMA_INITIATOR			(TME_BIT(8))
+#define TME_SCSI_ACTION_DMA_TARGET			(TME_BIT(9))
+#define TME_SCSI_ACTION_RESPOND_SELECTED		(TME_BIT(10))
+#define TME_SCSI_ACTION_RESPOND_RESELECTED		(TME_BIT(11))
+#define TME_SCSI_ACTION_SELECT				(TME_BIT(12))
+#define TME_SCSI_ACTION_SELECT_SINGLE_INITIATOR		(TME_BIT(13) | TME_SCSI_ACTION_SELECT)
+#define TME_SCSI_ACTION_RESELECT			(TME_BIT(14))
+#define TME_SCSI_ACTION_ARBITRATE_HALF			(TME_BIT(15))
+#define TME_SCSI_ACTION_ARBITRATE_FULL			(TME_BIT(16) | TME_SCSI_ACTION_ARBITRATE_HALF)
+
+/* this evaluates to nonzero if any of the actions in the mask are
+   selected, and no more significant actions are also selected: */
+#define TME_SCSI_ACTIONS_SELECTED(actions, actions_mask)	\
+  (((actions) & (actions_mask)) != 0 && (((actions) & ~(actions_mask)) < (actions_mask)))
 
 /* types: */
 
@@ -113,43 +151,6 @@ typedef tme_uint32_t tme_scsi_control_t;
 
 /* the SCSI data signals: */
 typedef tme_uint32_t tme_scsi_data_t;
-
-/* a SCSI sequence step: */
-struct tme_scsi_sequence {
-
-  /* the amount of time, in microseconds, to delay before asserting
-     signals in this sequence step.  TME_SCSI_SEQUENCE_TIME_ARBITRATE
-     is a special value indicating that this is the first step in
-     arbitration: */
-  unsigned long tme_scsi_sequence_delay_pre;
-
-  /* the SCSI control signals to assert in this sequence step: */
-  tme_scsi_control_t tme_scsi_sequence_controls;
-
-  /* the SCSI data signals to assert in this sequence step.  the
-     tme_scsi_sequence_data member is one of the TME_SCSI_DATA_
-     identifiers: */
-  unsigned int tme_scsi_sequence_data;
-  tme_scsi_data_t tme_scsi_sequence_data_imm;
-
-  /* the amount of time, in microseconds, to delay after signals have
-     been asserted before sampling the bus: */
-  unsigned long tme_scsi_sequence_delay_post;
-
-  /* the amount of time, in microseconds, to sample the bus.
-     TME_SCSI_SEQUENCE_TIME_INFINITE is a special value indicating
-     that this should wait forever: */
-  unsigned long tme_scsi_sequence_sample_time;
-     
-  /* the SCSI control and data signals masks to sample and match: */
-  tme_scsi_control_t tme_scsi_sequence_controls_mask;
-  tme_scsi_control_t tme_scsi_sequence_controls_match;
-  tme_scsi_data_t tme_scsi_sequence_data_mask;
-  tme_scsi_data_t tme_scsi_sequence_data_match;
-
-  /* if the match succeeds, this is the next sequence step: */
-  _tme_const struct tme_scsi_sequence *tme_scsi_sequence_next;
-};
 
 /* a SCSI DMA buffer: */
 struct tme_scsi_dma {
@@ -186,13 +187,9 @@ struct tme_scsi_connection {
   int (*tme_scsi_connection_cycle) _TME_P((struct tme_scsi_connection *,
 					   tme_scsi_control_t,
 					   tme_scsi_data_t,
-					   _tme_const struct tme_scsi_sequence *,
-					   struct tme_scsi_dma *));
-
-  /* this is called to get a predefined sequence: */
-  _tme_const struct tme_scsi_sequence *(*tme_scsi_connection_sequence_get)
-       _TME_P((struct tme_scsi_connection *,
-	       unsigned int, ...));
+					   tme_uint32_t,
+					   tme_uint32_t,
+					   const struct tme_scsi_dma *));
 };
 
 /* prototypes: */

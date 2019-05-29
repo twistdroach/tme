@@ -1,4 +1,4 @@
-/* $Id: misc.c,v 1.2 2003/06/27 21:00:21 fredette Exp $ */
+/* $Id: misc.c,v 1.4 2004/05/11 12:03:36 fredette Exp $ */
 
 /* libtme/misc.c - miscellaneous: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: misc.c,v 1.2 2003/06/27 21:00:21 fredette Exp $");
+_TME_RCSID("$Id: misc.c,v 1.4 2004/05/11 12:03:36 fredette Exp $");
 
 /* includes: */
 #include <tme/threads.h>
@@ -147,4 +147,179 @@ tme_free_string_array(char **array, int length)
   tme_free(array);
 }
     
+#ifdef TME_HAVE_INT64_T
+#define _tme_unumber_t tme_uint64_t
+#define _tme_number_t tme_int64_t
+#else  /* !TME_HAVE_INT64_T */
+#define _tme_unumber_t tme_uint32_t
+#define _tme_number_t tme_int32_t
+#endif /* !TME_HAVE_INT64_T */
+
+/* this internal function parses a number: */
+static _tme_unumber_t
+_tme_misc_number_parse(const char *string,
+		       _tme_unumber_t max_positive,
+		       _tme_unumber_t max_negative,
+		       _tme_unumber_t underflow,
+		       int *_failed)
+{
+  char c;
+  int negative;
+  unsigned int base;
+  _tme_unumber_t value, max, max_pre_shift;
+  tme_uint32_t units;
+  unsigned long digit;
+  int failed;
+  char cbuf[2], *p1;
+
+  /* assume simple conversion failure: */
+  *_failed = TRUE;
+  errno = 0;
+
+  /* return simple conversion failure for a NULL string: */
+  if (string == NULL) {
+    return (0);
+  }
+
+  /* XXX parts of this might be ASCII-centric: */
+
+  /* skip leading whitespace: */
+  for (; (c = *string) != '\0' && isspace(c); string++);
+
+  /* check for a leading '-' or '+' character: */
+  if ((negative = (c == '-'))
+      || c == '+') {
+    c = *(++string);
+  }
+
+  /* check for a leading 0x or 0X, indicating hex, or a leading 0,
+     indicating octal.  in the octal case, we don't skip the leading
+     zero, because it may be the only digit to convert: */
+  base = 10;
+  if (c == '0') {
+    base = 8;
+    c = *(string + 1);
+    if (c == 'x'
+	|| c == 'X') {
+      base = 16;
+      string += 2;
+    }
+  }
+
+  /* determine the maximum magnitude of the converted value, and the
+     maximum magnitude past which we cannot shift it to add another
+     digit in this base without overflowing: */
+  max = (negative ? max_negative : max_positive);
+  max_pre_shift = max / base;
+
+  /* prepare the strtoul character buffer: */
+  cbuf[1] = '\0';
+
+  /* convert characters: */
+  value = 0;  
+  for (failed = TRUE;
+       (c = *string) != '\0';
+       failed = FALSE, string++) {
+    
+    /* stop if we can't convert this character into a digit: */
+    cbuf[0] = c;
+    digit = strtoul(cbuf, &p1, base);
+    if (*p1 != '\0') {
+      break;
+    }
+
+    /* return ERANGE if this digit causes an overflow: */
+    if (value > max_pre_shift
+	|| digit > (max - (value *= base))) {
+      errno = ERANGE;
+      return (negative ? underflow : max_positive);
+    }
+    value += digit;
+  }
+
+  /* get any units: */
+  units = 1;
+  if (!strcmp(string, "GB")
+      || !strcasecmp(string, "G")) {
+    units = 1024 * 1024 * 1024;
+  }
+  else if (!strcmp(string, "MB")
+	   || !strcasecmp(string, "M")) {
+    units = 1024 * 1024;
+  }
+  else if (!strcmp(string, "KB")
+	   || !strcasecmp(string, "K")) {
+    units = 1024;
+  }
+  else if (*string != '\0') {
+    failed = TRUE;
+  }
+
+  /* return ERANGE if the units cause an overflow: */
+  if (!failed
+      && value > (max / units)) {
+    errno = ERANGE;
+    return (negative ? underflow : max_positive);
+  }
+
+  /* return success: */
+  *_failed = FALSE;
+  value *= units;
+  return (negative ? 0 - value : value);
+}
+
+/* this parses an unsigned number: */
+_tme_unumber_t
+tme_misc_unumber_parse_any(const char *string, 
+			   int *_failed)
+{
+  _tme_unumber_t max;
+  max = 0;
+  max -= 1;
+  return (_tme_misc_number_parse(string,
+				 max,
+				 max,
+				 max,
+				 _failed));
+}
+
+/* this parses a signed number: */
+_tme_number_t 
+tme_misc_number_parse_any(const char *string,
+			  int *_failed)
+{
+  _tme_unumber_t max_positive;
+  _tme_unumber_t max_negative;
+  max_positive = 1;
+  max_positive = (max_positive << ((sizeof(max_positive) * 8) - 1)) - 1;
+  max_negative = max_positive + 1;
+  return (_tme_misc_number_parse(string,
+				 max_positive,
+				 max_negative,
+				 max_negative,
+				 _failed));
+}
+
+/* this parses an unsigned number that has a restricted range: */
+_tme_unumber_t
+tme_misc_unumber_parse(const char *string, 
+		       _tme_unumber_t failure_value)
+{
+  int failed;
+  _tme_unumber_t value;
+  value = tme_misc_unumber_parse_any(string, &failed);
+  return (failed ? failure_value : value);
+}
+
+/* this parses a signed number that has a restricted range: */
+_tme_number_t
+tme_misc_number_parse(const char *string, 
+		      _tme_number_t failure_value)
+{
+  int failed;
+  _tme_number_t value;
+  value = tme_misc_number_parse_any(string, &failed);
+  return (failed ? failure_value : value);
+}
+
     

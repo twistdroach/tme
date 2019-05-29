@@ -52,6 +52,7 @@ AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
+CFLAGS_NO_STRICT_ALIASING = @CFLAGS_NO_STRICT_ALIASING@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CXX = @CXX@
@@ -164,18 +165,24 @@ AUTOMAKE_OPTIONS = 1.4 gnu
 INCLUDES = -I$(top_srcdir) -I$(srcdir) -I. -D_TME_IMPL
 
 pkglib_LTLIBRARIES = libtme-machine-sun.la
-libtme_machine_sun_la_SOURCES = sun-mmu.c
+libtme_machine_sun_la_SOURCES = sun-mmu.c \
+	sun-bwtwo.c \
+	sun-cgtwo.c \
+	sun-fb.c sun-fb.h \
+	sun-si.c \
+	sun-obie.c
+
 libtme_machine_sun_la_LDFLAGS = -version-info 0:0:0
 libtme_machine_sun_la_LIBADD = $(top_builddir)/libtme/libtme.la \
 	$(top_builddir)/generic/libtme-generic.la
 
 
-bin_SCRIPTS = tme-sun-idprom
+bin_SCRIPTS = tme-sun-idprom tme-sun-eeprom
 
 examplesdir = $(datadir)/examples/tme
 examples_DATA = sun-keyboards.txt my-sun-macros.txt
 
-EXTRA_DIST = tme-sun-idprom.pl $(examples_DATA)
+EXTRA_DIST = tme-sun-idprom.pl tme-sun-eeprom.pl $(examples_DATA)
 subdir = machine/sun
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = $(top_builddir)/config.h
@@ -184,7 +191,8 @@ LTLIBRARIES = $(pkglib_LTLIBRARIES)
 
 libtme_machine_sun_la_DEPENDENCIES = $(top_builddir)/libtme/libtme.la \
 	$(top_builddir)/generic/libtme-generic.la
-am_libtme_machine_sun_la_OBJECTS = sun-mmu.lo
+am_libtme_machine_sun_la_OBJECTS = sun-mmu.lo sun-bwtwo.lo sun-cgtwo.lo \
+	sun-fb.lo sun-si.lo sun-obie.lo
 libtme_machine_sun_la_OBJECTS = $(am_libtme_machine_sun_la_OBJECTS)
 SCRIPTS = $(bin_SCRIPTS)
 
@@ -192,7 +200,10 @@ SCRIPTS = $(bin_SCRIPTS)
 DEFAULT_INCLUDES =  -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
-@AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/sun-mmu.Plo
+@AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/sun-bwtwo.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/sun-cgtwo.Plo ./$(DEPDIR)/sun-fb.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/sun-mmu.Plo ./$(DEPDIR)/sun-obie.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/sun-si.Plo
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) \
@@ -272,7 +283,12 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sun-bwtwo.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sun-cgtwo.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sun-fb.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sun-mmu.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sun-obie.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sun-si.Plo@am__quote@
 
 distclean-depend:
 	-rm -rf ./$(DEPDIR)
@@ -519,6 +535,11 @@ uninstall-am: uninstall-binSCRIPTS uninstall-examplesDATA \
 # target to make tme-sun-idprom:
 tme-sun-idprom: tme-sun-idprom.pl
 	sed -e s%/usr/pkg/bin/perl%$(PERL)% < $(srcdir)/tme-sun-idprom.pl > $@
+
+# target to make tme-sun-eeprom:
+tme-sun-eeprom: tme-sun-eeprom.pl $(top_srcdir)/tools/tme-binary-struct.pl.in
+	cat $(top_srcdir)/tools/tme-binary-struct.pl.in $(srcdir)/tme-sun-eeprom.pl | \
+	sed -e s%/usr/pkg/bin/perl%$(PERL)% > $@
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:

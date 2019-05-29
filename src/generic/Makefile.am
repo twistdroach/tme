@@ -15,6 +15,7 @@ libtme_generic_la_SOURCES = bus.c \
 	disk.c \
 	tape.c \
 	mouse.c \
+	float.c \
 	keyboard.c
 libtme_generic_la_LDFLAGS = -version-info 0:0:0
 
@@ -25,11 +26,29 @@ fb-xlat-auto.c: fb-xlat-auto.sh
 # fb.lo depends on fb-xlat-auto.c:
 fb.lo: fb-xlat-auto.c
 
+# target to make float-auto.c:
+float-auto.c: float-auto.sh
+	$(SHELL) $(srcdir)/float-auto.sh > $@
+
+# float.lo depends on float-auto.c:
+float.lo: float-auto.c
+
+# target to make bus-device-auto.c:
+bus-device-auto.c: bus-device-auto.sh
+	$(SHELL) $(srcdir)/bus-device-auto.sh > $@
+
+# bus-device.lo depends on bus-device-auto.c:
+bus-device.lo: bus-device-auto.c
+
 pkglib_LTLIBRARIES = tme_generic.la
 tme_generic_la_SOURCES = bus-el.c
 tme_generic_la_LDFLAGS = -module -version-info 0:0:0
 tme_generic_la_LIBADD = libtme-generic.la
 
-EXTRA_DIST = fb-xlat-auto.sh
+EXTRA_DIST = fb-xlat-auto.sh \
+	float-auto.sh \
+	float-auto.c \
+	bus-device-auto.sh \
+	bus-device-auto.c
 
 include $(top_srcdir)/modules

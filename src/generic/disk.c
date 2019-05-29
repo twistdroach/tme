@@ -1,4 +1,4 @@
-/* $Id: disk.c,v 1.1 2003/07/29 18:18:35 fredette Exp $ */
+/* $Id: disk.c,v 1.2 2004/01/09 03:25:05 fredette Exp $ */
 
 /* generic/disk.c - generic disk implementation support: */
 
@@ -34,11 +34,11 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: disk.c,v 1.1 2003/07/29 18:18:35 fredette Exp $");
+_TME_RCSID("$Id: disk.c,v 1.2 2004/01/09 03:25:05 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/disk.h>
-#include <tme/generic/bus.h>
+#include <tme/misc.h>
 #include <stdlib.h>
 
 /* this scores a disk connection: */
@@ -67,7 +67,7 @@ tme_disk_connection_score(struct tme_connection *conn,
 
 /* this parses a disk dimension: */
 tme_uint32_t
-tme_disk_dimension_parse(_tme_const char *dimension_string)
+tme_disk_dimension_parse(const char *dimension_string)
 {
-  return (tme_bus_addr_parse(dimension_string, 0));
+  return (tme_misc_unumber_parse(dimension_string, 0));
 }

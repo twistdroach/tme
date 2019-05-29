@@ -1,4 +1,4 @@
-/* $Id: m68010.c,v 1.5 2003/05/16 21:48:10 fredette Exp $ */
+/* $Id: m68010.c,v 1.8 2005/03/23 11:49:31 fredette Exp $ */
 
 /* ic/m68k/m68010.c - implementation of Motorola 68010 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: m68010.c,v 1.5 2003/05/16 21:48:10 fredette Exp $");
+_TME_RCSID("$Id: m68010.c,v 1.8 2005/03/23 11:49:31 fredette Exp $");
 
 /* includes: */
 #include "m68k-impl.h"
@@ -85,6 +85,7 @@ struct tme_m68k_fmt8 {
 
 /* both executors are for the 68010: */
 #define _TME_M68K_EXECUTE_CPU TME_M68K_M68010
+#define _TME_M68K_EXECUTE_OPMAP tme_m68k_opcodes_m68010
 
 /* create the slow executor: */
 #define _TME_M68K_EXECUTE_NAME _tme_m68010_execute_slow
@@ -122,7 +123,7 @@ _tme_m68010_exception(struct tme_m68k *ic)
   exceptions = ic->_tme_m68k_exceptions;
 
   /* a reset exception: */
-  if (exceptions & TME_M68K_EXCEPTION_GROUP0_RESET) {
+  if (exceptions & TME_M68K_EXCEPTION_RESET) {
 
     /* do the common reset processing: */
     tme_m68k_do_reset(ic);
@@ -130,8 +131,8 @@ _tme_m68010_exception(struct tme_m68k *ic)
   }
 
   /* an address or bus error: */
-  else if (exceptions & (TME_M68K_EXCEPTION_GROUP0_AERR
-			 | TME_M68K_EXCEPTION_GROUP0_BERR)) {
+  else if (exceptions & (TME_M68K_EXCEPTION_AERR
+			 | TME_M68K_EXCEPTION_BERR)) {
 
     /* start the exception processing: */
     tme_m68k_exception_process_start(ic, 0);
@@ -263,15 +264,15 @@ do {						\
 
     /* now finish the processing for this exception: */
     tme_m68k_exception_process_finish(ic, TME_M68K_FORMAT_8, 
-				      ((exceptions & TME_M68K_EXCEPTION_GROUP0_BERR)
-				       ? 2
-				       : 3));
-    ic->_tme_m68k_exceptions = (exceptions &= ~ (TME_M68K_EXCEPTION_GROUP0_AERR
-						 | TME_M68K_EXCEPTION_GROUP0_BERR));
+				      ((exceptions & TME_M68K_EXCEPTION_BERR)
+				       ? TME_M68K_VECTOR_BERR
+				       : TME_M68K_VECTOR_AERR));
+    ic->_tme_m68k_exceptions = (exceptions &= ~ (TME_M68K_EXCEPTION_AERR
+						 | TME_M68K_EXCEPTION_BERR));
   }
 
   /* do normal exception processing: */
-  tme_m68k_exception_process(ic);
+  tme_m68000_exception_process(ic);
   /* NOTREACHED */
 }
 
@@ -308,7 +309,7 @@ _tme_m68010_rte(struct tme_m68k *ic)
 do {								\
   if (e) {							\
     ic->tme_m68k_ireg_pc -= sizeof(tme_uint16_t);		\
-    tme_m68k_exception(ic, TME_M68K_EXCEPTION_GROUP2(0xE));	\
+    tme_m68k_exception(ic, TME_M68K_EXCEPTION_INST(TME_M68K_VECTOR_FORMAT));\
     /* NOTREACHED */						\
   }								\
 } while (/* CONSTCOND */ 0)
@@ -326,7 +327,7 @@ do {								\
   /* read in the format 8 information.  if we get a bus error
      during this operation it's a double fault: */
   assert(ic->_tme_m68k_exceptions == 0);
-  ic->_tme_m68k_exceptions = TME_M68K_EXCEPTION_GROUP0_BERR;
+  ic->_tme_m68k_exceptions = TME_M68K_EXCEPTION_BERR;
   ic->_tme_m68k_ea_address = fmt8_address;
   tme_m68k_read_mem(ic, (tme_uint8_t *) &fmt8, sizeof(fmt8));
   ic->_tme_m68k_exceptions = 0;
@@ -505,7 +506,7 @@ TME_ELEMENT_X_NEW_DECL(tme_ic_,m68k,m68010) {
   ic->_tme_m68k_mode_execute = _tme_m68010_execute;
   ic->_tme_m68k_mode_exception = _tme_m68010_exception;
   ic->_tme_m68k_mode_rte = _tme_m68010_rte;
-  _tme_m68010_decoder_map_init(ic);
+  tme_m68k_opcodes_init_m68010(tme_m68k_opcodes_m68010);
 
   /* call the common m68k new function: */
   return (tme_m68k_new(ic, args, extra, _output));

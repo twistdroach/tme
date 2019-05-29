@@ -1,4 +1,10 @@
-the m68k exception vector table lists the spaces used for the different vectors
+the sun2 mainbus signal handler needs to OR together like signals from
+the different buses; right now the state of a signal on the mainbus is
+just the state of the signal on the last bus that happened to call it
+out.  this will cause interrupts to get lost (but because of cooperative
+threading, this probably isn't manifesting now).
+
+fix thread dispatch problems when not using gtk
 
 clean up posix-serial callouts to be like 3c400
 
@@ -28,3 +34,53 @@ test and goto in the fast FETCH macros.
 
 probably the way ENA_NONBOOT works on the sun2 is that all FC_SP
 references go to the PROM
+
+/* version enforcement: */
+#if !defined(TME_BUS_DEVICE_VERSION) || TME_VERSION_CURRENT_X(TME_BUS_DEVICE_VERSION) != 0
+#error "check your sources; <tme/bus-device.h> version is now 0"
+#endif
+
+/* includes: */
+#include <tme/element.h>
+#undef TME_BUS_VERSION
+#define TME_BUS_VERSION TME_VERSION_X(0, 0, 0)
+#include <tme/generic/bus.h>
+
+sun-sc's slow cycle implementation is broken; it should use the new
+bus-device dma support
+
+if a tlb_fill function invalidates previous TLBs, make sure that it
+invalidates before it fills (since it may be filling the same
+structure it wants to invalidate.)
+
+m68k: lowering the interrupt priority mask below 7 when the external
+priority is 7 causes another NMI to be recognized.
+
+TLBs filled for DVMA space for the VME bus shouldn't refer to the
+obmem bus fault handler, right?
+
+file a PR against NetBSD/sun3 1.6.x:
+sys/arch/sun3/dev/if_ie.c:ie_readframe(), when NBPFILTER == 0, calls
+ieget() with NULL for its int *to_bpf argument.  this ultimately
+causes a NULL dereference in (the inline expansion of) check_eh() -
+witness a "clrl 0" instruction in the compiler output for
+ie_readframe().  proper fix is to remove the *to_bpf = 0 in check_eh().
+
+file a PR against NetBSD/sun3:
+XXX FIXME - this hack works around a bug in NetBSD/sun3, present
+since revision 1.49 of src/sys/arch/sun3/conf/GENERIC (when the
+sun3x port was merged into the sun3 port).  in this revision, the
+declaration for cgtwo0 changed:
+
+-cgtwo0 at vmes0 addr 0xff400000 level 4 vect 0xA8
++cgtwo0 at vme2 addr 0x400000 ipl 4 vect 0xA8
+
+because the cg2mmap() function in src/sys/arch/sun3/dev/cg2.c
+doesn't add the 0xff000000 mask to the configured physical
+address (needed because the cgtwo is an A24 device), when Xsun
+mmap()s the cgtwo it gets a mapping of physical address 0x400000
+in VME space instead of the correct 0xff400000.  the sparc cgtwo
+driver gets this right.
+
+- bus: DRQ(x) and DACK(x), with an UNSPEC
+- ncr5380: bug where a SCSI callout deferred because of a higher-priority callout isn't put into later_callouts

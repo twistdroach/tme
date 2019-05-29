@@ -41,43 +41,62 @@
 #define tme_m68k_ireg_pc		tme_m68k_ireg_uint32(TME_M68K_IREG_PC)
 #define TME_M68K_IREG_PC_NEXT		(17)
 #define tme_m68k_ireg_pc_next		tme_m68k_ireg_uint32(TME_M68K_IREG_PC_NEXT)
-#define tme_m68k_ireg_sr		tme_m68k_ireg_uint16(18 << 1)
-#define tme_m68k_ireg_ccr		tme_m68k_ireg_uint8(18 << 2)
-#define TME_M68K_IREG_SHADOW_SR	(19 << 1)
+#define TME_M68K_IREG_PC_LAST		(18)
+#define tme_m68k_ireg_pc_last		tme_m68k_ireg_uint32(TME_M68K_IREG_PC_LAST)
+#define tme_m68k_ireg_sr		tme_m68k_ireg_uint16(19 << 1)
+#define tme_m68k_ireg_ccr		tme_m68k_ireg_uint8(19 << 2)
+#define TME_M68K_IREG_SHADOW_SR	(20 << 1)
 #define tme_m68k_ireg_shadow_sr	tme_m68k_ireg_uint16(TME_M68K_IREG_SHADOW_SR)
-#define TME_M68K_IREG_FORMAT_OFFSET	((19 << 1) + 1)
+#define TME_M68K_IREG_FORMAT_OFFSET	((20 << 1) + 1)
 #define tme_m68k_ireg_format_offset	tme_m68k_ireg_uint16(TME_M68K_IREG_FORMAT_OFFSET)
-#define TME_M68K_IREG_MEMX32		(20)
+#define TME_M68K_IREG_MEMX32		(21)
 #define tme_m68k_ireg_memx32		tme_m68k_ireg_uint32(TME_M68K_IREG_MEMX32)
-#define TME_M68K_IREG_MEMX16		(20 << 1)
+#define TME_M68K_IREG_MEMX16		(21 << 1)
 #define tme_m68k_ireg_memx16		tme_m68k_ireg_uint16(TME_M68K_IREG_MEMX16)
-#define TME_M68K_IREG_MEMX8		(20 << 2)
+#define TME_M68K_IREG_MEMX8		(21 << 2)
 #define tme_m68k_ireg_memx8		tme_m68k_ireg_uint8(TME_M68K_IREG_MEMX8)
-#define TME_M68K_IREG_MEMY32		(21)
+#define TME_M68K_IREG_MEMY32		(22)
 #define tme_m68k_ireg_memy32		tme_m68k_ireg_uint32(TME_M68K_IREG_MEMY32)
-#define TME_M68K_IREG_MEMY16		(21 << 1)
+#define TME_M68K_IREG_MEMY16		(22 << 1)
 #define tme_m68k_ireg_memy16		tme_m68k_ireg_uint16(TME_M68K_IREG_MEMY16)
-#define TME_M68K_IREG_MEMY8		(21 << 2)
+#define TME_M68K_IREG_MEMY8		(22 << 2)
 #define tme_m68k_ireg_memy8		tme_m68k_ireg_uint8(TME_M68K_IREG_MEMY8)
-#define TME_M68K_IREG_MEMZ32		(22)
+#define TME_M68K_IREG_MEMZ32		(23)
 #define tme_m68k_ireg_memz32		tme_m68k_ireg_uint32(TME_M68K_IREG_MEMZ32)
-#define TME_M68K_IREG_MEMZ16		(22 << 1)
+#define TME_M68K_IREG_MEMZ16		(23 << 1)
 #define tme_m68k_ireg_memz16		tme_m68k_ireg_uint16(TME_M68K_IREG_MEMZ16)
-#define TME_M68K_IREG_MEMZ8		(22 << 2)
+#define TME_M68K_IREG_MEMZ8		(23 << 2)
 #define tme_m68k_ireg_memz8		tme_m68k_ireg_uint8(TME_M68K_IREG_MEMZ8)
-#define TME_M68K_IREG_USP		(23)
+#define TME_M68K_IREG_USP		(24)
 #define tme_m68k_ireg_usp		tme_m68k_ireg_uint32(TME_M68K_IREG_USP)
-#define TME_M68K_IREG_ISP		(24)
+#define TME_M68K_IREG_ISP		(25)
 #define tme_m68k_ireg_isp		tme_m68k_ireg_uint32(TME_M68K_IREG_ISP)
-#define TME_M68K_IREG_MSP		(25)
+#define TME_M68K_IREG_MSP		(26)
 #define tme_m68k_ireg_msp		tme_m68k_ireg_uint32(TME_M68K_IREG_MSP)
-#define TME_M68K_IREG_SFC		(26)
+#define TME_M68K_IREG_SFC		(27)
 #define tme_m68k_ireg_sfc		tme_m68k_ireg_uint32(TME_M68K_IREG_SFC)
-#define TME_M68K_IREG_DFC		(27)
+#define TME_M68K_IREG_DFC		(28)
 #define tme_m68k_ireg_dfc		tme_m68k_ireg_uint32(TME_M68K_IREG_DFC)
-#define TME_M68K_IREG_VBR		(28)
+#define TME_M68K_IREG_VBR		(29)
 #define tme_m68k_ireg_vbr		tme_m68k_ireg_uint32(TME_M68K_IREG_VBR)
-#define TME_M68K_IREG32_COUNT		(29)
+#define TME_M68K_IREG_CACR		(30)
+#define tme_m68k_ireg_cacr		tme_m68k_ireg_uint32(TME_M68K_IREG_CACR)
+#define TME_M68K_IREG_CAAR		(31)
+#define tme_m68k_ireg_caar		tme_m68k_ireg_uint32(TME_M68K_IREG_CAAR)
+#define TME_M68K_IREG32_COUNT		(32)
+#define TME_M68K_IREG_IMM32		(32)
+#define tme_m68k_ireg_imm32		tme_m68k_ireg_uint32(TME_M68K_IREG_IMM32)
+#define TME_M68K_IREG_EA		(33)
+#define tme_m68k_ireg_ea		tme_m68k_ireg_uint32(TME_M68K_IREG_EA)
+#define TME_M68K_IREG_ZERO		(34)
+#define TME_M68K_IREG_ONE		(35)
+#define TME_M68K_IREG_TWO		(36)
+#define TME_M68K_IREG_THREE		(37)
+#define TME_M68K_IREG_FOUR		(38)
+#define TME_M68K_IREG_FIVE		(39)
+#define TME_M68K_IREG_SIX		(40)
+#define TME_M68K_IREG_SEVEN		(41)
+#define TME_M68K_IREG_EIGHT		(42)
 
 #endif /* _IC_M68K_MISC_H */
 
@@ -248,34 +267,70 @@
 /* on all hosts, this fetches a 16-bit unsigned value for the slow executor: */
 #undef _TME_M68K_EXECUTE_FETCH_U16
 #define _TME_M68K_EXECUTE_FETCH_U16(v) \
+  /* we update the instruction buffer fetch total and sizes values \
+     before we do the actual fetch, because we may transfer a few \
+     bytes and then fault.  without this, those few bytes wouldn't get \
+     saved in the exception stack frame by tme_m68k_insn_buffer_xfer(), \
+     because it wouldn't know about the fetch.  later, when the \
+     instruction would be resumed, tme_m68k_fetch16() won't refetch \
+     them, because it knows they've already been fetched and thinks \
+     they're still in the instruction buffer: */ \
+  ic->_tme_m68k_insn_buffer_fetch_total += sizeof(tme_uint16_t); \
+  ic->_tme_m68k_insn_buffer_fetch_sizes <<= 1; \
   (v) = (tme_uint16_t) tme_m68k_fetch16(ic, linear_pc); \
-  insn_fetch_sizes <<= 1; \
   linear_pc += sizeof(tme_uint16_t)
 
 /* on all hosts, this fetches a 16-bit signed value for the slow executor: */
 #undef _TME_M68K_EXECUTE_FETCH_S16
 #define _TME_M68K_EXECUTE_FETCH_S16(v) \
+  /* we update the instruction buffer fetch total and sizes values \
+     before we do the actual fetch, because we may transfer a few \
+     bytes and then fault.  without this, those few bytes wouldn't get \
+     saved in the exception stack frame by tme_m68k_insn_buffer_xfer(), \
+     because it wouldn't know about the fetch.  later, when the \
+     instruction would be resumed, tme_m68k_fetch16() won't refetch \
+     them, because it knows they've already been fetched and thinks \
+     they're still in the instruction buffer: */ \
+  ic->_tme_m68k_insn_buffer_fetch_total += sizeof(tme_int16_t); \
+  ic->_tme_m68k_insn_buffer_fetch_sizes <<= 1; \
   (v) = (tme_int16_t) tme_m68k_fetch16(ic, linear_pc); \
-  insn_fetch_sizes <<= 1; \
   linear_pc += sizeof(tme_int16_t)
 
 /* on all hosts, this fetches a 32-bit unsigned value for the slow executor: */
 #undef _TME_M68K_EXECUTE_FETCH_U32
 #define _TME_M68K_EXECUTE_FETCH_U32(v) \
+  /* we update the instruction buffer fetch total and sizes values \
+     before we do the actual fetch, because we may transfer a few \
+     bytes and then fault.  without this, those few bytes wouldn't get \
+     saved in the exception stack frame by tme_m68k_insn_buffer_xfer(), \
+     because it wouldn't know about the fetch.  later, when the \
+     instruction would be resumed, tme_m68k_fetch32() won't refetch \
+     them, because it knows they've already been fetched and thinks \
+     they're still in the instruction buffer: */ \
+  ic->_tme_m68k_insn_buffer_fetch_total += sizeof(tme_uint32_t); \
+  ic->_tme_m68k_insn_buffer_fetch_sizes = (ic->_tme_m68k_insn_buffer_fetch_sizes << 1) | 1; \
   (v) = (tme_uint32_t) tme_m68k_fetch32(ic, linear_pc); \
-  insn_fetch_sizes = (insn_fetch_sizes << 1) | 1; \
   linear_pc += sizeof(tme_uint32_t)
 
 /* on all hosts, this fetches a 32-bit signed value for the slow executor: */
 #undef _TME_M68K_EXECUTE_FETCH_S32
 #define _TME_M68K_EXECUTE_FETCH_S32(v) \
+  /* we update the instruction buffer fetch total and sizes values \
+     before we do the actual fetch, because we may transfer a few \
+     bytes and then fault.  without this, those few bytes wouldn't get \
+     saved in the exception stack frame by tme_m68k_insn_buffer_xfer(), \
+     because it wouldn't know about the fetch.  later, when the \
+     instruction would be resumed, tme_m68k_fetch32() won't refetch \
+     them, because it knows they've already been fetched and thinks \
+     they're still in the instruction buffer: */ \
+  ic->_tme_m68k_insn_buffer_fetch_total += sizeof(tme_int32_t); \
+  ic->_tme_m68k_insn_buffer_fetch_sizes = (ic->_tme_m68k_insn_buffer_fetch_sizes << 1) | 1; \
   (v) = (tme_int32_t) tme_m68k_fetch32(ic, linear_pc); \
-  insn_fetch_sizes = (insn_fetch_sizes << 1) | 1; \
   linear_pc += sizeof(tme_int32_t)
 
 #endif /* !_TME_M68K_EXECUTE_FAST */
 /* automatically generated by m68k-insns-auto.sh, do not edit! */
-_TME_RCSID("$Id: m68k-insns-auto.sh,v 1.21 2003/08/05 03:33:07 fredette Exp $");
+_TME_RCSID("$Id: m68k-insns-auto.sh,v 1.23 2005/03/10 13:26:23 fredette Exp $");
 
 TME_M68K_INSN_DECL(tme_m68k_add8);
 TME_M68K_INSN_DECL(tme_m68k_sub8);

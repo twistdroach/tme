@@ -1,4 +1,4 @@
-/* $Id: threads-sjlj.c,v 1.10 2003/08/23 13:49:17 fredette Exp $ */
+/* $Id: threads-sjlj.c,v 1.12 2005/02/17 13:23:35 fredette Exp $ */
 
 /* libtme/threads-sjlj.c - implementation of setjmp/longjmp threads: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: threads-sjlj.c,v 1.10 2003/08/23 13:49:17 fredette Exp $");
+_TME_RCSID("$Id: threads-sjlj.c,v 1.12 2005/02/17 13:23:35 fredette Exp $");
 
 /* includes: */
 #include <tme/threads.h>
@@ -47,6 +47,9 @@ _TME_RCSID("$Id: threads-sjlj.c,v 1.10 2003/08/23 13:49:17 fredette Exp $");
 /* if we don't have GTK, fake a few definitions to keep things
    compiling: */
 #ifdef HAVE_GTK
+#ifndef G_ENABLE_DEBUG
+#define G_ENABLE_DEBUG (0)
+#endif /* !G_ENABLE_DEBUG */
 #include <gtk/gtk.h>
 #else  /* !HAVE_GTK */
 typedef int gint;
@@ -86,10 +89,8 @@ struct tme_sjlj_thread {
   void *tme_sjlj_thread_func_private;
   tme_thread_t tme_sjlj_thread_func;
 
-  /* any condition that this thread is waiting on, a flag that is set
-     when this thread is notified: */
+  /* any condition that this thread is waiting on: */
   tme_cond_t *tme_sjlj_thread_cond;
-  int tme_sjlj_thread_cond_notified;
 
   /* the file descriptors that this thread is waiting on: */
   int tme_sjlj_thread_max_fd;
@@ -651,6 +652,7 @@ tme_sjlj_thread_create(tme_thread_t func, void *func_private)
   thread->tme_sjlj_thread_max_fd = -1;
   thread->tme_sjlj_thread_sleep.tv_sec = 0;
   thread->tme_sjlj_thread_sleep.tv_usec = 0;
+  thread->timeout_prev = NULL;
 
   /* make this thread runnable: */
   thread->tme_sjlj_thread_state = TME_SJLJ_THREAD_STATE_BLOCKED;

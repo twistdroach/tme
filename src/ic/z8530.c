@@ -1,4 +1,4 @@
-/* $Id: z8530.c,v 1.14 2003/10/25 17:07:58 fredette Exp $ */
+/* $Id: z8530.c,v 1.15 2004/04/30 11:51:30 fredette Exp $ */
 
 /* ic/z8530.c - implementation of Zilog 8530 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: z8530.c,v 1.14 2003/10/25 17:07:58 fredette Exp $");
+_TME_RCSID("$Id: z8530.c,v 1.15 2004/04/30 11:51:30 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -827,8 +827,7 @@ _tme_z8530_callout(struct tme_z8530 *z8530, struct tme_z8530_chan *chan, int new
        TME_BUS_SIGNAL_INT_UNSPEC
        | (int_asserted
 	  ? TME_BUS_SIGNAL_LEVEL_ASSERTED
-	  : TME_BUS_SIGNAL_LEVEL_NEGATED)
-       | TME_BUS_SIGNAL_EDGE);
+	  : TME_BUS_SIGNAL_LEVEL_NEGATED));
     
     /* lock our mutex: */
     tme_mutex_lock(&z8530->tme_z8530_mutex);

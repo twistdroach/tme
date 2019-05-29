@@ -1,4 +1,4 @@
-/* $Id: fb.h,v 1.1 2003/06/27 21:05:35 fredette Exp $ */
+/* $Id: fb.h,v 1.2 2005/04/30 15:07:05 fredette Exp $ */
 
 /* tme/generic/fb.h - header file for generic framebuffer support: */
 
@@ -37,7 +37,7 @@
 #define _TME_GENERIC_FB_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: fb.h,v 1.1 2003/06/27 21:05:35 fredette Exp $");
+_TME_RCSID("$Id: fb.h,v 1.2 2005/04/30 15:07:05 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -48,6 +48,41 @@ _TME_RCSID("$Id: fb.h,v 1.1 2003/06/27 21:05:35 fredette Exp $");
 #define TME_FB_XLAT_SCALE_HALF		(2 / 2)
 #define TME_FB_XLAT_SCALE_NONE		(2)
 #define TME_FB_XLAT_SCALE_DOUBLE	(2 * 2)
+
+/* the different framebuffer classes: */
+#define TME_FB_XLAT_CLASS_ANY		(0)
+#define TME_FB_XLAT_CLASS_MONOCHROME	(1)
+#define TME_FB_XLAT_CLASS_COLOR		(2)
+
+/* the different mapping types: */
+#define TME_FB_XLAT_MAP_ANY		(0)
+#define TME_FB_XLAT_MAP_LINEAR		(1)
+#define TME_FB_XLAT_MAP_INDEX		(2)
+
+/* when we have primary intensities but no destination pixel subfield
+   masks, we use these masks: */
+#define TME_FB_XLAT_MASK_DEFAULT_G	(0x07e0)
+#define TME_FB_XLAT_MASK_DEFAULT_R	(0xf800)
+#define TME_FB_XLAT_MASK_DEFAULT_B	(0x001f)
+
+/* since you can't have a noncontiguous subfield mask, we use one as
+   the wildcarded subfield mask: */
+#define TME_FB_XLAT_MASK_ANY		(0x5)
+
+/* this is the maximum value that will be used as an index in an index
+   mapping: */
+#define TME_FB_XLAT_MAP_INDEX_MASK_MAX	(0xffff)
+#if (TME_FB_XLAT_MAP_INDEX_MASK_MAX > 0xffff)
+#error "maximum index mask is greater than 0xffff"
+#endif
+#if ((TME_FB_XLAT_MASK_DEFAULT_G | TME_FB_XLAT_MASK_DEFAULT_R | TME_FB_XLAT_MASK_DEFAULT_B) > TME_FB_XLAT_MAP_INDEX_MASK_MAX)
+#error "default masks are bigger than the maximum index mask"
+#endif
+
+/* TME_FB_XLAT_MAP_BASE_MASK returns a base mask, one without any
+   least significant zero bits: */
+#define TME_FB_XLAT_MAP_BASE_MASK(mask)			\
+  ((mask) / _TME_FIELD_MASK_FACTOR(mask))
 
 /* types: */
 
@@ -92,10 +127,33 @@ struct tme_fb_connection {
   /* the real framebuffer memory: */
   tme_uint8_t *tme_fb_connection_buffer;
 
-  /* if this is displaying a 1-bit deep source framebuffer, this maps
-     from 1-bit pixel values (if we're halving, actually four pixel
-     values added together) to a pixel value for the destination: */
-  tme_uint32_t *tme_fb_connection_depth1_map;
+  /* the class of the framebuffer: */
+  unsigned int tme_fb_connection_class;
+
+  /* any masks for pixel value subfields: */
+  tme_uint32_t tme_fb_connection_mask_g;
+  tme_uint32_t tme_fb_connection_mask_r;
+  tme_uint32_t tme_fb_connection_mask_b;
+
+  /* these are used for index-mapping pixel values or pixel subfield
+     values to intensities, or vice-versa.  if these are NULL,
+     everything is linearly mapped: */
+  const void *tme_fb_connection_map_g;
+  const void *tme_fb_connection_map_r;
+  const void *tme_fb_connection_map_b;
+
+  /* if this is nonzero, intensities are inverted (a smaller value is
+     more intense than a greater value): */
+  int tme_fb_connection_inverted;
+
+  /* in a source framebuffer connection, this is the size of an
+     intensity, in bits.  this cannot be greater than 16: */
+  unsigned int tme_fb_connection_map_bits;
+
+  /* in a destination framebuffer connection, this is used to map
+     source pixel values into destination pixel values: */
+  const tme_uint32_t *tme_fb_connection_map_pixel;
+  tme_uint32_t tme_fb_connection_map_pixel_count;
 };
 
 /* one frame buffer translation function: */
@@ -136,6 +194,24 @@ struct tme_fb_xlat {
      order (endianness): */
   int tme_fb_xlat_src_order; 
 
+  /* iff not TME_FB_XLAT_CLASS_ANY, this function applies only to
+     a source framebuffer of this class: */
+  int tme_fb_xlat_src_class;
+
+  /* iff not TME_FB_XLAT_MAP_ANY, this function applies only to
+     a source framebuffer with this type of intensity mapping: */
+  int tme_fb_xlat_src_map;
+
+  /* iff nonzero, this function applies only when source intensities
+     have this many bits: */
+  unsigned int tme_fb_xlat_src_map_bits;
+
+  /* iff not TME_FB_XLAT_MASK_ANY, this function applies only to a
+     source framebuffer with these subfield masks: */
+  tme_uint32_t tme_fb_xlat_src_mask_g;
+  tme_uint32_t tme_fb_xlat_src_mask_r;
+  tme_uint32_t tme_fb_xlat_src_mask_b;
+
   /* iff nonzero, this function applies only when destination pixels
      have this depth: */
   unsigned int tme_fb_xlat_dst_depth;
@@ -156,6 +232,24 @@ struct tme_fb_xlat {
   /* this function applies only when destination scanline data has
      this order (endianness): */
   int tme_fb_xlat_dst_order; 
+
+  /* iff not TME_FB_XLAT_MAP_ANY, this function applies only to
+     a destination framebuffer with this type of intensity mapping: */
+  int tme_fb_xlat_dst_map;
+
+  /* iff not TME_FB_XLAT_MASK_ANY, this function applies only to a
+     destination framebuffer with these subfield masks: */
+  tme_uint32_t tme_fb_xlat_dst_mask_g;
+  tme_uint32_t tme_fb_xlat_dst_mask_r;
+  tme_uint32_t tme_fb_xlat_dst_mask_b;
+};
+
+/* a color: */
+struct tme_fb_color {
+  tme_uint32_t tme_fb_color_pixel;
+  tme_uint16_t tme_fb_color_value_g;
+  tme_uint16_t tme_fb_color_value_r;
+  tme_uint16_t tme_fb_color_value_b;
 };
 
 /* prototypes: */
@@ -163,6 +257,14 @@ _tme_const struct tme_fb_xlat *tme_fb_xlat_best _TME_P((_tme_const struct tme_fb
 int tme_fb_xlat_is_optimal _TME_P((_tme_const struct tme_fb_xlat *));
 int tme_fb_xlat_alloc_src _TME_P((struct tme_fb_connection *));
 void tme_fb_xlat_redraw _TME_P((struct tme_fb_connection *));
+tme_uint32_t tme_fb_xlat_colors_get _TME_P((const struct tme_fb_connection *,
+					    unsigned int,
+					    struct tme_fb_connection *,
+					    struct tme_fb_color **));
+void tme_fb_xlat_colors_set _TME_P((const struct tme_fb_connection *,
+				    unsigned int,
+				    struct tme_fb_connection *,
+				    struct tme_fb_color *));
 int tme_fb_connection_score _TME_P((struct tme_connection *, unsigned int *));
 
 #endif /* !_TME_GENERIC_FB_H */

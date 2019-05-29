@@ -1,4 +1,4 @@
-/* $Id: bus.h,v 1.5 2003/06/27 21:06:28 fredette Exp $ */
+/* $Id: bus.h,v 1.12 2005/04/30 15:07:46 fredette Exp $ */
 
 /* tme/generic/bus.h - header file for generic bus support: */
 
@@ -37,7 +37,7 @@
 #define _TME_GENERIC_BUS_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: bus.h,v 1.5 2003/06/27 21:06:28 fredette Exp $");
+_TME_RCSID("$Id: bus.h,v 1.12 2005/04/30 15:07:46 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -52,32 +52,41 @@ _TME_RCSID("$Id: bus.h,v 1.5 2003/06/27 21:06:28 fredette Exp $");
 #define TME_BUS16_LOG2		(1)
 #define TME_BUS32_LOG2		(2)
 
-/* bus signals: */
+/* bus signal flags and form: */
 #define TME_BUS_SIGNAL_LEVEL_MASK	(0x03)
 #define  TME_BUS_SIGNAL_LEVEL_LOW	(0x00)
 #define  TME_BUS_SIGNAL_LEVEL_HIGH	(0x01)
 #define  TME_BUS_SIGNAL_LEVEL_NEGATED	(0x02)
 #define  TME_BUS_SIGNAL_LEVEL_ASSERTED	(0x03)
-#define  TME_BUS_SIGNAL_LEVEL_NORMAL	(0x00)
-#define  TME_BUS_SIGNAL_LEVEL_INVERTED	(0x03)
 #define TME_BUS_SIGNAL_EDGE		(0x04)
-#define _TME_BUS_SIGNAL_BITS		(3)
-#define TME_BUS_SIGNAL_INT(x)		((x) << _TME_BUS_SIGNAL_BITS)
-#define TME_BUS_SIGNAL_IS_INT(x)	((x) < (32 << _TME_BUS_SIGNAL_BITS))
-#define TME_BUS_SIGNAL_WHICH_INT(x)	((x) >> _TME_BUS_SIGNAL_BITS)
-#define TME_BUS_SIGNAL_INT_UNSPEC	(32 << _TME_BUS_SIGNAL_BITS)
-#define TME_BUS_SIGNAL_HALT		(33 << _TME_BUS_SIGNAL_BITS)
-#define TME_BUS_SIGNAL_RESET		(34 << _TME_BUS_SIGNAL_BITS)
-#define TME_BUS_SIGNAL_IGNORE		(35 << _TME_BUS_SIGNAL_BITS)
-#define TME_BUS_SIGNAL_ABORT		(36 << _TME_BUS_SIGNAL_BITS)
-#define _TME_BUS_SIGNAL_COUNT		(37)
-#define TME_BUS_SIGNAL_WHICH(x)		((x) >> _TME_BUS_SIGNAL_BITS)
-#define TME_BUS_SIGNAL_X(x)		(((x) + _TME_BUS_SIGNAL_COUNT) << _TME_BUS_SIGNAL_BITS)
-#define TME_BUS_SIGNAL_IS_X(x)		((x) >= (_TME_BUS_SIGNAL_COUNT << _TME_BUS_SIGNAL_BITS))
+#define _TME_BUS_SIGNAL_BITS		(5)
+#define TME_BUS_SIGNAL_WHICH(x)		((x) & ~((1 << _TME_BUS_SIGNAL_BITS) - 1))
+#define TME_BUS_SIGNAL_INDEX(x)		((x) >> _TME_BUS_SIGNAL_BITS)
+#define TME_BUS_SIGNAL_X(x)		((x) << _TME_BUS_SIGNAL_BITS)
+
+/* all bus signal set identifiers: */
+#define TME_BUS_SIGNALS_ID_GENERIC	(0)
+#define TME_BUS_SIGNALS_ID_I825X6	(1)
+
+/* the generic bus signal set: */
+#define TME_BUS_SIGNAL_INT(x)		TME_BUS_SIGNAL_X(x)
+#define TME_BUS_SIGNAL_IS_INT(x)	(TME_BUS_SIGNAL_INDEX(x) < 256)
+#define TME_BUS_SIGNAL_INDEX_INT(x)	TME_BUS_SIGNAL_INDEX(x)
+#define TME_BUS_SIGNAL_INT_UNSPEC	TME_BUS_SIGNAL_X(256)
+#define TME_BUS_SIGNAL_HALT		TME_BUS_SIGNAL_X(257)
+#define TME_BUS_SIGNAL_RESET		TME_BUS_SIGNAL_X(258)
+#define TME_BUS_SIGNAL_IGNORE		TME_BUS_SIGNAL_X(259)
+#define TME_BUS_SIGNAL_ABORT		TME_BUS_SIGNAL_X(260)
+#define TME_BUS_SIGNAL_DRQ		TME_BUS_SIGNAL_X(261)
+#define TME_BUS_SIGNAL_DACK		TME_BUS_SIGNAL_X(262)
+#define TME_BUS_SIGNALS_GENERIC		{ TME_BUS_SIGNALS_ID_GENERIC, TME_BUS_VERSION, 384, 0 }
 
 /* this gets the index and mask of a bus signal bit in a byte array: */
-#define TME_BUS_SIGNAL_BIT_INDEX(x)	(((x) >> _TME_BUS_SIGNAL_BITS) >> 3)
-#define TME_BUS_SIGNAL_BIT_MASK(x)	TME_BIT(((x) >> _TME_BUS_SIGNAL_BITS) & 7)
+#define TME_BUS_SIGNAL_BIT_INDEX(x)	(TME_BUS_SIGNAL_INDEX(x) >> 3)
+#define TME_BUS_SIGNAL_BIT_MASK(x)	TME_BIT(TME_BUS_SIGNAL_INDEX(x) & 7)
+
+/* this gets the number of bytes in a byte array of bus signal bits: */
+#define TME_BUS_SIGNAL_BIT_BYTES(count)	(((count) + 7) >> 3)
 
 /* the undefined interrupt vector: */
 #define TME_BUS_INTERRUPT_VECTOR_UNDEF	(-1)
@@ -165,6 +174,12 @@ do {							\
 #define TME_BUS_LANE_ROUTE_WRITE_IGNORE		TME_BIT(6)
 #define TME_BUS_LANE_ROUTE(x)			(x)
 
+/* this is a special bus cycle return value.  it doesn't indicate a
+   fault, but instead tells the initiator that some other event has
+   happened on the bus, synchronous with the bus cycle, that the
+   initiator should handle: */
+#define TME_BUS_CYCLE_SYNCHRONOUS_EVENT		(EINTR)
+
 /* types: */
 struct tme_bus_tlb;
 
@@ -229,11 +244,40 @@ struct tme_bus_tlb {
   TME_ATOMIC(tme_bus_addr_t, tme_bus_tlb_addr_first);
   TME_ATOMIC(tme_bus_addr_t, tme_bus_tlb_addr_last);
 
+  /* this TLB entry pointer is meant to make TLB filling more
+     thread-safe.  since callers of TLB fill functions should release
+     all locks before calling out, caller code could run in *another*
+     thread during the TLB fill, and see an inconsistent TLB entry,
+     or, worse, call out a TLB fill of its own on the same entry.
+
+     in general, to avoid this kind of problem, connection interface
+     functions that take pointers to data structures to read or write,
+     should almost always be passed pointers to data structures local
+     to the thread - usually automatic storage on the stack.
+
+     so, TLB fill functions should expect to be filling TLB entries
+     on the stack.  however, since TLB entries may also be invalidated by
+     the filler at some later time, the caller must provide a pointer to
+     its "global" TLB entry that backs the local TLB entry filled.
+     this is that pointer.
+
+     additionally, this field is used in "global" backing TLB entries
+     as a sort of reservation field.  before a TLB fill callout is
+     made, the caller stores the pointer to the local TLB entry being
+     filled.  after the TLB fill returns and the caller relocks its
+     data structures, it can test to see if its reservation on the
+     global backing TLB entry has been broken or not.  it will only be
+     broken by a concurrent TLB fill by caller code, or by a regular
+     TLB invalidation (possibly an invalidation of the TLB entry just
+     filled!)  only if the reservation has not been broken will the
+     local TLB entry be copied back into the backing TLB entry: */
+  TME_ATOMIC(struct tme_bus_tlb *, tme_bus_tlb_backing_reservation);
+
   /* when one or both of these pointers are not TME_EMULATOR_OFF_UNDEF, 
      this TLB entry allows fast (memory) reads of and/or writes to the
      bus region.  adding an address in the bus region to one of these
      pointers yields the desired host memory address: */
-  tme_uint8_t *tme_bus_tlb_emulator_off_read;
+  _tme_const tme_uint8_t *tme_bus_tlb_emulator_off_read;
   tme_uint8_t *tme_bus_tlb_emulator_off_write;
 
   /* fast (memory) reads and writes are protected by this rwlock: */
@@ -262,6 +306,22 @@ struct tme_bus_tlb {
   } tme_bus_tlb_fault_handlers[TME_BUS_TLB_FAULT_HANDLERS];
 };
 
+/* a bus signals set: */
+struct tme_bus_signals {
+
+  /* the bus signals set identifier: */
+  tme_uint32_t tme_bus_signals_id;
+
+  /* the version of the bus signals: */
+  tme_uint32_t tme_bus_signals_version;
+
+  /* the maximum number of bus signals in the set: */
+  tme_uint32_t tme_bus_signals_count;
+
+  /* the first signal in the bus signals set: */
+  tme_uint32_t tme_bus_signals_first;
+};
+
 /* a bus connection: */
 struct tme_bus_connection {
 
@@ -282,6 +342,10 @@ struct tme_bus_connection {
     _tme_const struct tme_bus_subregion *tme_bus_subregion_next;
   } tme_bus_subregions;
 
+  /* the bus signal set adder: */
+  int (*tme_bus_signals_add) _TME_P((struct tme_bus_connection *,
+				     struct tme_bus_signals *));
+
   /* the bus signal handler: */
   int (*tme_bus_signal) _TME_P((struct tme_bus_connection *, unsigned int));
 
@@ -289,7 +353,7 @@ struct tme_bus_connection {
   int (*tme_bus_intack) _TME_P((struct tme_bus_connection *, unsigned int, int *));
 
   /* the bus TLB set allocator: */
-  int (*tme_bus_tlb_set_allocate) _TME_P((struct tme_bus_connection *, unsigned int, unsigned int, TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb **)));
+  int (*tme_bus_tlb_set_allocate) _TME_P((struct tme_bus_connection *, unsigned int, unsigned int, TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb *)));
 
   /* the bus TLB entry filler: */
   int (*tme_bus_tlb_fill) _TME_P((struct tme_bus_connection *, struct tme_bus_tlb *,
@@ -318,12 +382,16 @@ struct tme_bus_connection_int {
      the connection doesn't know already: */
   int tme_bus_connection_int_signal_int;
 
+  /* the single interrupt vector used by this connection, when the
+     connection doesn't know already: */
+  int tme_bus_connection_int_vector_int;
+
   /* nonzero iff we've already logged an unconfigured interrupt
      signal: */
   int tme_bus_connection_int_logged_int;
 
   /* the current status of the bus signals for this connection: */
-  tme_uint8_t tme_bus_connection_int_signals[(_TME_BUS_SIGNAL_COUNT + 7) >> 3];
+  tme_uint8_t *tme_bus_connection_int_signals;
 };
 
 /* a generic bus: */
@@ -350,8 +418,12 @@ struct tme_bus {
     _tme_const struct tme_bus_subregion *tme_bus_addressable_subregion;
   } *tme_bus_addressables;
 
+  /* the bus signal sets on this bus: */
+  unsigned int tme_bus_signals_count;
+  struct tme_bus_signals *tme_bus_signals;
+
   /* the number of devices asserting the various bus signals: */
-  unsigned int tme_bus_signal_asserts[_TME_BUS_SIGNAL_COUNT];
+  unsigned int *tme_bus_signal_asserts;
 };
 
 /* prototypes: */
@@ -371,8 +443,10 @@ int tme_bus_tlb_set_allocate _TME_P((struct tme_bus *,
 				     struct tme_bus_connection_int *,
 				     unsigned int,
 				     unsigned int, 
-				     TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb **)));
+				     TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb *)));
 void tme_bus_tlb_map _TME_P((struct tme_bus_tlb *, tme_bus_addr_t, _tme_const struct tme_bus_tlb *, tme_bus_addr_t));
+void tme_bus_tlb_reserve _TME_P((struct tme_bus_tlb *, struct tme_bus_tlb *));
+void tme_bus_tlb_back _TME_P((_tme_const struct tme_bus_tlb *));
 void tme_bus_tlb_invalidate _TME_P((struct tme_bus_tlb *));
 void tme_bus_tlb_initialize _TME_P((struct tme_bus_tlb *));
 int tme_bus_tlb_fault _TME_P((struct tme_bus_tlb *, struct tme_bus_cycle *, int));
@@ -380,5 +454,6 @@ tme_bus_addr_t tme_bus_addr_parse _TME_P((_tme_const char *, tme_bus_addr_t));
 tme_bus_addr_t tme_bus_addr_parse_any _TME_P((_tme_const char *, int *));
 void tme_bus_cycle_xfer _TME_P((struct tme_bus_cycle *, struct tme_bus_cycle *));
 void tme_bus_cycle_xfer_memory _TME_P((struct tme_bus_cycle *, tme_uint8_t *, tme_bus_addr_t));
+void tme_bus_cycle_xfer_reg _TME_P((struct tme_bus_cycle *, void *, unsigned int));
 
 #endif /* !_TME_GENERIC_BUS_H */

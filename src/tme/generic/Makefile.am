@@ -16,4 +16,5 @@ tmegeneric_HEADERS = \
 	disk.h \
 	tape.h \
 	mouse.h \
+	float.h \
 	keyboard.h

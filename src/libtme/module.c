@@ -1,4 +1,4 @@
-/* $Id: module.c,v 1.5 2003/08/23 13:48:30 fredette Exp $ */
+/* $Id: module.c,v 1.6 2005/01/26 12:59:24 fredette Exp $ */
 
 /* libtme/module.c - module management: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: module.c,v 1.5 2003/08/23 13:48:30 fredette Exp $");
+_TME_RCSID("$Id: module.c,v 1.6 2005/01/26 12:59:24 fredette Exp $");
 
 /* includes: */
 #include <tme/threads.h>
@@ -296,7 +296,6 @@ tme_module_open(const char *module_fake_pathname, void **_module, char **_output
   if (tokens_count == 0) {
     tme_output_append_error(_output, module_fake_pathname);
     tme_free(modules_dir);
-    tme_free_string_array(tokens, -1);
     return (ENOENT);
   }
 

@@ -1,4 +1,4 @@
-/* $Id: scsi-bus.c,v 1.4 2003/10/16 02:35:21 fredette Exp $ */
+/* $Id: scsi-bus.c,v 1.5 2005/02/18 03:16:37 fredette Exp $ */
 
 /* scsi/scsi-bus.c - a generic SCSI bus element: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: scsi-bus.c,v 1.4 2003/10/16 02:35:21 fredette Exp $");
+_TME_RCSID("$Id: scsi-bus.c,v 1.5 2005/02/18 03:16:37 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/scsi.h>
@@ -45,9 +45,6 @@ _TME_RCSID("$Id: scsi-bus.c,v 1.4 2003/10/16 02:35:21 fredette Exp $");
 #endif /* HAVE_STDARG_H */
 
 /* macros: */
-
-/* the count of IDs: */
-#define TME_SCSI_BUS_ID_COUNT	(sizeof(tme_scsi_data_t) * 8)
 
 /* the callout flags: */
 #define TME_SCSI_BUS_CALLOUT_CHECK		(0)
@@ -91,37 +88,26 @@ struct tme_scsi_connection_int {
   tme_scsi_control_t tme_scsi_connection_int_last_control;
   tme_scsi_control_t tme_scsi_connection_int_last_data;
 
-  /* any sequence that this connection is running, and the step
-     within that sequence: */
-  const struct tme_scsi_sequence *tme_scsi_connection_int_sequence;
+  /* any events that this connection is waiting on, and any that
+     triggered: */
+  tme_uint32_t tme_scsi_connection_int_events_waiting;
+  tme_uint32_t tme_scsi_connection_int_events_triggered;
+
+  /* any actions that this connection is waiting to take, and any that
+     were taken: */
+  tme_uint32_t tme_scsi_connection_int_actions_waiting;
+  tme_uint32_t tme_scsi_connection_int_actions_taken;
+
+  /* any step within the current action sequence: */
   unsigned int tme_scsi_connection_int_sequence_step;
 
   /* any DMA structure for this connection: */
+  struct tme_scsi_dma tme_scsi_connection_int_dma_buffer;
   struct tme_scsi_dma *tme_scsi_connection_int_dma;
   
   /* specific callout flags for this connection: */
   int tme_scsi_connection_int_callout_flags;
 };
-
-/* the predefined sequence atom type: */
-typedef unsigned long tme_scsi_sequence_atom_t;
-
-/* globals: */
-
-/* atoms representing the predefined sequences.  the tme SCSI
-   interface allows a bus implementation to return predefined
-   sequences that are actually completely opaque - despite getting a
-   struct tme_scsi_sequence *, SCSI device implementations are not
-   allowed to even *dereference* a pointer returned by a bus
-   implementation's tme_scsi_connection_sequence_get method.  we take
-   advantage of this here to make a partial, optimized implementation: */
-const struct {
-  tme_scsi_sequence_atom_t tme_scsi_sequence_info_dma_initiator;
-  tme_scsi_sequence_atom_t tme_scsi_sequence_info_dma_target;
-  tme_scsi_sequence_atom_t tme_scsi_sequence_wait_select_half[TME_SCSI_BUS_ID_COUNT];
-  tme_scsi_sequence_atom_t tme_scsi_sequence_wait_select_full[TME_SCSI_BUS_ID_COUNT];
-  tme_scsi_sequence_atom_t tme_scsi_sequence_wait_change;
-} _tme_scsi_bus_sequences;
 
 /* the SCSI bus callout function.  it must be called with the mutex locked: */
 static void
@@ -132,6 +118,10 @@ _tme_scsi_bus_callout(struct tme_scsi_bus *scsi_bus, int new_callouts)
   int callouts, later_callouts;
   tme_scsi_control_t control;
   tme_scsi_data_t data;
+  tme_uint32_t events_triggered;
+  tme_uint32_t actions_taken;
+  struct tme_scsi_dma dma_buffer;
+  const struct tme_scsi_dma *dma;
   int rc;
   
   /* add in any new callouts: */
@@ -194,6 +184,16 @@ _tme_scsi_bus_callout(struct tme_scsi_bus *scsi_bus, int new_callouts)
 	conn_int->tme_scsi_connection_int_last_data
 	  = data;
 
+	/* get the events triggered, actions taken, and any DMA
+           structure: */
+	events_triggered = conn_int->tme_scsi_connection_int_events_triggered;
+	actions_taken = conn_int->tme_scsi_connection_int_actions_taken;
+	dma = conn_int->tme_scsi_connection_int_dma;
+	if (dma != NULL) {
+	  dma_buffer = *dma;
+	  dma = &dma_buffer;
+	}
+
 	/* unlock the mutex: */
 	tme_mutex_unlock(&scsi_bus->tme_scsi_bus_mutex);
 	
@@ -205,8 +205,9 @@ _tme_scsi_bus_callout(struct tme_scsi_bus *scsi_bus, int new_callouts)
 	      (conn_scsi,
 	       control,
 	       data,
-	       conn_int->tme_scsi_connection_int_sequence,
-	       NULL));
+	       events_triggered,
+	       actions_taken,
+	       dma));
 	
 	/* lock the mutex: */
 	tme_mutex_lock(&scsi_bus->tme_scsi_bus_mutex);
@@ -232,12 +233,15 @@ static int
 _tme_scsi_bus_cycle(struct tme_scsi_connection *conn_scsi,
 		    tme_scsi_control_t control,
 		    tme_scsi_data_t data,
-		    const struct tme_scsi_sequence *sequence_asker,
-		    struct tme_scsi_dma *dma)
+		    tme_uint32_t events_asker,
+		    tme_uint32_t actions_asker,
+		    const struct tme_scsi_dma *dma_asker)
 {
   struct tme_scsi_bus *scsi_bus;
   struct tme_scsi_connection_int *conn_int_asker, *conn_int;
-  const struct tme_scsi_sequence *sequence;
+  tme_uint32_t events;
+  tme_uint32_t actions;
+  struct tme_scsi_dma *dma;
   struct tme_scsi_connection_int *dma_initiator;
   struct tme_scsi_connection_int *dma_target;
   struct tme_scsi_dma *dma_in, *dma_out;
@@ -245,7 +249,6 @@ _tme_scsi_bus_cycle(struct tme_scsi_connection *conn_scsi,
   int bus_changed;
   int new_callouts;
   int again;
-  tme_scsi_data_t id;
 
   /* recover our bus and internal connection: */
   scsi_bus = conn_scsi->tme_scsi_connection.tme_connection_element->tme_element_private;
@@ -261,43 +264,66 @@ _tme_scsi_bus_cycle(struct tme_scsi_connection *conn_scsi,
   conn_int_asker->tme_scsi_connection_int_control = control;
   conn_int_asker->tme_scsi_connection_int_data = data;
 
-  /* update the sequence for this device: */
-  if (sequence_asker != NULL) {
+  /* if you're waiting on TME_SCSI_EVENT_BUS_CHANGE, you can't wait on
+     anything else, and you can't have any actions: */
+  /* you can't wait on TME_SCSI_EVENT_BUS_CHANGE and anything else: */
+  assert(!(events_asker & TME_SCSI_EVENT_BUS_CHANGE)
+	 || (events_asker == TME_SCSI_EVENT_BUS_CHANGE
+	     && actions_asker == TME_SCSI_ACTION_NONE));
 
-    /* being a partial implementation, we don't support device-defined
-       sequences - any sequence must be a predefined sequence that we
-       returned: */
-    if ((sequence_asker
-	 < (const struct tme_scsi_sequence *) (char *) &_tme_scsi_bus_sequences)
-	|| (sequence_asker
-	    >= (const struct tme_scsi_sequence *) (char *) (&_tme_scsi_bus_sequences + 1))) {
-      abort();
-    }
-  }
-  conn_int_asker->tme_scsi_connection_int_sequence = sequence_asker;
+  /* you can do at most one of: select, reselect, DMA initiator, DMA target: */
+  assert (((events_asker
+	    & (TME_SCSI_ACTION_SELECT
+	       | TME_SCSI_ACTION_RESELECT
+	       | TME_SCSI_ACTION_DMA_INITIATOR
+	       | TME_SCSI_ACTION_DMA_TARGET))
+	   & ((events_asker
+	       & (TME_SCSI_ACTION_SELECT
+		  | TME_SCSI_ACTION_RESELECT
+		  | TME_SCSI_ACTION_DMA_INITIATOR
+		  | TME_SCSI_ACTION_DMA_TARGET)) - 1)) == 0);
+
+  /* you can't provide a DMA structure without a DMA action, or with any events: */
+  assert ((dma_asker != NULL)
+	  == ((actions_asker
+	       & (TME_SCSI_ACTION_DMA_INITIATOR
+		  | TME_SCSI_ACTION_DMA_TARGET)) != 0));
+  assert ((dma_asker == NULL) || (events_asker == TME_SCSI_EVENT_NONE));
+
+  /* update the events and actions for this device: */
+  conn_int_asker->tme_scsi_connection_int_events_waiting = events_asker;
+  conn_int_asker->tme_scsi_connection_int_events_triggered = 0;
+  conn_int_asker->tme_scsi_connection_int_actions_waiting = actions_asker;
+  conn_int_asker->tme_scsi_connection_int_actions_taken = 0;
   conn_int_asker->tme_scsi_connection_int_sequence_step = 0;
 
-  /* update the DMA structure for this device.  being a partial
-     implementation, we only support 8-bit asynchronous DMA: */
-  if (dma != NULL) {
-    if (((dma->tme_scsi_dma_flags
-	  & TME_SCSI_DMA_WIDTH)
-	 != TME_SCSI_DMA_8BIT)
-	|| (dma->tme_scsi_dma_sync_offset
-	    != 0)) {
+  /* if this is a DMA sequence: */
+  conn_int_asker->tme_scsi_connection_int_dma = NULL;
+  if (dma_asker != NULL) {
+
+    /* XXX is the 8-bit DMA restriction necessary?  how does wide SCSI
+       handle transfers of odd numbers of bytes? */
+    if ((dma_asker->tme_scsi_dma_flags
+	 & TME_SCSI_DMA_WIDTH)
+	!= TME_SCSI_DMA_8BIT) {
       abort();
     }
-    if (dma->tme_scsi_dma_resid == 0) {
+
+    /* copy in the DMA structure: */
+    conn_int_asker->tme_scsi_connection_int_dma_buffer = *dma_asker;
+    conn_int_asker->tme_scsi_connection_int_dma = &conn_int_asker->tme_scsi_connection_int_dma_buffer;
+
+    /* if the caller passed us a DMA structure with zero bytes left to
+       transfer, call out a cycle now: */
+    if (dma_asker->tme_scsi_dma_resid == 0) {
       conn_int_asker->tme_scsi_connection_int_callout_flags
 	|= TME_SCSI_BUS_CALLOUT_CYCLE;
-      conn_int_asker->tme_scsi_connection_int_sequence
-	= NULL;
+      conn_int_asker->tme_scsi_connection_int_events_waiting = TME_SCSI_EVENT_NONE;
+      conn_int_asker->tme_scsi_connection_int_actions_waiting = actions_asker;
       new_callouts
 	|= TME_SCSI_BUS_CALLOUT_CYCLE;
-      dma = NULL;
     }
   }
-  conn_int_asker->tme_scsi_connection_int_dma = dma;
 
   /* if during any iteration of the below loop, we see or cause a
      change on the bus, we want to call out cycles to all devices
@@ -339,118 +365,211 @@ _tme_scsi_bus_cycle(struct tme_scsi_connection *conn_scsi,
 	   = ((struct tme_scsi_connection_int *)
 	      conn_int->tme_scsi_connection_int.tme_scsi_connection.tme_connection_next)) {
 
-      /* dispatch on this device's sequence: */
-      sequence = conn_int->tme_scsi_connection_int_sequence;
-#define SEQUENCE_IS(s, f)				\
-  (((s)							\
-    >= ((const struct tme_scsi_sequence *)		\
-	&_tme_scsi_bus_sequences.f))			\
-   && ((s)						\
-       < ((const struct tme_scsi_sequence *)		\
-	  (&_tme_scsi_bus_sequences.f			\
-	   + 1))))
-#define SEQUENCE_INDEX(s, f)				\
-  (((const tme_scsi_sequence_atom_t *) (s))		\
-   - &_tme_scsi_bus_sequences.f[0])
+      /* get any waiting events and actions: */
+      events = conn_int->tme_scsi_connection_int_events_waiting;
+      actions = conn_int->tme_scsi_connection_int_actions_waiting;
 
-      /* a device with no sequence is ignoring the bus completely: */
-      if (sequence == NULL) {
-	/* nothing to do: */
+      /* if this device is waiting on any change to the bus state, and
+         the bus has changed: */
+      if ((events & TME_SCSI_EVENT_BUS_CHANGE)
+	  && (bus_changed
+	      || (control !=
+		  conn_int->tme_scsi_connection_int_last_control)
+	      || (data
+		  != conn_int->tme_scsi_connection_int_last_data))) {
+
+	/* this event has triggered.  we never take any action: */
+	conn_int->tme_scsi_connection_int_events_triggered = TME_SCSI_EVENT_BUS_CHANGE;
+	events = TME_SCSI_EVENT_NONE;
+	actions = TME_SCSI_ACTION_NONE;
       }
 
-      /* a device in TME_SCSI_SEQUENCE_WAIT_CHANGE is waiting on any
-	 change to the bus state: */
-      else if (SEQUENCE_IS(sequence, tme_scsi_sequence_wait_change)) {
-
-	/* if the bus has changed, callout a cycle on this device: */
-	if (bus_changed
-	    || (control !=
-		conn_int->tme_scsi_connection_int_last_control)
-	    || (data
-		!= conn_int->tme_scsi_connection_int_last_data)) {
-	  conn_int->tme_scsi_connection_int_callout_flags
-	    |= TME_SCSI_BUS_CALLOUT_CYCLE;
-	  conn_int->tme_scsi_connection_int_sequence
-	    = NULL;
-	  new_callouts
-	    |= TME_SCSI_BUS_CALLOUT_CYCLE;
-	}
-      }
-
-      /* a connection in TME_SCSI_SEQUENCE_WAIT_SELECT_HALF or
-	 TME_SCSI_SEQUENCE_WAIT_SELECT_FULL is waiting to be selected: */
-      else if (SEQUENCE_IS(sequence,
-			   tme_scsi_sequence_wait_select_half)
-	       || SEQUENCE_IS(sequence,
-			      tme_scsi_sequence_wait_select_full)) {
-
-	/* get the SCSI ID for the connection: */
-	id = (SEQUENCE_IS(sequence,
-			  tme_scsi_sequence_wait_select_half)
-	      ? SEQUENCE_INDEX(sequence,
-			       tme_scsi_sequence_wait_select_half)
-	      : SEQUENCE_INDEX(sequence,
-			       tme_scsi_sequence_wait_select_full));
-	
-	/* dispatch on the sequence step: */
-	switch (conn_int->tme_scsi_connection_int_sequence_step) {
+      /* if this device is waiting to be selected, and the device is
+         now being selected: */
+      if ((events & TME_SCSI_EVENT_SELECTED)
 
 	  /* "In all systems, the target shall determine that it is
 	     selected when SEL and its SCSI ID bit are true and BSY and
 	     I/O are false for at least a bus settle delay." */
+	  && TME_SCSI_ID_SELECTED(TME_SCSI_EVENT_IDS_WHICH(events), control, data)) {
+
+	/* this event has triggered.  the only action we can take is
+	   to respond to the selection: */
+	conn_int->tme_scsi_connection_int_events_triggered = TME_SCSI_EVENT_SELECTED | TME_SCSI_EVENT_IDS_SELF(data);
+	events = TME_SCSI_EVENT_NONE;
+	actions &= TME_SCSI_ACTION_RESPOND_SELECTED;
+      }
+
+      /* if this device is waiting to be reselected, and the device is
+         now being reselected: */
+      if ((events & TME_SCSI_EVENT_RESELECTED)
+
+	  /* "The initiator shall determine that it is reselected when
+	     SEL, I/O, and its SCSI ID bit are true and BSY is false
+	     for at least a bus settle delay." */
+	  && TME_SCSI_ID_RESELECTED(TME_SCSI_EVENT_IDS_WHICH(events), control, data)) {
+
+	/* this event has triggered.  the only action we can take is
+	   to respond to the reselection: */
+	conn_int->tme_scsi_connection_int_events_triggered = TME_SCSI_EVENT_RESELECTED | TME_SCSI_EVENT_IDS_SELF(data);
+	events = TME_SCSI_EVENT_NONE;
+	actions &= TME_SCSI_ACTION_RESPOND_RESELECTED;
+      }
+
+      /* if this device is waiting for the bus to be free, and the bus
+         is now free: */
+      if ((events & TME_SCSI_EVENT_BUS_FREE)
+
+	  /* "SCSI devices shall detect the BUS FREE phase after SEL
+	     and BSY are both false for at least a bus settle delay."  */
+	  && (control
+	      & (TME_SCSI_SIGNAL_SEL
+		 | TME_SCSI_SIGNAL_BSY)) == 0) {
+
+	/* this event has triggered.  we won't respond to selection or
+	   reselection, since we won't be selected or reselected: */
+	conn_int->tme_scsi_connection_int_events_triggered = TME_SCSI_EVENT_BUS_FREE;
+	events = TME_SCSI_EVENT_NONE;
+	actions &= ~(TME_SCSI_ACTION_RESPOND_SELECTED | TME_SCSI_ACTION_RESPOND_RESELECTED);
+      }
+
+      /* put back this device's waiting events.  if this device is
+         still waiting for one or more events, continue now: */
+      conn_int->tme_scsi_connection_int_events_waiting = events;
+      if (events != TME_SCSI_EVENT_NONE) {
+	continue;
+      }
+
+      /* if this device is arbitrating for the bus: */
+      if (TME_SCSI_ACTIONS_SELECTED(actions, TME_SCSI_ACTION_ARBITRATE_FULL)) {
+	
+	/* assert BSY and the device ID on this device's behalf.  if
+	   we're doing full arbitration, also assert SEL on this
+	   device's behalf: */
+	conn_int->tme_scsi_connection_int_control
+	  = (TME_SCSI_SIGNAL_BSY
+	     | (((actions & TME_SCSI_ACTION_ARBITRATE_FULL)
+		 == TME_SCSI_ACTION_ARBITRATE_FULL)
+		? TME_SCSI_SIGNAL_SEL
+		: 0));
+	conn_int->tme_scsi_connection_int_data
+	  = TME_BIT(TME_SCSI_ACTION_ID_SELF_WHICH(actions));
+	again = TRUE;
+	bus_changed = TRUE;
+
+	/* this action has been taken: */
+	conn_int->tme_scsi_connection_int_actions_taken
+	  |= ((actions & TME_SCSI_ACTION_ARBITRATE_FULL)
+	      | TME_SCSI_ACTION_ID_SELF(TME_SCSI_ACTION_ID_SELF_WHICH(actions)));
+	actions &= ~TME_SCSI_ACTION_ARBITRATE_FULL;
+      }
+
+      /* if this device is selecting or reselecting another device: */
+      if (TME_SCSI_ACTIONS_SELECTED(actions,
+				    (TME_SCSI_ACTION_SELECT
+				     | TME_SCSI_ACTION_SELECT_SINGLE_INITIATOR
+				     | TME_SCSI_ACTION_RESELECT))) {
+
+	/* "Except in certain single initiator environments with
+	   initiators employing the single initiator option, the
+	   initiator shall set the DATA BUS to a value which is the OR
+	   of its SCSI ID bit and the target's SCSI ID bit.  The
+	   initiator shall then wait at least two deskew delays and
+	   release BSY."
+
+	   "Initiators that do not implement the RESELECTION phase and
+	   do not operate in the multiple initiator environment are
+	   allowed to set only the target's SCSI ID bit during the
+	   SELECTION phase.  This makes it impossible for the target
+	   to determine the initiator's SCSI ID."
+
+	   "The winning SCSI device becomes a target by asserting the
+	   I/O signal.  The winning SCSI device shall also set the
+	   DATA BUS to a value that is the OR of its SCSI ID bit and
+	   the initiator's SCSI ID bit.  The target shall wait at
+	   least two deskew delays and release BSY." */
+
+	/* set the sequence's selection/reselection SCSI IDs on the
+	   bus, then set I/O if this is a reselection, and release
+	   BSY: */
+	conn_int->tme_scsi_connection_int_data
+	  = (TME_BIT(TME_SCSI_ACTION_ID_OTHER_WHICH(actions))
+	     | (((actions & TME_SCSI_ACTION_SELECT_SINGLE_INITIATOR)
+		 == TME_SCSI_ACTION_SELECT_SINGLE_INITIATOR)
+		? 0
+		: TME_BIT(TME_SCSI_ACTION_ID_SELF_WHICH(actions))));
+	conn_int->tme_scsi_connection_int_control
+	  = (TME_SCSI_SIGNAL_SEL
+	     | ((actions & TME_SCSI_ACTION_RESELECT)
+		? TME_SCSI_SIGNAL_I_O
+		: 0));
+	again = TRUE;
+	bus_changed = TRUE;
+
+	/* this action has been taken: */
+	conn_int->tme_scsi_connection_int_actions_taken
+	  |= ((actions
+	       & (TME_SCSI_ACTION_SELECT
+		  | TME_SCSI_ACTION_SELECT_SINGLE_INITIATOR
+		  | TME_SCSI_ACTION_RESELECT))
+	      | TME_SCSI_ACTION_ID_SELF(TME_SCSI_ACTION_ID_SELF_WHICH(actions))
+	      | TME_SCSI_ACTION_ID_OTHER(TME_SCSI_ACTION_ID_OTHER_WHICH(actions)));
+	actions &= ~(TME_SCSI_ACTION_SELECT
+		     | TME_SCSI_ACTION_SELECT_SINGLE_INITIATOR
+		     | TME_SCSI_ACTION_RESELECT);
+      }
+
+      /* if this device is responding to selection or reselection: */
+      if (TME_SCSI_ACTIONS_SELECTED(actions, 
+				    (TME_SCSI_ACTION_RESPOND_SELECTED
+				     | TME_SCSI_ACTION_RESPOND_RESELECTED))) {
+
+	/* dispatch on the step: */
+	switch (conn_int->tme_scsi_connection_int_sequence_step) {
+	    
 	case 0:
-	  if (((control
-		& (TME_SCSI_SIGNAL_BSY
-		   | TME_SCSI_SIGNAL_SEL
-		   | TME_SCSI_SIGNAL_I_O))
-	       == TME_SCSI_SIGNAL_SEL)
-	      && (data
-		  & TME_BIT(id))) {
+	  
+	  /* assert BSY on the device's behalf: */
+	  conn_int->tme_scsi_connection_int_control
+	    = TME_SCSI_SIGNAL_BSY;
+	  again = TRUE;
+	  bus_changed = TRUE;
 
-	    /* this device is being selected: */
+	  /* advance to the next step: */
+	  conn_int->tme_scsi_connection_int_sequence_step++;
+	    
+	  /* FALLTHROUGH */
 
-	    /* if this device is in
-	       TME_SCSI_SEQUENCE_WAIT_SELECT_HALF, callout a cycle on
-	       this device: */
-	    if (SEQUENCE_IS(sequence,
-			    tme_scsi_sequence_wait_select_half)) {
-	      conn_int->tme_scsi_connection_int_callout_flags
-		|= TME_SCSI_BUS_CALLOUT_CYCLE;
-	      conn_int->tme_scsi_connection_int_sequence
-		= NULL;
-	      new_callouts
-		|= TME_SCSI_BUS_CALLOUT_CYCLE;
-	    }
-
-	    /* otherwise, this device is in
-	       TME_SCSI_SEQUENCE_WAIT_SELECT_FULL.  assert BSY on its
-	       behalf and advance to the next state: */
-	    else {
-	      conn_int->tme_scsi_connection_int_control
-		|= TME_SCSI_SIGNAL_BSY;
-	      conn_int->tme_scsi_connection_int_sequence_step++;
-	      again = TRUE;
-	      bus_changed = TRUE;
-	    }
-	  }
-	  break;
+	case 1:
 
 	  /* "At least two deskew delays after the initiator detects
 	     BSY is true, it shall release SEL and may change the DATA
 	     BUS."
 
-	     as the target, we wait for SEL to be negated: */
-	case 1:
+	     "After the reselected initiator detects SEL false, it
+	     shall release BSY." */
 	  if (!(control
 		& TME_SCSI_SIGNAL_SEL)) {
-	  
-	    /* callout a cycle on this device: */
-	    conn_int->tme_scsi_connection_int_callout_flags
-	      |= TME_SCSI_BUS_CALLOUT_CYCLE;
-	    conn_int->tme_scsi_connection_int_sequence
-	      = NULL;
-	    new_callouts
-	      |= TME_SCSI_BUS_CALLOUT_CYCLE;
+
+	    /* if this was a reselection: */
+	    if (actions & TME_SCSI_ACTION_RESPOND_RESELECTED) {
+
+	      /* negate BSY on the device's behalf: */
+	      conn_int->tme_scsi_connection_int_control
+		= 0;
+	      again = TRUE;
+	      bus_changed = TRUE;
+	    }
+
+	    /* this action has been taken: */
+	    conn_int->tme_scsi_connection_int_actions_taken
+	      |= (actions
+		  & (TME_SCSI_ACTION_RESPOND_SELECTED
+		     | TME_SCSI_ACTION_RESPOND_RESELECTED));
+	    actions
+	      &= ~(TME_SCSI_ACTION_RESPOND_SELECTED
+		   | TME_SCSI_ACTION_RESPOND_RESELECTED);
+	    conn_int->tme_scsi_connection_int_sequence_step = 0;
 	  }
 	  break;
 	}
@@ -458,13 +577,34 @@ _tme_scsi_bus_cycle(struct tme_scsi_connection *conn_scsi,
 
       /* there can be at most one device in an initiator or target
 	 information transfer phase DMA sequence: */
-      else if (SEQUENCE_IS(sequence, tme_scsi_sequence_info_dma_initiator)) {
+      else if (TME_SCSI_ACTIONS_SELECTED(actions, TME_SCSI_ACTION_DMA_INITIATOR)) {
 	assert (dma_initiator == NULL);
 	dma_initiator = conn_int;
       }
-      else if (SEQUENCE_IS(sequence, tme_scsi_sequence_info_dma_target)) {
+      else if (TME_SCSI_ACTIONS_SELECTED(actions, TME_SCSI_ACTION_DMA_TARGET)) {
 	assert (dma_target == NULL);
 	dma_target = conn_int;
+      }
+
+      /* put back this device's waiting actions.  if this device is
+         not waiting for any more actions: */
+      conn_int->tme_scsi_connection_int_actions_waiting = actions;
+      if ((actions
+	   & (TME_SCSI_ACTION_DMA_INITIATOR
+	      | TME_SCSI_ACTION_DMA_TARGET
+	      | TME_SCSI_ACTION_RESPOND_SELECTED
+	      | TME_SCSI_ACTION_RESPOND_RESELECTED
+	      | TME_SCSI_ACTION_SELECT
+	      | TME_SCSI_ACTION_SELECT_SINGLE_INITIATOR
+	      | TME_SCSI_ACTION_RESELECT
+	      | TME_SCSI_ACTION_ARBITRATE_HALF
+	      | TME_SCSI_ACTION_ARBITRATE_FULL)) == 0) {
+
+	/* call out a cycle on this device: */
+	conn_int->tme_scsi_connection_int_callout_flags
+	  |= TME_SCSI_BUS_CALLOUT_CYCLE;
+	new_callouts
+	  |= TME_SCSI_BUS_CALLOUT_CYCLE;
       }
     }
 
@@ -481,8 +621,10 @@ _tme_scsi_bus_cycle(struct tme_scsi_connection *conn_scsi,
 	    != TME_SCSI_PHASE(dma_initiator->tme_scsi_connection_int_last_control))) {
       dma_initiator->tme_scsi_connection_int_callout_flags
 	|= TME_SCSI_BUS_CALLOUT_CYCLE;
-      dma_initiator->tme_scsi_connection_int_sequence
-	= NULL;
+      dma_initiator->tme_scsi_connection_int_actions_waiting
+	= TME_SCSI_ACTION_NONE;
+      dma_initiator->tme_scsi_connection_int_actions_taken
+	|= TME_SCSI_ACTION_DMA_INITIATOR;
       new_callouts
 	|= TME_SCSI_BUS_CALLOUT_CYCLE;
       dma_initiator = NULL;
@@ -532,8 +674,10 @@ _tme_scsi_bus_cycle(struct tme_scsi_connection *conn_scsi,
 	/* request the callout: */
 	dma_target->tme_scsi_connection_int_callout_flags
 	  |= TME_SCSI_BUS_CALLOUT_CYCLE;
-	dma_target->tme_scsi_connection_int_sequence
-	  = NULL;
+	dma_target->tme_scsi_connection_int_actions_waiting
+	  = TME_SCSI_ACTION_NONE;
+	dma_target->tme_scsi_connection_int_actions_taken
+	  |= TME_SCSI_ACTION_DMA_TARGET;
 	new_callouts
 	  |= TME_SCSI_BUS_CALLOUT_CYCLE;
 
@@ -556,8 +700,10 @@ _tme_scsi_bus_cycle(struct tme_scsi_connection *conn_scsi,
 	/* request the callout: */
 	dma_initiator->tme_scsi_connection_int_callout_flags
 	  |= TME_SCSI_BUS_CALLOUT_CYCLE;
-	dma_initiator->tme_scsi_connection_int_sequence
-	  = NULL;
+	dma_initiator->tme_scsi_connection_int_actions_waiting
+	  = TME_SCSI_ACTION_NONE;
+	dma_initiator->tme_scsi_connection_int_actions_taken
+	  |= TME_SCSI_ACTION_DMA_INITIATOR;
 	new_callouts
 	  |= TME_SCSI_BUS_CALLOUT_CYCLE;
 
@@ -612,8 +758,10 @@ _tme_scsi_bus_cycle(struct tme_scsi_connection *conn_scsi,
 	if (--dma->tme_scsi_dma_resid == 0) {
 	  dma_target->tme_scsi_connection_int_callout_flags
 	    |= TME_SCSI_BUS_CALLOUT_CYCLE;
-	  dma_target->tme_scsi_connection_int_sequence
-	    = NULL;
+	  dma_target->tme_scsi_connection_int_actions_waiting
+	    = TME_SCSI_ACTION_NONE;
+	  dma_target->tme_scsi_connection_int_actions_taken
+	    |= TME_SCSI_ACTION_DMA_TARGET;
 	  new_callouts
 	    |= TME_SCSI_BUS_CALLOUT_CYCLE;
 	  break;
@@ -686,8 +834,12 @@ _tme_scsi_bus_cycle(struct tme_scsi_connection *conn_scsi,
 	/* callout a cycle on this device: */
 	dma_target->tme_scsi_connection_int_callout_flags
 	  |= TME_SCSI_BUS_CALLOUT_CYCLE;
-	dma_target->tme_scsi_connection_int_sequence
-	  = NULL;
+	dma_target->tme_scsi_connection_int_actions_waiting
+	  = TME_SCSI_ACTION_NONE;
+	dma_target->tme_scsi_connection_int_actions_taken
+	  = TME_SCSI_ACTION_NONE;
+	dma_target->tme_scsi_connection_int_events_triggered
+	  = TME_SCSI_EVENT_BUS_RESET;
 	new_callouts
 	  |= TME_SCSI_BUS_CALLOUT_CYCLE;
       }
@@ -770,8 +922,10 @@ _tme_scsi_bus_cycle(struct tme_scsi_connection *conn_scsi,
 	if (--dma->tme_scsi_dma_resid == 0) {
 	  dma_initiator->tme_scsi_connection_int_callout_flags
 	    |= TME_SCSI_BUS_CALLOUT_CYCLE;
-	  dma_initiator->tme_scsi_connection_int_sequence
-	    = NULL;
+	  dma_initiator->tme_scsi_connection_int_actions_waiting
+	    = TME_SCSI_ACTION_NONE;
+	  dma_initiator->tme_scsi_connection_int_actions_taken
+	    |= TME_SCSI_ACTION_DMA_INITIATOR;
 	  new_callouts |= TME_SCSI_BUS_CALLOUT_CYCLE;
 	}
 	
@@ -789,16 +943,20 @@ _tme_scsi_bus_cycle(struct tme_scsi_connection *conn_scsi,
       if (control & TME_SCSI_SIGNAL_RST) {
 
 	/* negate all signals on the initiator's behalf: */
-	dma_target->tme_scsi_connection_int_control = 0;
-	dma_target->tme_scsi_connection_int_data = 0;
+	dma_initiator->tme_scsi_connection_int_control = 0;
+	dma_initiator->tme_scsi_connection_int_data = 0;
 	again = TRUE;
 	bus_changed = TRUE;
 	
 	/* callout a cycle on this device: */
-	dma_target->tme_scsi_connection_int_callout_flags
+	dma_initiator->tme_scsi_connection_int_callout_flags
 	  |= TME_SCSI_BUS_CALLOUT_CYCLE;
-	dma_target->tme_scsi_connection_int_sequence
-	  = NULL;
+	dma_initiator->tme_scsi_connection_int_actions_waiting
+	  = TME_SCSI_ACTION_NONE;
+	dma_initiator->tme_scsi_connection_int_actions_taken
+	  = TME_SCSI_ACTION_NONE;
+	dma_initiator->tme_scsi_connection_int_events_triggered
+	  = TME_SCSI_EVENT_BUS_RESET;
 	new_callouts
 	  |= TME_SCSI_BUS_CALLOUT_CYCLE;
       }
@@ -814,68 +972,13 @@ _tme_scsi_bus_cycle(struct tme_scsi_connection *conn_scsi,
   return (TME_OK);
 }
 
-/* this returns a predefined SCSI sequence: */
-#ifdef HAVE_STDARG_H
-static const struct tme_scsi_sequence *
-_tme_scsi_bus_sequence_get(struct tme_scsi_connection *conn_scsi,
-			   unsigned int sequence_type,
-			   ...)
-#else  /* HAVE_STDARG_H */
-static const struct tme_scsi_sequence *_tme_scsi_bus_sequence_get(conn_scsi, sequence_type, va_alist)
-     struct tme_scsi_connection *conn_scsi;
-     unsigned int sequence_type;
-     va_dcl
-#endif /* HAVE_STDARG_H */
-{
-  va_list sequence_args;
-  const struct tme_scsi_sequence *sequence;
-  tme_scsi_data_t id0;
-
-  /* start the variable arguments: */
-#ifdef HAVE_STDARG_H
-  va_start(sequence_args, sequence_type);
-#else  /* HAVE_STDARG_H */
-  va_start(sequence_args);
-#endif /* HAVE_STDARG_H */
-
-  /* dispatch on the sequence type: */
-#define SEQUENCE(f) ((const struct tme_scsi_sequence *) &_tme_scsi_bus_sequences.f)
-  switch (sequence_type) {
-  case TME_SCSI_SEQUENCE_INFO_DMA_INITIATOR:
-    sequence = SEQUENCE(tme_scsi_sequence_info_dma_initiator);
-    break;
-  case TME_SCSI_SEQUENCE_INFO_DMA_TARGET:
-    sequence = SEQUENCE(tme_scsi_sequence_info_dma_target);
-    break;
-  case TME_SCSI_SEQUENCE_WAIT_SELECT_HALF:
-    id0 = va_arg(sequence_args, tme_scsi_data_t);
-    sequence = SEQUENCE(tme_scsi_sequence_wait_select_half[id0]);
-    break;
-  case TME_SCSI_SEQUENCE_WAIT_SELECT_FULL:
-    id0 = va_arg(sequence_args, tme_scsi_data_t);
-    sequence = SEQUENCE(tme_scsi_sequence_wait_select_full[id0]);
-    break;
-  case TME_SCSI_SEQUENCE_WAIT_CHANGE:
-    sequence = SEQUENCE(tme_scsi_sequence_wait_change);
-    break;
-  default:
-    abort();
-  }
-#undef SEQUENCE
-
-  /* end the variable arguments: */
-  va_end(sequence_args);
-
-  return (sequence);
-}
-
 /* this scores a new connection: */
 static int
 _tme_scsi_bus_connection_score(struct tme_connection *conn,
 			       unsigned int *_score)
 {
   struct tme_scsi_bus *scsi_bus;
-  struct tme_scsi_connection_int *conn_int_other;
+  struct tme_scsi_connection *conn_other;
 
   /* both sides must be SCSI connections: */
   assert (conn->tme_connection_type == TME_CONNECTION_SCSI);
@@ -883,12 +986,12 @@ _tme_scsi_bus_connection_score(struct tme_connection *conn,
 
   /* recover our bus and the other internal connection side: */
   scsi_bus = conn->tme_connection_element->tme_element_private;
-  conn_int_other = (struct tme_scsi_connection_int *) conn->tme_connection_other;
+  conn_other = (struct tme_scsi_connection *) conn->tme_connection_other;
 
   /* you cannot connect a bus to a bus: */
+  /* XXX we need a way to distinguish a bus from a device: */
   *_score
-    = (conn_int_other->tme_scsi_connection_int.tme_scsi_connection_sequence_get
-       == NULL);
+    = 1;
   return (TME_OK);
 }
 
@@ -969,7 +1072,6 @@ _tme_scsi_bus_connections_new(struct tme_element *element,
 
   /* fill in the SCSI connection: */
   conn_scsi->tme_scsi_connection_cycle = _tme_scsi_bus_cycle;
-  conn_scsi->tme_scsi_connection_sequence_get = _tme_scsi_bus_sequence_get;
 
   /* return the connection side possibility: */
   *_conns = conn;

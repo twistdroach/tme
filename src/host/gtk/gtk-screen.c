@@ -1,4 +1,4 @@
-/* $Id: gtk-screen.c,v 1.3 2003/10/29 02:03:26 fredette Exp $ */
+/* $Id: gtk-screen.c,v 1.7 2005/05/14 22:12:48 fredette Exp $ */
 
 /* host/gtk/gtk-screen.c - GTK screen support: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: gtk-screen.c,v 1.3 2003/10/29 02:03:26 fredette Exp $");
+_TME_RCSID("$Id: gtk-screen.c,v 1.7 2005/05/14 22:12:48 fredette Exp $");
 
 /* we are aware of the problems with gdk_image_new_bitmap, and we cope
    with them, so we define GDK_ENABLE_BROKEN to get its prototype
@@ -114,13 +114,23 @@ _tme_gtk_screen_th_update(struct tme_gtk_display *display)
 static unsigned int
 _tme_gtk_gdkimage_bipp(GdkImage *image)
 {
-  unsigned int bipp, total_bits_halved;
+  unsigned int bipp, total_bits;
 
-  total_bits_halved = image->bpl;
-  total_bits_halved = (total_bits_halved * 8) / 2;
-  for (bipp = image->depth;
-       (bipp * image->width) <= total_bits_halved;
-       bipp <<= 1);
+  /* if the bytes per pixel value is greater than one, or if the image
+     depth is 8 or greater, just convert the bytes per pixel value to
+     bits per pixel: */
+  if (image->bpp > 1
+      || image->depth >= 8) {
+    return (image->bpp * 8);
+  }
+
+  /* otherwise, we know that the depth of the image is less than
+     eight, and the number of bits per pixel is eight or less: */
+  total_bits = image->bpl;
+  total_bits *= 8;
+  for (bipp = 8;
+       bipp > image->depth && (bipp * image->width) > total_bits;
+       bipp >>= 1);
   return (bipp);
 }
 
@@ -154,8 +164,11 @@ _tme_gtk_screen_mode_change(struct tme_fb_connection *conn_fb)
   gint width, height;
   GdkImage *gdkimage;
   GdkVisual *visual;
-  int color_count, color_i;
-  GdkColor color;
+  tme_uint32_t color_count, color_i;
+  struct tme_fb_color *colors_tme;
+  GdkColor *colors_gdk;
+  gboolean *success;
+  gboolean warned_color_alloc;
 
   /* recover our data structures: */
   display = conn_fb->tme_fb_connection.tme_connection_element->tme_element_private;
@@ -214,7 +227,15 @@ _tme_gtk_screen_mode_change(struct tme_fb_connection *conn_fb)
   gdkimage = gdk_image_new(GDK_IMAGE_FASTEST,
 			   visual,
 			   width,
-			   height);
+			   height
+			   /* NB: we need to allocate an extra scanline's worth
+			      (or, if we're doubling, an extra two scanlines' 
+			      worth) of image, because the framebuffer translation 
+			      functions can sometimes overtranslate (see the 
+			      explanation of TME_FB_XLAT_RUN in fb-xlat-auto.sh): */
+			   + (scale == TME_FB_XLAT_SCALE_DOUBLE
+			      ? 2
+			      : 1));
 
   /* set the new image on the image widget: */
   gtk_image_set(GTK_IMAGE(screen->tme_gtk_screen_gtkimage),
@@ -224,6 +245,40 @@ _tme_gtk_screen_mode_change(struct tme_fb_connection *conn_fb)
   /* destroy the previous gdkimage and remember the new one: */
   gdk_image_destroy(screen->tme_gtk_screen_gdkimage);
   screen->tme_gtk_screen_gdkimage = gdkimage;
+
+  /* free any previously allocated maps and colors: */
+  if (conn_fb->tme_fb_connection_map_g != NULL) {
+    tme_free((void *) conn_fb->tme_fb_connection_map_g);
+  }
+  if (conn_fb->tme_fb_connection_map_r != NULL) {
+    tme_free((void *) conn_fb->tme_fb_connection_map_r);
+  }
+  if (conn_fb->tme_fb_connection_map_b != NULL) {
+    tme_free((void *) conn_fb->tme_fb_connection_map_b);
+  }
+  if (conn_fb->tme_fb_connection_map_pixel != NULL) {
+
+    /* recreate the array of GdkColor: */
+    color_count = conn_fb->tme_fb_connection_map_pixel_count;
+    colors_gdk = tme_new(GdkColor, color_count);
+    for (color_i = 0;
+	 color_i < color_count;
+	 color_i++) {
+      colors_gdk[color_i].pixel = conn_fb->tme_fb_connection_map_pixel[color_i];
+    }
+    
+    /* free the colors: */
+    gdk_colormap_free_colors(gdk_colormap_get_system(),
+			     colors_gdk,
+			     color_count);
+    tme_free(colors_gdk);
+    tme_free((void *) conn_fb->tme_fb_connection_map_pixel);
+  }
+  conn_fb->tme_fb_connection_map_g = NULL;
+  conn_fb->tme_fb_connection_map_r = NULL;
+  conn_fb->tme_fb_connection_map_b = NULL;
+  conn_fb->tme_fb_connection_map_pixel = NULL;
+  conn_fb->tme_fb_connection_map_pixel_count = 0;
 
   /* update our framebuffer connection: */
   conn_fb->tme_fb_connection_width = width;
@@ -236,48 +291,81 @@ _tme_gtk_screen_mode_change(struct tme_fb_connection *conn_fb)
 				      ? TME_ENDIAN_LITTLE
 				      : TME_ENDIAN_BIG);
   conn_fb->tme_fb_connection_buffer = gdkimage->mem;
-
-  /* when we're showing a framebuffer with a depth of one, we need to
-     provide the pixel values for black and white, and, if we're
-     halving, three shades of gray in between: */
-  if (conn_fb->tme_fb_connection_depth1_map != NULL) {
-
-    /* XXX we almost certainly should free colors
-       previously allocated: */
-    tme_free(conn_fb->tme_fb_connection_depth1_map);
+  switch (visual->type) {
+  case GDK_VISUAL_STATIC_GRAY: 
+  case GDK_VISUAL_GRAYSCALE:
+    conn_fb->tme_fb_connection_class = TME_FB_XLAT_CLASS_MONOCHROME;
+    break;
+  default:
+    assert(FALSE);
+    /* FALLTHROUGH */
+  case GDK_VISUAL_STATIC_COLOR:
+  case GDK_VISUAL_PSEUDO_COLOR:
+  case GDK_VISUAL_DIRECT_COLOR:
+  case GDK_VISUAL_TRUE_COLOR:
+    conn_fb->tme_fb_connection_class = TME_FB_XLAT_CLASS_COLOR;
+    break;
   }
-  if (conn_fb_other->tme_fb_connection_depth == 1) {
+  switch (visual->type) {
+  case GDK_VISUAL_DIRECT_COLOR:
+    /* we set the primary maps to anything non-NULL, to indicate that
+       primaries are index mapped: */
+    conn_fb->tme_fb_connection_map_g = conn_fb;
+    conn_fb->tme_fb_connection_map_r = conn_fb;
+    conn_fb->tme_fb_connection_map_b = conn_fb;
+    /* FALLTHROUGH */
+  case GDK_VISUAL_TRUE_COLOR:
+    conn_fb->tme_fb_connection_mask_g = visual->green_mask;
+    conn_fb->tme_fb_connection_mask_r = visual->red_mask;
+    conn_fb->tme_fb_connection_mask_b = visual->blue_mask;
+    break;
+  default:
+    conn_fb->tme_fb_connection_mask_g = 0;
+    conn_fb->tme_fb_connection_mask_r = 0;
+    conn_fb->tme_fb_connection_mask_b = 0;
+    break;
+  }
 
-    /* allocate the depth-one map: */
-    color_count = (scale == TME_FB_XLAT_SCALE_HALF
-		   ? 5
-		   : 2);
-    conn_fb->tme_fb_connection_depth1_map
-      = tme_new(tme_uint32_t, color_count);
-
-    /* allocate the colors it needs: */
-    for (color_i = 0;
-	 color_i < color_count;
-	 color_i++) {
-
-      /* set the RGB values: */
-      color.red
-	= (((65535UL * color_i) / (color_count - 1))
-	   ^ screen->tme_gtk_screen_mono_invert_mask);
-      color.green = color.red;
-      color.blue = color.red;
-
-      /* allocate the color: */
-      gdk_colormap_alloc_color(gdk_colormap_get_system(),
-			       &color,
-			       FALSE,
-			       TRUE);
-      conn_fb->tme_fb_connection_depth1_map[color_i]
-	= color.pixel;
+  /* get the needed colors: */
+  color_count = tme_fb_xlat_colors_get(conn_fb_other, scale, conn_fb, &colors_tme);
+  
+  /* if we need to allocate colors, do so: */
+  if (color_count > 0) {
+    colors_gdk = tme_new(GdkColor, color_count);
+    for (color_i = 0; color_i < color_count; color_i++) {
+      colors_gdk[color_i].green = colors_tme[color_i].tme_fb_color_value_g;
+      colors_gdk[color_i].red   = colors_tme[color_i].tme_fb_color_value_r;
+      colors_gdk[color_i].blue  = colors_tme[color_i].tme_fb_color_value_b;
     }
-  }
-  else {
-    conn_fb->tme_fb_connection_depth1_map = NULL;
+    success = tme_new(gboolean, color_count);
+    gdk_colormap_alloc_colors(gdk_colormap_get_system(),
+			      colors_gdk,
+			      color_count,
+			      FALSE,
+			      FALSE,
+			      success);
+    warned_color_alloc = FALSE;
+    for (color_i = 0; color_i < color_count; color_i++) {
+      if (!success[color_i]) {
+	if (!gdk_colormap_alloc_color(gdk_colormap_get_system(),
+				      &colors_gdk[color_i],
+				      FALSE,
+				      TRUE)) {
+	  if (!warned_color_alloc) {
+	    warned_color_alloc = TRUE;
+	    tme_log(&display->tme_gtk_display_element->tme_element_log_handle, 0, ENOMEM,
+		    (&display->tme_gtk_display_element->tme_element_log_handle,
+		     _("could not allocate all colors")));
+	  }
+	}
+      }
+      colors_tme[color_i].tme_fb_color_pixel = colors_gdk[color_i].pixel;
+    }
+    tme_free(success);
+    tme_free(colors_gdk);
+  
+    /* set the needed colors: */
+    tme_fb_xlat_colors_set(conn_fb_other, scale, conn_fb, colors_tme);
   }
 
   /* compose the framebuffer translation question: */
@@ -289,11 +377,25 @@ _tme_gtk_screen_mode_change(struct tme_fb_connection *conn_fb)
   fb_xlat_q.tme_fb_xlat_src_skipx		= conn_fb_other->tme_fb_connection_skipx;
   fb_xlat_q.tme_fb_xlat_src_scanline_pad	= conn_fb_other->tme_fb_connection_scanline_pad;
   fb_xlat_q.tme_fb_xlat_src_order		= conn_fb_other->tme_fb_connection_order;
+  fb_xlat_q.tme_fb_xlat_src_class		= conn_fb_other->tme_fb_connection_class;
+  fb_xlat_q.tme_fb_xlat_src_map			= (conn_fb_other->tme_fb_connection_map_g != NULL
+						   ? TME_FB_XLAT_MAP_INDEX
+						   : TME_FB_XLAT_MAP_LINEAR);
+  fb_xlat_q.tme_fb_xlat_src_map_bits		= conn_fb_other->tme_fb_connection_map_bits;
+  fb_xlat_q.tme_fb_xlat_src_mask_g		= conn_fb_other->tme_fb_connection_mask_g;
+  fb_xlat_q.tme_fb_xlat_src_mask_r		= conn_fb_other->tme_fb_connection_mask_r;
+  fb_xlat_q.tme_fb_xlat_src_mask_b		= conn_fb_other->tme_fb_connection_mask_b;
   fb_xlat_q.tme_fb_xlat_dst_depth		= conn_fb->tme_fb_connection_depth;
   fb_xlat_q.tme_fb_xlat_dst_bits_per_pixel	= conn_fb->tme_fb_connection_bits_per_pixel;
   fb_xlat_q.tme_fb_xlat_dst_skipx		= conn_fb->tme_fb_connection_skipx;
   fb_xlat_q.tme_fb_xlat_dst_scanline_pad	= conn_fb->tme_fb_connection_scanline_pad;
   fb_xlat_q.tme_fb_xlat_dst_order		= conn_fb->tme_fb_connection_order;
+  fb_xlat_q.tme_fb_xlat_dst_map			= (conn_fb->tme_fb_connection_map_g != NULL
+						   ? TME_FB_XLAT_MAP_INDEX
+						   : TME_FB_XLAT_MAP_LINEAR);
+  fb_xlat_q.tme_fb_xlat_dst_mask_g		= conn_fb->tme_fb_connection_mask_g;
+  fb_xlat_q.tme_fb_xlat_dst_mask_r		= conn_fb->tme_fb_connection_mask_r;
+  fb_xlat_q.tme_fb_xlat_dst_mask_b		= conn_fb->tme_fb_connection_mask_b;
 
   /* ask the framebuffer translation question: */
   fb_xlat_a = tme_fb_xlat_best(&fb_xlat_q);
@@ -430,9 +532,6 @@ _tme_gtk_screen_new(struct tme_gtk_display *display)
   /* the user hasn't specified a scaling yet: */
   screen->tme_gtk_screen_fb_scale
     = -TME_FB_XLAT_SCALE_NONE;
-
-  /* XXX this should be controlled by an argument somewhere: */
-  screen->tme_gtk_screen_mono_invert_mask = 0xffff;
 
   /* create the top-level window, and allow it to shrink, grow,
      and auto-shrink: */

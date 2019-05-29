@@ -1,4 +1,4 @@
-/* $Id: bus.c,v 1.5 2003/10/16 02:48:18 fredette Exp $ */
+/* $Id: bus.c,v 1.9 2005/04/30 15:00:48 fredette Exp $ */
 
 /* generic/gen-bus.c - generic bus support: */
 
@@ -34,10 +34,11 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: bus.c,v 1.5 2003/10/16 02:48:18 fredette Exp $");
+_TME_RCSID("$Id: bus.c,v 1.9 2005/04/30 15:00:48 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus.h>
+#include <tme/misc.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -198,7 +199,7 @@ int
 tme_bus_tlb_set_allocate(struct tme_bus *bus,
 			 struct tme_bus_connection_int *conn_int_asker,
 			 unsigned int count, unsigned int sizeof_one, 
-			 TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb **) _tlbs)
+			 TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb *) _tlbs)
 {
   struct tme_bus_connection *conn_bus_other, *conn_bus_dma;
   int conn_int_i;
@@ -453,16 +454,107 @@ tme_bus_tlb_map(struct tme_bus_tlb *tlb0, tme_bus_addr_t addr0,
   tlb0->tme_bus_tlb_addr_offset -= addr_offset;
 }
 
+/* this reserves a TLB entry in backing storage: */
+void
+tme_bus_tlb_reserve(struct tme_bus_tlb *tlb_backing,
+		    struct tme_bus_tlb *tlb_local)
+{
+  TME_ATOMIC_WRITE(struct tme_bus_tlb *, tlb_backing->tme_bus_tlb_backing_reservation,
+		   tlb_local);
+  TME_ATOMIC_WRITE(struct tme_bus_tlb *, tlb_local->tme_bus_tlb_backing_reservation,
+		   tlb_backing);
+}
+
+/* this saves a bus TLB entry in automatic storage into a reserved TLB
+   entry in backing storage, but only if the backing storage
+   reservation has not been broken, and only if the TLB entry hasn't
+   been invalidated since it was filled: */
+void
+tme_bus_tlb_back(const struct tme_bus_tlb *tlb_local)
+{
+  struct tme_bus_tlb *tlb_backing;
+
+  /* get the backing TLB entry: */
+  tlb_backing = TME_ATOMIC_READ(struct tme_bus_tlb *, tlb_local->tme_bus_tlb_backing_reservation);
+
+  /* if the backing storage reservation has been broken, return now: */
+  if (TME_ATOMIC_READ(struct tme_bus_tlb *, tlb_backing->tme_bus_tlb_backing_reservation)
+      != tlb_local) {
+    return;
+  }
+
+#define TLB_BACK(f) tlb_backing->f = tlb_local->f
+
+  /* the first address covered: */
+  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb_backing->tme_bus_tlb_addr_first,
+		   TME_ATOMIC_READ(tme_bus_addr_t, tlb_local->tme_bus_tlb_addr_first));
+
+  /* the last address covered: */
+  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb_backing->tme_bus_tlb_addr_last,
+		   TME_ATOMIC_READ(tme_bus_addr_t, tlb_local->tme_bus_tlb_addr_last));
+
+  /* the fast (memory) transfers: */
+  TLB_BACK(tme_bus_tlb_emulator_off_read);
+  TLB_BACK(tme_bus_tlb_emulator_off_write);
+
+  /* fast (memory) reads and writes are protected by this rwlock: */
+  TLB_BACK(tme_bus_tlb_rwlock);
+
+  /* when one or both of TLB_BUS_CYCLE_READ and TLB_BUS_CYCLE_WRITE
+     are set in this value, this TLB entry allows slow (function call)
+     reads of and/or writes to the bus region: */
+  TLB_BACK(tme_bus_tlb_cycles_ok);
+
+  /* adding an address in the bus region to this offset, and then
+     shifting that result to the right (shift > 0) or to the left
+     (shift < 0) yields an address for the bus cycle handler: */
+  TLB_BACK(tme_bus_tlb_addr_offset);
+  TLB_BACK(tme_bus_tlb_addr_shift);
+
+  /* the bus cycle handler: */
+  TLB_BACK(tme_bus_tlb_cycle_private);
+  TLB_BACK(tme_bus_tlb_cycle);
+
+  /* the bus fault handlers: */
+  TLB_BACK(tme_bus_tlb_fault_handler_count);
+  memcpy (&tlb_backing->tme_bus_tlb_fault_handlers[0],
+	  &tlb_local->tme_bus_tlb_fault_handlers[0],
+	  sizeof (tlb_local->tme_bus_tlb_fault_handlers[0])
+	  * tlb_local->tme_bus_tlb_fault_handler_count);
+
+#undef TLB_BACK
+
+  /* XXX FIXME - serializing would be useful here: */
+
+  /* if this TLB entry has been invalidated while we were writing,
+     complete the invalidation: */
+  /* if the backing storage reservation has been broken, return now: */
+  if (TME_ATOMIC_READ(struct tme_bus_tlb *, tlb_backing->tme_bus_tlb_backing_reservation)
+      != tlb_local) {
+    assert (TME_ATOMIC_READ(struct tme_bus_tlb *, tlb_backing->tme_bus_tlb_backing_reservation) == NULL);
+    tme_bus_tlb_invalidate(tlb_backing);
+  }
+}
+
 /* this invalidates a bus TLB entry: */
 void
 tme_bus_tlb_invalidate(struct tme_bus_tlb *tlb)
 {
+
+  /* clear the backing-reservation pointer.  this will invalidate TLB
+     entries that have not yet been copied from local to global
+     storage: */
+  TME_ATOMIC_WRITE(struct tme_bus_tlb *, tlb->tme_bus_tlb_backing_reservation, NULL);
+
+  /* XXX FIXME - serializing would be useful here: */
   
   /* make the first address covered all-bits-one.  the only bus TLB
      entries this will not invalidate are those that have a last
      address covered of all-bits one: */
   TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first, -1);
   
+  /* XXX FIXME - serializing would be useful here: */
+
   /* make the last address covered all-bits-zero.  this will
      invalidate the TLB entries we didn't catch above: */
   TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last, 0);
@@ -519,43 +611,7 @@ tme_bus_tlb_fault(struct tme_bus_tlb *tlb, struct tme_bus_cycle *cycle, int rc)
 tme_bus_addr_t
 tme_bus_addr_parse_any(const char *address_string, int *_failed)
 {
-  unsigned long address;
-  char *units;
-
-  /* catch a NULL string: */
-  if (address_string == NULL) {
-    *_failed = TRUE;
-    return (0);
-  }
-
-  /* assume we will succeed: */
-  *_failed = FALSE;
-
-  /* convert the string: */
-  address = strtoul(address_string, &units, 0);
-  if (units == address_string) {
-    *_failed = TRUE;
-    return (0);
-  }
-
-  /* handle any units: */
-  if (!strcmp(units, "GB")
-      || !strcasecmp(units, "G")) {
-    return (((tme_bus_addr_t) address) * 1024 * 1024 * 1024);
-  }
-  else if (!strcmp(units, "MB")
-      || !strcasecmp(units, "M")) {
-    return (((tme_bus_addr_t) address) * 1024 * 1024);
-  }
-  else if (!strcmp(units, "KB")
-	   || !strcasecmp(units, "k")) {
-    return (((tme_bus_addr_t) address) * 1024);
-  }
-  else if (*units == '\0') {
-    return ((tme_bus_addr_t) address);
-  }
-  *_failed = TRUE;
-  return (0);
+  return (tme_misc_unumber_parse_any(address_string, _failed));
 }
 
 /* this parses a bus address that has a restricted range: */
@@ -824,3 +880,200 @@ tme_bus_cycle_xfer_memory(struct tme_bus_cycle *cycle_init, tme_uint8_t *memory,
   assert((cycle_init->tme_bus_cycle_address - 1) <= address_last);
 }
   
+/* given an initiator's cycle and a responder's port size, assuming
+   that the responder's port fits completely within the initiator's
+   port, this internal function returns the "correct" least lane for
+   the responder's port, relative to the least lane of the initiator's
+   port.  this requires that the initiator's lane routing use either
+   TME_BUS_LANE_ABORT or TME_BUS_LANE_WARN on routings for incorrect
+   lanes: */
+static unsigned int
+_tme_bus_cycle_xfer_resp_least_lane(const struct tme_bus_cycle *cycle_init, 
+				    unsigned int port_size_log2_resp)
+{
+  unsigned int port_size_resp;
+  unsigned int port_lane_least_max_resp;
+  unsigned int port_lane_least_resp;
+  const tme_bus_lane_t *lane_routing_init;
+  unsigned int lane;
+  int lane_routing;
+
+  /* get the responder's port size: */
+  port_size_resp = (1 << port_size_log2_resp);
+
+  /* calculate the maximum possible least lane for the responder.  we
+     require that the responder's port fit completely within the
+     initiator's port: */
+  port_lane_least_max_resp = (1 << TME_BUS_CYCLE_PORT_SIZE_LG2(cycle_init->tme_bus_cycle_port));
+  if (__tme_predict_false(port_size_resp > port_lane_least_max_resp)) {
+    abort();
+  }
+  port_lane_least_max_resp -= port_size_resp;
+
+  /* assume that the responder will have the same least lane as the
+     initiator, and get the initiator's lane routing for that
+     responder least lane: */
+  port_lane_least_resp = 0;
+  lane_routing_init
+    = (cycle_init->tme_bus_cycle_lane_routing
+       + TME_BUS_ROUTER_INDEX(TME_BUS_CYCLE_PORT_SIZE_LG2(cycle_init->tme_bus_cycle_port),
+			      port_size_log2_resp,
+			      port_lane_least_resp));
+
+  /* loop over all of the possible least lanes for the responder: */
+  for (;
+       port_lane_least_resp <= port_lane_least_max_resp;
+       port_lane_least_resp++) {
+
+    /* check the routing for all of the lanes in the responder's port, starting
+       from the highest numbered lane and working down: */
+    lane = port_lane_least_resp + port_size_resp;
+    for (;;) {
+      lane = lane - 1;
+      lane_routing = lane_routing_init[lane];
+
+      /* if this lane gets a warning or an abort, this is not the
+	 correct least lane for the responder: */
+      if ((lane_routing & TME_BUS_LANE_WARN) 
+	  || lane_routing == TME_BUS_LANE_ABORT) {
+	break;
+      }
+
+      /* if we have now checked all of the lanes in the overlap between
+	 initiator and responder, we've found the correct least lane for
+	 the responder: */
+      if (lane == port_lane_least_resp) {
+	return (port_lane_least_resp);
+      }
+    }
+
+    /* advance the offset into the initiator's lane routing: */
+    lane_routing_init += (1 << TME_BUS_CYCLE_PORT_SIZE_LG2(cycle_init->tme_bus_cycle_port));
+  }
+
+  /* if we get here, the initiator doesn't allow responders of the
+     given port size: */
+  abort();
+}
+	  
+/* this handles a bus cycle for a simple register device: */
+void
+tme_bus_cycle_xfer_reg(struct tme_bus_cycle *cycle_init, 
+		       void *resp_reg,
+		       unsigned int port_size_log2_resp)
+{
+  unsigned int port_lane_least_resp;
+  const tme_bus_lane_t *lane_routing_init;
+  unsigned int lane_count;
+  unsigned int lane;
+  tme_uint8_t *buffer_init;
+  tme_uint8_t *buffer_resp;
+  int lane_routing;
+  int cycle_size_init;
+  int buffer_increment_mask_init;
+  int writer_init;
+
+  /* see if the initiator is writing: */
+  writer_init = (cycle_init->tme_bus_cycle_type == TME_BUS_CYCLE_WRITE);
+  assert (writer_init || cycle_init->tme_bus_cycle_type == TME_BUS_CYCLE_READ);
+
+  /* get the increment mask for the initiator.  since
+     tme_bus_cycle_buffer_increment is always 1 or -1, this mask is
+     used to negate values without multiplication: */
+  if (cycle_init->tme_bus_cycle_buffer_increment == -1) {
+    buffer_increment_mask_init = -1;
+  }
+  else {
+    assert(cycle_init->tme_bus_cycle_buffer_increment == 1);
+    buffer_increment_mask_init = 0;
+  }
+
+  /* get the least lane for the responder's port relative to the
+     initiator port's least lane, assuming that the responder's port
+     fits completely within the initiator's port and starts at the
+     "correct" least lane: */
+  port_lane_least_resp = _tme_bus_cycle_xfer_resp_least_lane(cycle_init,
+							     port_size_log2_resp);
+
+  /* get the initiator's lane routing: */
+  lane_routing_init
+    = (cycle_init->tme_bus_cycle_lane_routing
+       + TME_BUS_ROUTER_INDEX(TME_BUS_CYCLE_PORT_SIZE_LG2(cycle_init->tme_bus_cycle_port),
+			      port_size_log2_resp,
+			      port_lane_least_resp));
+
+  /* return some things to the initiator: */
+  cycle_init->tme_bus_cycle_lane_routing = lane_routing_init;
+  cycle_init->tme_bus_cycle_port = 
+    TME_BUS_CYCLE_PORT((TME_BUS_CYCLE_PORT_LANE_LEAST(cycle_init->tme_bus_cycle_port)
+			+ port_lane_least_resp),
+		       port_size_log2_resp);
+
+  /* advance the initiator's lane routing to the first lane in the
+     responder's port: */
+  lane_routing_init += port_lane_least_resp;
+
+  /* get the lane count: */
+  lane_count = (1 << port_size_log2_resp);
+
+  /* get the initial pointer into the responder's register buffer.  we
+     move from lower-numbered lanes (with data of lesser significance)
+     to higher-numbered lanes (with data of more significance).  we
+     are always called with pointers to registers in host native byte
+     order, so if the host is little-endian, we start from the given
+     pointer, else we start from the other end of the register
+     buffer: */
+  buffer_resp = (((tme_uint8_t *) resp_reg)
+		 + (TME_ENDIAN_NATIVE == TME_ENDIAN_BIG
+		    ? (lane_count - 1)
+		    : 0));
+
+  /* loop over the lanes: */
+  lane = 0;
+  cycle_size_init = 0;
+  do {
+
+    /* get the routing for this lane: */
+    lane_routing = *(lane_routing_init++);
+
+    /* this cannot be a TME_BUS_LANE_WARN, or a TME_BUS_LANE_ABORT, or
+       an enabled byte lane with an undefined value: */
+    assert (!(lane_routing & TME_BUS_LANE_WARN)
+	    && lane_routing != TME_BUS_LANE_ABORT
+	    && lane_routing != TME_BUS_LANE_UNDEF);
+
+    /* if this is an enabled byte lane: */
+    if (__tme_predict_true(!(lane_routing & TME_BUS_LANE_ROUTE_WRITE_IGNORE))) {
+
+      /* get a pointer into the initiator's buffer for this lane: */
+      buffer_init
+	= (cycle_init->tme_bus_cycle_buffer
+	   + _TME_BUS_CYCLE_BUFFER_MULTIPLY(lane_routing,
+					    buffer_increment_mask_init));
+
+      /* transfer the byte: */
+      if (writer_init) {
+	*buffer_resp = *buffer_init;
+      }
+      else {
+	*buffer_init = *buffer_resp;
+      }
+
+      /* update the cycle size for the initiator: */
+      if (lane_routing >= cycle_size_init) {
+	cycle_size_init = lane_routing + 1;
+      }
+    }
+
+    /* update the pointer into the responder's buffer for the next lane: */
+    buffer_resp += (TME_ENDIAN_NATIVE == TME_ENDIAN_BIG ? -1 : 1);
+
+  } while (--lane_count > 0);
+
+  /* give the initiator feedback: */
+  cycle_init->tme_bus_cycle_size = cycle_size_init;
+  cycle_init->tme_bus_cycle_address += cycle_size_init;
+  cycle_init->tme_bus_cycle_buffer += 
+    _TME_BUS_CYCLE_BUFFER_MULTIPLY(cycle_size_init,
+				   buffer_increment_mask_init);
+}

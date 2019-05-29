@@ -1,4 +1,4 @@
-/* $Id: scsi-device.h,v 1.3 2003/10/16 02:48:25 fredette Exp $ */
+/* $Id: scsi-device.h,v 1.4 2005/02/18 03:06:40 fredette Exp $ */
 
 /* tme/scsi/scsi-device.h - header file for generic SCSI device support: */
 
@@ -37,7 +37,7 @@
 #define _TME_SCSI_SCSI_DEVICE_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: scsi-device.h,v 1.3 2003/10/16 02:48:25 fredette Exp $");
+_TME_RCSID("$Id: scsi-device.h,v 1.4 2005/02/18 03:06:40 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/scsi.h>
@@ -140,10 +140,6 @@ struct tme_scsi_device {
   char *tme_scsi_device_vendor;
   char *tme_scsi_device_product;
   char *tme_scsi_device_revision;
-
-  /* the SCSI bus sequences: */
-  _tme_const struct tme_scsi_sequence *tme_scsi_device_sequence_wait_select_full;
-  _tme_const struct tme_scsi_sequence *tme_scsi_device_sequence_info_dma_target;
 
   /* the SCSI control signals currently asserted: */
   tme_scsi_control_t tme_scsi_device_control;

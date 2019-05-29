@@ -1,4 +1,4 @@
-/* $Id: 3c400.c,v 1.7 2003/07/29 18:17:14 fredette Exp $ */
+/* $Id: 3c400.c,v 1.8 2004/04/30 11:51:29 fredette Exp $ */
 
 /* bus/multibus/3c400.c - implementation of the Multibus 3c400 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: 3c400.c,v 1.7 2003/07/29 18:17:14 fredette Exp $");
+_TME_RCSID("$Id: 3c400.c,v 1.8 2004/04/30 11:51:29 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -439,8 +439,7 @@ _tme_3c400_callout(struct tme_3c400 *_3c400, int new_callouts)
 	   TME_BUS_SIGNAL_INT_UNSPEC
 	   | (int_asserted
 	      ? TME_BUS_SIGNAL_LEVEL_ASSERTED
-	      : TME_BUS_SIGNAL_LEVEL_NEGATED)
-	   | TME_BUS_SIGNAL_EDGE);
+	      : TME_BUS_SIGNAL_LEVEL_NEGATED));
 
 	/* lock our mutex: */
 	tme_mutex_lock(&_3c400->tme_3c400_mutex);

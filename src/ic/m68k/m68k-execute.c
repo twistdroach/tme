@@ -1,4 +1,4 @@
-/* $Id: m68k-execute.c,v 1.14 2003/10/25 17:08:00 fredette Exp $ */
+/* $Id: m68k-execute.c,v 1.20 2005/04/30 15:18:33 fredette Exp $ */
 
 /* ic/m68k/m68k-execute.c - executes Motorola 68k instructions: */
 
@@ -33,7 +33,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-_TME_RCSID("$Id: m68k-execute.c,v 1.14 2003/10/25 17:08:00 fredette Exp $");
+_TME_RCSID("$Id: m68k-execute.c,v 1.20 2005/04/30 15:18:33 fredette Exp $");
 
 /* includes: */
 #include "m68k-auto.h"
@@ -46,8 +46,9 @@ _TME_M68K_EXECUTE_NAME(struct tme_m68k *ic)
 #undef _TME_M68K_INSN_FETCH_SAVE
 #ifdef _TME_M68K_EXECUTE_FAST
   struct tme_m68k_tlb *tlb;
-  tme_uint8_t *emulator_load, *emulator_load_last;
-  tme_uint8_t *emulator_load_start;
+  const tme_uint8_t *emulator_load, *emulator_load_last;
+  const tme_uint8_t *emulator_load_start;
+  tme_uint16_t insn_fetch_sizes;
 #define _TME_M68K_INSN_FETCH_SAVE \
 do { \
   ic->_tme_m68k_insn_buffer_fetch_total = emulator_load - emulator_load_start; \
@@ -59,8 +60,6 @@ do { \
   tme_uint32_t linear_pc;
 #define _TME_M68K_INSN_FETCH_SAVE \
 do { \
-  ic->_tme_m68k_insn_buffer_fetch_total = linear_pc - ic->tme_m68k_ireg_pc; \
-  ic->_tme_m68k_insn_buffer_fetch_sizes = insn_fetch_sizes; \
 } while (/* CONSTCOND */ 0)
 #define _TME_M68K_SEQUENCE_RESTARTING	TME_M68K_SEQUENCE_RESTARTING
 #endif /* !_TME_M68K_EXECUTE_FAST */
@@ -68,33 +67,29 @@ do { \
   unsigned int eai_function_code;
   int ea_post_index;
   unsigned int ea_i_is;
+  tme_uint32_t ea_od;
+  unsigned int src_specifier;
 #else  /* !TME_M68K_M68020 && !TME_M68K_M68030 */
 #define eai_function_code ea_function_code
 #endif  /* !TME_M68K_M68020 && !TME_M68K_M68030 */
   unsigned int function_code_program;
   unsigned int function_code_data;
   tme_uint16_t opw, extword;
-  const struct _tme_m68k_decoder_root *root_entry;
-  const struct _tme_m68k_decoder_submap *submap_entry;
-  const struct _tme_m68k_opcode *opcode;
   void (*func) _TME_P((struct tme_m68k *, void *, void *));
-  int specop_type;
-  void *operand0, *operand1;
-  tme_uint16_t insn_fetch_sizes;
+  tme_uint32_t params;
   unsigned int first_ea_extword_offset;
-  int ea_size, ea_cycles;
-  unsigned int ea_mode;
+  int ea_size;
   int ea_reg, ea_pre_index;
   unsigned int ea_index_long, ea_index_scale;
   tme_uint32_t ea_address;
   unsigned int ea_function_code;
-  tme_int32_t disp, ea_bd;
-  int imm_operand, imm_size;
+  tme_int32_t ea_bd;
   tme_uint32_t imm32;
-  tme_uint16_t imm16;
-  tme_uint8_t imm8;
   tme_uint16_t transfer_next_before;
   int rc;
+
+  /* silence gcc -Wuninitialized: */
+  ea_size = 0;
 
   /* get the function codes.  if the privilege ever changes as a
      result of any instruction, we must redispatch: */
@@ -155,15 +150,19 @@ do { \
       tme_m68k_redispatch(ic);
     }
     emulator_load_start = emulator_load = tlb->tme_m68k_tlb_emulator_off_read + ic->tme_m68k_ireg_pc;
+    insn_fetch_sizes = 0;
     assert(TME_M68K_TLB_OK_FAST_READ(tlb, function_code_program, ic->tme_m68k_ireg_pc, ic->tme_m68k_ireg_pc)
 	   || (emulator_load - 1) == emulator_load_last);
     tme_m68k_verify_begin(ic, emulator_load_start);
 #else  /* !_TME_M68K_EXECUTE_FAST */
     linear_pc = ic->tme_m68k_ireg_pc;
     ic->_tme_m68k_insn_buffer_off = 0;
+    ic->_tme_m68k_insn_buffer_fetch_total = 0;
+    ic->_tme_m68k_insn_buffer_fetch_sizes = 0;
     exceptions = 0;
-    if (__tme_predict_false(TME_M68K_FLAG_T(ic->tme_m68k_ireg_sr) != 0)) {
-      exceptions |= TME_M68K_EXCEPTION_GROUP1_TRACE;
+    if (__tme_predict_false((ic->tme_m68k_ireg_sr & ic->_tme_m68k_sr_mask_t) == TME_M68K_FLAG_T1)) {
+      ic->tme_m68k_ireg_pc_last = ic->tme_m68k_ireg_pc;
+      exceptions |= TME_M68K_EXCEPTION_TRACE;
     }
     tme_m68k_verify_begin(ic, NULL);
 #endif /* _TME_M68K_EXECUTE_FAST */
@@ -172,186 +171,337 @@ do { \
       tme_m68k_verify_hook();
     }
 #endif
-    insn_fetch_sizes = 0;
+#ifdef _TME_M68K_STATS
+    ic->tme_m68k_stats.tme_m68k_stats_insns_total++;
+#ifndef _TME_M68K_EXECUTE_FAST
+    ic->tme_m68k_stats.tme_m68k_stats_insns_slow++;
+#endif /* !_TME_M68K_EXECUTE_FAST */
+#endif /* _TME_M68K_STATS */
     first_ea_extword_offset = sizeof(opw);
     ic->_tme_m68k_instruction_burst_remaining--;
     
     /* fetch and decode the first word of this instruction: */
     _TME_M68K_EXECUTE_FETCH_U16(opw);
     ic->_tme_m68k_insn_opcode = opw;
-    root_entry = ic->_tme_m68k_decoder_root
-      + TME_FIELD_EXTRACTU(opw, 6, 10);
-    submap_entry = root_entry->_tme_m68k_decoder_root_submap
-      + TME_FIELD_EXTRACTU(opw, 0, 6);
-    opcode = root_entry->_tme_m68k_decoder_root_opcode_map
-      + submap_entry->_tme_m68k_decoder_submap_opcode_map_index;
-    
-    /* set func: */
-    func = opcode->_tme_m68k_opcode_func;
-    
-    /* set operand 0: */
-    operand0 = submap_entry->_tme_m68k_decoder_submap_gen._tme_m68k_decoder_gen_operand0;
-    if (operand0 == NULL)
-      operand0 = root_entry->_tme_m68k_decoder_root_gen._tme_m68k_decoder_gen_operand0;
-    
-    /* set operand 1: */
-    operand1 = submap_entry->_tme_m68k_decoder_submap_gen._tme_m68k_decoder_gen_operand1;
-    if (operand1 == NULL)
-      operand1 = root_entry->_tme_m68k_decoder_root_gen._tme_m68k_decoder_gen_operand1;
-    
-    /* set ea_size: */
-    ea_size = submap_entry->_tme_m68k_decoder_submap_gen._tme_m68k_decoder_gen_eax_size;
-    if (ea_size == TME_M68K_SIZE_SUBMAP_X)
-      ea_size = root_entry->_tme_m68k_decoder_root_gen._tme_m68k_decoder_gen_eax_size;
-    
-    /* set imm_operand: */
-    imm_operand = submap_entry->_tme_m68k_decoder_submap_gen._tme_m68k_decoder_gen_imm_operand;
-    imm_size = submap_entry->_tme_m68k_decoder_submap_gen._tme_m68k_decoder_gen_imm_size;
-    if (imm_operand == TME_M68K_OPNUM_SUBMAP_X) {
-      imm_operand = root_entry->_tme_m68k_decoder_root_gen._tme_m68k_decoder_gen_imm_operand;
-      imm_size = root_entry->_tme_m68k_decoder_root_gen._tme_m68k_decoder_gen_imm_size;
-    }
-    
-    /* set ea_mode, ea_reg, ea_cycles and ea_function_code -
-       instructions or the EA itself may override these: */
-    ea_mode = TME_FIELD_EXTRACTU(opw, 3, 3);
-    ea_reg = TME_M68K_IREG_A0 + TME_FIELD_EXTRACTU(opw, 0, 3);
-    ea_cycles = opcode->_tme_m68k_opcode_eax_cycles;
-    ea_function_code = function_code_data;
-    assert(ea_size == TME_M68K_SIZE_UNDEF
-	   || ea_size == TME_M68K_SIZE_UNSIZED
-	   || ea_cycles != TME_BUS_CYCLE_UNDEF);
-      
-    /* dispatch on the special operand specifier type: */
-    specop_type = opcode->_tme_m68k_opcode_specop_type;
-    if (__tme_predict_false(specop_type != TME_M68K_SPECOP_UNDEF)) {
-      switch (specop_type) {
-	
-	/* a Bcc may have an extended displacement, and we need to
-	   translate BF to BSR: */
-      case TME_M68K_SPECOP_BCC:
-	disp = TME_EXT_S8_S32((tme_int8_t) opw);
-	if (disp == 0) {
-	  _TME_M68K_EXECUTE_FETCH_S16(disp);
-	}
-#if (_TME_M68K_EXECUTE_CPU == TME_M68K_M68020) || (_TME_M68K_EXECUTE_CPU == TME_M68K_M68030)
-	else if (disp == -255) {
-	  _TME_M68K_EXECUTE_FETCH_S32(disp);
-	}
-#endif /* TME_M68K_M68020 || TME_M68K_M68030 */
-	imm32 = (tme_uint32_t) disp;
-	operand0 = &imm32;
-	if (TME_FIELD_EXTRACTU(opw, 8, 4) == TME_M68K_C_F) {
-	  func = tme_m68k_bsr;
-	}
-	break;
-	
-#if (_TME_M68K_EXECUTE_CPU == TME_M68K_M68020) || (_TME_M68K_EXECUTE_CPU == TME_M68K_M68030)
-	/* these are similar: */
-      case TME_M68K_SPECOP_DIVUL:
-      case TME_M68K_SPECOP_MULUL:
-	_TME_M68K_EXECUTE_FETCH_U16(specop);
-	first_ea_extword_offset = 4;
-	if (specop & TME_BIT(11)) {
-	  /* this is really a signed operation, override
-	     m68k-opmap-make.sh's guess that it is unsigned: */
-	  func = ((opcode->_tme_m68k_opcode_specop_type == TME_M68K_SPECOP_DIVUL)
-		  ? tme_m68k_divsl
-		  : tme_m68k_mulsl);
-	}
-	break;
-#endif /* TME_M68K_M68020 || TME_M68K_M68030 */
-	
-#if (_TME_M68K_EXECUTE_CPU != TME_M68K_M68000)
-	/* moves: */
-      case TME_M68K_SPECOP_MOVES:
+    params = _TME_M68K_EXECUTE_OPMAP[opw];
+    func = tme_m68k_opcode_insns[TME_M68K_OPCODE_INSN_WHICH(params)];
 
-	/* fetch the remainder of the instruction and decide what EA
-	   function code and cycles we need: */
-	_TME_M68K_EXECUTE_FETCH_U16(ic->_tme_m68k_insn_specop);
-	first_ea_extword_offset = 4;
-	if (ic->_tme_m68k_insn_specop & TME_BIT(11)) {
-	  ea_cycles = TME_BUS_CYCLE_WRITE;
-	  ea_function_code = ic->tme_m68k_ireg_dfc;
+    /* now that we no longer need the insn index part of the params,
+       replace it with the least significant bits of the opcode, which
+       contain any EA mode and reg fields: */
+    TME_FIELD_MASK_DEPOSITU(params, 
+			    TME_M68K_OPCODE_INSN_MASK, 
+			    (opw & (TME_M68K_OPCODE_INSN_MASK / TME_M68K_OPCODE_INSN(1))));
+    
+    /* if this is a special opcode: */
+    if (__tme_predict_false((params & TME_M68K_OPCODE_SPECOP) != 0)) {
+
+#if (_TME_M68K_EXECUTE_CPU == TME_M68K_M68020) || (_TME_M68K_EXECUTE_CPU == TME_M68K_M68030)
+
+      /* a general floating-point instruction: */
+      if (__tme_predict_false((opw & 0xffc0) == 0xf200)) {
+
+	/* if there is no FPU present, or if it isn't enabled: */
+	if (__tme_predict_false(!ic->tme_m68k_fpu_enabled)) {
+
+	  /* mark this instruction as illegal and use an FPgen command
+	     word of zero: */
+	  func = tme_m68k_illegal;
+	  extword = 0;
 	}
+
+	/* otherwise, there is an FPU present and it is enabled: */
 	else {
-	  ea_cycles = TME_BUS_CYCLE_READ;
-	  ea_function_code = ic->tme_m68k_ireg_sfc;
+
+	  /* fetch the FPgen command word: */
+	  _TME_M68K_EXECUTE_FETCH_U16(ic->_tme_m68k_insn_specop);
+	  first_ea_extword_offset = 4;
+
+	  /* temporarily store the FPgen command word in extword: */
+	  extword = ic->_tme_m68k_insn_specop;
 	}
 
-	/* if we're not privileged, don't fetch any EA, and run the
-	   priv function instead: */
-	if (!TME_M68K_PRIV(ic)) {
-	  func = tme_m68k_priv;
-	  ea_size = TME_M68K_SIZE_UNDEF;
+	/* the goal here is not to decide whether or not an FPgen
+	   instruction is legal, although some illegal instructions
+	   are caught.  the goal is to only decide if this FPgen
+	   instruction uses the EA field.
+
+	   we need to know this here because only the executer can
+	   calculate all memory EAs (i.e., absolute addresses,
+	   indirect addresses, PC-relative addresses, etc.) and fetch
+	   immediates.
+
+	   in general, all other decisions about whether or not an
+	   instruction is legal (including whether or not certain EAs
+	   are legal, like data register direct or address register
+	   direct) or how to dispatch it is done somewhere else.
+
+	   all legal FPgen instructions that use the EA field are
+	   handled by one of the following ifs.  all illegal FPgen
+	   instructions, and all FPgen instructions that do not use
+	   the EA field are handled by the final unconditional else
+	   clause that cancels memory EA calculation and immediate
+	   fetching.
+
+	   for those FPgen instructions that do use the EA field, they
+	   either leave the EA cycles unchanged, as TME_M68K_OPCODE_EA_READ, to
+	   indicate that they read the EA, or they change it to
+	   TME_M68K_OPCODE_EA_WRITE to indicate that they write the EA.
+	   additionally, they either flag any immediate operand as
+	   illegal, fetch it themselves, or specify its size for the
+	   normal immediate fetching code to use: */
+
+	/* m68k-iset.txt must assume that any EA is not written: */
+	assert (!TME_M68K_OPCODE_HAS_EA(params)
+		|| ((params
+		     & (TME_M68K_OPCODE_EA_READ
+			| TME_M68K_OPCODE_EA_WRITE))
+		    == TME_M68K_OPCODE_EA_READ));
+
+	/* m68k-iset.txt must assume that any immediate is 32 bits: */
+	assert (!TME_M68K_OPCODE_HAS_IMM(params)
+		|| (params & (TME_M68K_OPCODE_IMM_16 | TME_M68K_OPCODE_IMM_32)) == TME_M68K_OPCODE_IMM_32);
+
+	/* if this is an FMOVE or FMOVEM of floating-point control
+	   registers (command word pattern 10dr rr00 0000 0000): */
+	if ((extword & 0xc3ff) == 0x8000) {
+
+	  /* override the function: */
+	  func = tme_m68k_fmovemctl;
+
+	  /* if this is a register-to-memory operation: */
+	  if (extword & TME_BIT(13)) {
+
+	    /* any EA must be writable: */
+	    params |= TME_M68K_OPCODE_EA_WRITE;
+	  }
+
+	  /* otherwise, this is a memory-to-register operation: */
+	  else {
+
+	    /* if this instruction has an immediate, and this
+	       instruction is moving multiple control registers, this
+	       is an illegal instruction: */
+	    /* NB the trick we use to see if multiple bits are set in
+	       the rrr field - we subtract one from the base of the
+	       rrr field (0x0400), binary-AND the result with extword,
+	       and mask off all bits except the rrr field.  this
+	       result will be nonzero iff the rrr field has multiple
+	       bits set: */
+	    if (__tme_predict_false(TME_M68K_OPCODE_HAS_IMM(params)
+				    && ((extword & (extword - 0x0400)) & 0x1c00))) {
+	      func = tme_m68k_illegal;
+	    }
+	  }
 	}
-	break;
-#endif /* !TME_M68K_M68000 */
 
-	/* many instructions have a single special extension word: */
-      case TME_M68K_SPECOP_SPECOP16:
-	_TME_M68K_EXECUTE_FETCH_U16(ic->_tme_m68k_insn_specop);
-	first_ea_extword_offset = 4;
-	break;
+	/* if this is an FMOVEM
+	   (command word pattern 11dm m000 rrrr rrrr): */
+	else if ((extword & 0xc700) == 0xc000) {
 
-	/* all of these always have two specop words: */
-      case TME_M68K_SPECOP_CAS2:
-	_TME_M68K_EXECUTE_FETCH_U16(ic->_tme_m68k_insn_specop);
-	_TME_M68K_EXECUTE_FETCH_U16(ic->_tme_m68k_insn_specop2);
-	first_ea_extword_offset = 6;
-	break;
-	
-	/* a memory-to-memory move instruction has additional ea mode
-	   and reg fields, but we don't need to do anything for that
-	   yet: */
-      case TME_M68K_SPECOP_MOVEMEMTOMEM:
-	break;
+	  /* override the function: */
+	  func = tme_m68k_fmovem;
 
-	/* a nonmemory-to-memory move instruction has additional ea
-	   mode and reg fields, and we use them now: */
-      case TME_M68K_SPECOP_MOVENONMEMTOMEM:
-	ea_mode = TME_FIELD_EXTRACTU(opw, 6, 3);
-	ea_reg = TME_M68K_IREG_A0 + TME_FIELD_EXTRACTU(opw, 9, 3);
-	assert(ea_cycles == TME_BUS_CYCLE_WRITE);
-	break;
-	
-	/* the illegal specop makes sure not to fetch any EAs or
-           immediates: */
-      case TME_M68K_SPECOP_ILLEGAL:
-	ea_size = TME_M68K_SIZE_UNDEF;
-	imm_operand = TME_M68K_OPNUM_UNDEF;
-	break;
-	
-      default: abort();
+	  /* if this instruction has an immediate, this is an
+	     illegal instruction: */
+	  if (__tme_predict_false(TME_M68K_OPCODE_HAS_IMM(params))) {
+	    func = tme_m68k_illegal;
+	  }
+
+	  /* if this is a register-to-memory operation: */
+	  if (extword & TME_BIT(13)) {
+
+	    /* any EA must be writable: */
+	    params |= TME_M68K_OPCODE_EA_WRITE;
+	  }
+	}
+
+	/* if this is a register-to-memory FMOVE instruction
+	   (command word pattern 011d ddss skkk kkkk): */
+	else if ((extword & 0xe000) == 0x6000) {
+
+	  /* override the function: */
+	  func = tme_m68k_fmove_rm;
+
+	  /* any EA must be writable: */
+	  params |= TME_M68K_OPCODE_EA_WRITE;
+	}
+
+	/* if this is a memory-to-register true FPgen instruction
+	   (command word pattern 010s ssdd dooo oooo): */
+	else if ((extword & 0xe000) == 0x4000
+		 && (_tme_m6888x_fpgen_opmode_bitmap[TME_FIELD_EXTRACTU(extword, 0, 7) / 8]
+		     & (1 << (TME_FIELD_EXTRACTU(extword, 0, 7) % 8)))
+		 && TME_FIELD_EXTRACTU(extword, 10, 3) != TME_M6888X_TYPE_INVALID) {
+
+	  /* if this instruction has an immediate: */
+	  if (TME_M68K_OPCODE_HAS_IMM(params)) {
+
+	    /* if the source specifier is for a size that the normal
+	       immediate fetching code can handle, let it handle it,
+	       otherwise we have to fetch the immediate ourselves: */
+
+	    /* m68k-iset.txt must have specified the EA operand to be
+	       operand one: */
+	    assert((void *) TME_M68K_OPCODE_OP1_WHICH(ic, params)
+		   == (void *) &ic->tme_m68k_ireg_uint32(TME_M68K_IREG_IMM32 + 0));
+
+	    /* dispatch on the source specifier: */
+	    src_specifier = TME_FIELD_EXTRACTU(extword, 10, 3);
+	    switch (src_specifier) {
+
+	      /* we can let the normal immediate fetching code fetch
+		 word integers, long-word integers, and
+		 single-precision reals: */
+	    default: 
+	      assert (func == tme_m68k_illegal);
+	      /* FALLTHROUGH */
+	    case TME_M6888X_TYPE_WORD:
+	      /* we can simply flip TME_M68K_OPCODE_IMM_16 and
+		 TME_M68K_OPCODE_IMM_32 to select a 16-bit immediate;
+		 we know that only TME_M68K_OPCODE_IMM_32 is set,
+		 thanks to the assert we did at the beginning of the
+		 fpgen specop handling: */
+	      params ^= (TME_M68K_OPCODE_IMM_16 | TME_M68K_OPCODE_IMM_32);
+	      /* FALLTHROUGH */
+	    case TME_M6888X_TYPE_LONG:
+	    case TME_M6888X_TYPE_SINGLE:
+	      break;
+	    case TME_M6888X_TYPE_EXTENDED80:
+	    case TME_M6888X_TYPE_PACKEDDEC:
+	    case TME_M6888X_TYPE_DOUBLE:
+	      _TME_M68K_EXECUTE_FETCH_U32(imm32);
+	      ic->tme_m68k_ireg_uint32(TME_M68K_IREG_IMM32 + 0) = imm32;
+	      _TME_M68K_EXECUTE_FETCH_U32(imm32);
+	      ic->tme_m68k_ireg_uint32(TME_M68K_IREG_IMM32 + 1) = imm32;
+	      if (src_specifier != TME_M6888X_TYPE_DOUBLE) {
+		_TME_M68K_EXECUTE_FETCH_U32(imm32);
+		ic->tme_m68k_ireg_uint32(TME_M68K_IREG_IMM32 + 2) = imm32;
+	      }
+	      /* we only need to clear TME_M68K_OPCODE_IMM_32 here to
+		 cancel the later immediate fetching; we know that
+		 only TME_M68K_OPCODE_IMM_32 is set, thanks to the
+		 assert we did at the beginning of the fpgen specop
+		 handling: */
+	      params &= ~TME_M68K_OPCODE_IMM_32;
+	      break;
+	    case TME_M6888X_TYPE_BYTE:	      
+	      _TME_M68K_EXECUTE_FETCH_U16(imm32);
+	      ic->tme_m68k_ireg_uint32(TME_M68K_IREG_IMM32 + 0) = TME_EXT_S8_U32((tme_int8_t) imm32);
+	      /* we only need to clear TME_M68K_OPCODE_IMM_32 here to
+		 cancel the later immediate fetching; we know that
+		 only TME_M68K_OPCODE_IMM_32 is set, thanks to the
+		 assert we did at the beginning of the fpgen specop
+		 handling: */
+	      params &= ~TME_M68K_OPCODE_IMM_32;
+	      break;
+	    }
+	  }
+	}
+
+	/* otherwise, this FPgen instruction does not need any memory
+	   EA or immediate.  we'll decide later if this instruction is
+	   actually legal: */
+	else {
+	  /* cancel immediate fetching and all EA work: */
+	  params &= ~(TME_M68K_OPCODE_IMM_32
+		      | TME_M68K_OPCODE_IMM_16
+		      | TME_M68K_OPCODE_EA_SIZE_MASK
+		      | TME_M68K_OPCODE_EA_READ
+		      | TME_M68K_OPCODE_EA_WRITE);
+	}
+
+	/* if this instruction has already been marked as illegal, or
+	   this EA must be writable, and this is a PC-relative or
+	   immediate EA, this instruction is illegal: */
+	if (__tme_predict_false(func == tme_m68k_illegal
+				|| (params & TME_M68K_OPCODE_EA_WRITE
+				    && (TME_M68K_OPCODE_HAS_IMM(params)
+					|| (TME_M68K_OPCODE_EA_MODE_WHICH(params) == 7
+					    && (TME_M68K_OPCODE_EA_REG_WHICH(params) & 6) == 2))))) {
+	  func = tme_m68k_illegal;
+	  /* cancel immediate fetching and all EA work: */
+	  params &= ~(TME_M68K_OPCODE_IMM_32
+		      | TME_M68K_OPCODE_IMM_16
+		      | TME_M68K_OPCODE_EA_SIZE_MASK
+		      | TME_M68K_OPCODE_EA_READ
+		      | TME_M68K_OPCODE_EA_WRITE);
+	}
+
+	/* otherwise, if this instruction has a memory EA: */
+	else if (params & TME_M68K_OPCODE_EA_READ) {
+
+	  /* override any m68k-iset.txt guess about the operand
+	     size, and cancel all memory cycles.  the instruction
+	     itself will do the actual operand reading and any address
+	     register postincrement or predecrement: */
+	  params = 
+	    ((params
+	      & ~(TME_M68K_OPCODE_EA_READ
+		  | TME_M68K_OPCODE_EA_WRITE
+		  | TME_M68K_OPCODE_EA_SIZE_MASK))
+	     | TME_M68K_OPCODE_EA_UNSIZED);
+	}
+
+	/* otherwise, this instruction does not have a memory EA: */
+	else {
+
+	  /* cancel all EA work: */
+	  params &= ~(TME_M68K_OPCODE_EA_SIZE_MASK
+		      | TME_M68K_OPCODE_EA_READ
+		      | TME_M68K_OPCODE_EA_WRITE);
+	}
       }
+      else
+#endif /* TME_M68K_M68020 || TME_M68K_M68030 */
+
+	/* if this is not a memory-to-memory move instruction: */
+	if ((params & TME_M68K_OPCODE_EA_Y) == 0) {
+
+	  /* many instructions have a single special extension word: */
+	  _TME_M68K_EXECUTE_FETCH_U16(ic->_tme_m68k_insn_specop);
+	  first_ea_extword_offset = 4;
+	}
     }
-    
+
     /* get any immediate operand: */
-    if (__tme_predict_false(imm_operand != TME_M68K_OPNUM_UNDEF)) {
-      switch (imm_size) {
-      case TME_M68K_SIZE_16:
-	_TME_M68K_EXECUTE_FETCH_U16(imm16);
-	if (imm_operand == 0) operand0 = &imm16; else operand1 = &imm16;
-	break;
-      case TME_M68K_SIZE_32:
-	_TME_M68K_EXECUTE_FETCH_U32(imm32);
-	if (imm_operand == 0) operand0 = &imm32; else operand1 = &imm32;
-	break;
-      case TME_M68K_SIZE_16S32:
+    if (__tme_predict_false(TME_M68K_OPCODE_HAS_IMM(params))) {
+      if (params & TME_M68K_OPCODE_IMM_16) {
 	_TME_M68K_EXECUTE_FETCH_S16(imm32);
-	if (imm_operand == 0) operand0 = &imm32; else operand1 = &imm32;
-	break;
-      case TME_M68K_SIZE_16U8:
-	_TME_M68K_EXECUTE_FETCH_U16(imm8);
-	if (imm_operand == 0) operand0 = &imm8; else operand1 = &imm8;
-	break;
-      default: assert(FALSE);
       }
-    }
+      else {
+	_TME_M68K_EXECUTE_FETCH_U32(imm32);
+      }
+      ic->tme_m68k_ireg_imm32 = imm32;
+    }	
     
     /* loop over up to two effective addresses calculations.  this
        initializes for the normal, single effective address: */
-    while (ea_size != TME_M68K_SIZE_UNDEF) {
+    while (TME_M68K_OPCODE_HAS_EA(params)) {
+
+      /* if this EA is described by the alternate EA mode and reg
+	 fields, copy them into the EA mode and reg fields in
+	 params: */
+      if (__tme_predict_false((params
+			       & (TME_M68K_OPCODE_EA_Y | TME_M68K_OPCODE_SPECOP))
+			      == TME_M68K_OPCODE_EA_Y)) {
+      
+	/* reload to write the other memory EA: */
+	params
+	  = ((params
+	      & ~(TME_M68K_OPCODE_EA_MODE_MASK
+		  | TME_M68K_OPCODE_EA_REG_MASK
+		  | TME_M68K_OPCODE_EA_READ
+		  | TME_M68K_OPCODE_EA_Y))
+	     | TME_M68K_OPCODE_EA_MODE(TME_FIELD_EXTRACTU(opw, 6, 3))
+	     | TME_M68K_OPCODE_EA_REG(TME_FIELD_EXTRACTU(opw, 9, 3))
+	     | TME_M68K_OPCODE_EA_WRITE);
+      }
+
+      /* get the reg, size, and function code of this EA: */
+      ea_reg = TME_M68K_IREG_A0 + TME_M68K_OPCODE_EA_REG_WHICH(params);
+      ea_size = TME_M68K_OPCODE_EA_SIZE_WHICH(params);
+      ea_function_code = function_code_data;
       
       /* this EA must have either no size, or be exactly one, two, or
 	 four bytes: */
@@ -390,7 +540,7 @@ do { \
       eai_function_code = ea_function_code;
 
       /* dispatch on the mode: */
-      switch (ea_mode) {
+      switch (TME_M68K_OPCODE_EA_MODE_WHICH(params)) {
 	
 	/* address register indirect: */
       case 2:
@@ -468,20 +618,21 @@ do { \
 #endif /* !TME_M68K_M68020 && !TME_M68K_M68030 */
 	  
 	/* if this is a full extension word: */
-	if (extword & TME_BIT(8)) {
+	if (__tme_predict_false(extword & TME_BIT(8))) {
 #if (_TME_M68K_EXECUTE_CPU == TME_M68K_M68020) || (_TME_M68K_EXECUTE_CPU == TME_M68K_M68030)
 
 	  ea_i_is = TME_FIELD_EXTRACTU(extword, 0, 3);
 
 	  /* optionally suppress the base register: */
 	  if (extword & TME_BIT(7)) {
-	    ea_reg = TME_M68K_IREG_ZERO32;
+	    ea_reg = TME_M68K_IREG_ZERO;
 	  }
 	    
 	  /* fetch any base displacement: */
+	  ea_bd = 0;
 	  switch (TME_FIELD_EXTRACTU(extword, 4, 2)) {
 	  case 0: abort();
-	  case 1: ea_bd = 0; break;
+	  case 1: break;
 	  case 2: _TME_M68K_EXECUTE_FETCH_S16(ea_bd); break;
 	  case 3: _TME_M68K_EXECUTE_FETCH_S32(ea_bd); break;
 	  }
@@ -490,21 +641,22 @@ do { \
 	     where we check for combined IS-I/IS fields greater than
 	     or equal to 0xc, which are reserved: */
 	  if (extword & TME_BIT(6)) {
-	    ea_pre_index = TME_M68K_IREG_ZERO32;
+	    ea_pre_index = TME_M68K_IREG_ZERO;
 	    if (ea_i_is >= 0x4) {
 	      abort();
 	    }
 	  }
 
 	  /* fetch any outer displacement: */
+	  ea_od = 0;
 	  switch (ea_i_is & 3) {
-	  case 0: case 1: ea_od = 0; break;
+	  case 0: case 1: break;
 	  case 2: _TME_M68K_EXECUTE_FETCH_S16(ea_od); break;
 	  case 3: _TME_M68K_EXECUTE_FETCH_S32(ea_od); break;
 	  }
 
 	  /* dispatch on the I/IS fields: */
-	  ea_post_index = TME_M68K_IREG_ZERO32;
+	  ea_post_index = TME_M68K_IREG_ZERO;
 	  switch (ea_i_is) {
 
 	    /* no memory indirect action: */
@@ -526,7 +678,7 @@ do { \
 	    /* indirect postindexed with long outer displacement: */
 	  case 0x5: case 0x6: case 0x7:
 	    ea_post_index = ea_pre_index;
-	    ea_pre_index = TME_M68K_IREG_ZERO32;
+	    ea_pre_index = TME_M68K_IREG_ZERO;
 	    break;
 	  }
 
@@ -619,27 +771,23 @@ do { \
       
       /* XXX XXX XXX - if we detect a store to program space, that's an illegal: */
       /* XXX but maybe not for moves? */
-      if (ea_function_code == function_code_program
-	  && (ea_cycles & TME_BUS_CYCLE_WRITE)) {
+      if (__tme_predict_false(ea_function_code == function_code_program
+			      && (params & TME_M68K_OPCODE_EA_WRITE) != 0)) {
 	abort();
       }
 
       /* if we're loading this operand: */
-      if (ea_cycles & TME_BUS_CYCLE_READ) {
+      if (params & TME_M68K_OPCODE_EA_READ) {
 	_TME_M68K_INSN_FETCH_SAVE;
 	(*_tme_m68k_read_memx[ea_size])(ic);
       }
 
       /* stop unless this is a memory-to-memory move: */
-      if (specop_type != TME_M68K_SPECOP_MOVEMEMTOMEM)
+      if (__tme_predict_true(!(params & TME_M68K_OPCODE_EA_Y)))
 	break;
 
-      /* reload for the other memory EA at the same size: */
-      ea_mode = TME_FIELD_EXTRACTU(opw, 6, 3);
-      ea_reg = TME_M68K_IREG_A0 + TME_FIELD_EXTRACTU(opw, 9, 3);
-      ea_cycles = TME_BUS_CYCLE_WRITE;
-      ea_function_code = function_code_data;
-      specop_type = TME_M68K_SPECOP_UNDEF;
+      /* loop to reload for the other memory EA at the same size: */
+      params &= ~TME_M68K_OPCODE_SPECOP;
     }
 
     /* we've fetched all of the instruction words: */
@@ -657,7 +805,7 @@ do { \
     if (!_TME_M68K_SEQUENCE_RESTARTING
 	|| (ic->_tme_m68k_mode_flags & TME_M68K_EXECUTION_INST_CANFAULT)) {
       transfer_next_before = ic->_tme_m68k_sequence._tme_m68k_sequence_transfer_next;
-      (*func)(ic, operand0, operand1);
+      (*func)(ic, TME_M68K_OPCODE_OP0_WHICH(ic, params), TME_M68K_OPCODE_OP1_WHICH(ic, params));
       assert(!(ic->_tme_m68k_mode_flags & TME_M68K_EXECUTION_INST_CANFAULT)
 	     != (ic->_tme_m68k_sequence._tme_m68k_sequence_transfer_next
 		 != transfer_next_before));
@@ -665,8 +813,7 @@ do { \
     }
 
     /* store up to one EA path: */
-    if (ea_size != TME_M68K_SIZE_UNDEF
-	&& (ea_cycles & TME_BUS_CYCLE_WRITE)) {
+    if ((params & TME_M68K_OPCODE_EA_WRITE) != 0) {
       (*_tme_m68k_write_memx[ea_size])(ic);
     }
 

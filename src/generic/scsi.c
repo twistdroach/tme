@@ -1,4 +1,4 @@
-/* $Id: scsi.c,v 1.1 2003/07/29 18:18:35 fredette Exp $ */
+/* $Id: scsi.c,v 1.2 2005/02/18 03:51:13 fredette Exp $ */
 
 /* generic/scsi.c - generic SCSI implementation support: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: scsi.c,v 1.1 2003/07/29 18:18:35 fredette Exp $");
+_TME_RCSID("$Id: scsi.c,v 1.2 2005/02/18 03:51:13 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/scsi.h>
@@ -56,11 +56,9 @@ tme_scsi_connection_score(struct tme_connection *conn, unsigned int *_score)
     = (struct tme_scsi_connection *) conn;
   conn_scsi_other 
     = (struct tme_scsi_connection *) conn->tme_connection_other;
+  /* XXX we need a way to distinguish a bus from a device: */
   *_score
-    = ((conn_scsi->tme_scsi_connection_sequence_get
-	== NULL)
-       != (conn_scsi_other->tme_scsi_connection_sequence_get
-	   == NULL));
+    = 1;
   return (TME_OK);
 }
 

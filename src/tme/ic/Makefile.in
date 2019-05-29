@@ -52,6 +52,7 @@ AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
+CFLAGS_NO_STRICT_ALIASING = @CFLAGS_NO_STRICT_ALIASING@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CXX = @CXX@
@@ -162,7 +163,14 @@ target_vendor = @target_vendor@
 AUTOMAKE_OPTIONS = 1.4 gnu
 
 tmeicincludedir = $(pkgincludedir)/ic
-tmeicinclude_HEADERS = m68k.h am9513.h z8530.h mm58167.h
+tmeicinclude_HEADERS = m68k.h \
+	am9513.h \
+	z8530.h \
+	mm58167.h \
+	isil7170.h \
+	i825x6.h \
+	ieee754.h
+
 subdir = tme/ic
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = $(top_builddir)/config.h

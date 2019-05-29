@@ -1,4 +1,4 @@
-/* $Id: bsd-bpf.c,v 1.4 2003/10/16 02:48:23 fredette Exp $ */
+/* $Id: bsd-bpf.c,v 1.6 2004/05/17 11:57:01 fredette Exp $ */
 
 /* host/bsd/bsd-bpf.c - BSD Berkeley Packet Filter Ethernet support: */
 
@@ -34,11 +34,12 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: bsd-bpf.c,v 1.4 2003/10/16 02:48:23 fredette Exp $");
+_TME_RCSID("$Id: bsd-bpf.c,v 1.6 2004/05/17 11:57:01 fredette Exp $");
 
 /* includes: */
 #include "bsd-impl.h"
 #include <tme/generic/ethernet.h>
+#include <tme/misc.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -92,9 +93,8 @@ struct tme_bsd_bpf {
   /* our mutex: */
   tme_mutex_t tme_bsd_bpf_mutex;
 
-  /* our reader and writer conditions: */
+  /* our reader condition: */
   tme_cond_t tme_bsd_bpf_cond_reader;
-  tme_cond_t tme_bsd_bpf_cond_writer;
 
   /* the callout flags: */
   unsigned int tme_bsd_bpf_callout_flags;
@@ -115,6 +115,18 @@ struct tme_bsd_bpf {
      in the packet buffer: */
   size_t tme_bsd_bpf_buffer_offset;
   size_t tme_bsd_bpf_buffer_end;
+
+  /* when nonzero, the packet delay time, in microseconds: */
+  unsigned long tme_bsd_bpf_delay_time;
+
+  /* all packets received on or before this time can be released: */
+  struct timeval tme_bsd_bpf_delay_release;
+
+  /* when nonzero, the packet delay sleep time, in microseconds: */
+  unsigned long tme_bsd_bpf_delay_sleep;
+
+  /* when nonzero, the packet delay is sleeping: */
+  int tme_bsd_bpf_delay_sleeping;
 };
 
 /* the accept and reject packet insns: */
@@ -390,6 +402,7 @@ static void
 _tme_bsd_bpf_th_reader(struct tme_bsd_bpf *bpf)
 {
   ssize_t buffer_end;
+  unsigned long sleep_usec;
   
   /* lock the mutex: */
   tme_mutex_lock(&bpf->tme_bsd_bpf_mutex);
@@ -397,11 +410,45 @@ _tme_bsd_bpf_th_reader(struct tme_bsd_bpf *bpf)
   /* loop forever: */
   for (;;) {
 
-    /* if the buffer is not empty, wait until it is: */
+    /* if the delay sleeping flag is set: */
+    if (bpf->tme_bsd_bpf_delay_sleeping) {
+
+      /* clear the delay sleeping flag: */
+      bpf->tme_bsd_bpf_delay_sleeping = FALSE;
+      
+      /* call out that we can be read again: */
+      _tme_bsd_bpf_callout(bpf, TME_BSD_BPF_CALLOUT_CTRL);
+    }
+
+    /* if a delay has been requested: */
+    sleep_usec = bpf->tme_bsd_bpf_delay_sleep;
+    if (sleep_usec > 0) {
+
+      /* clear the delay sleep time: */
+      bpf->tme_bsd_bpf_delay_sleep = 0;
+
+      /* set the delay sleeping flag: */
+      bpf->tme_bsd_bpf_delay_sleeping = TRUE;
+
+      /* unlock our mutex: */
+      tme_mutex_unlock(&bpf->tme_bsd_bpf_mutex);
+      
+      /* sleep for the delay sleep time: */
+      tme_thread_sleep_yield(0, sleep_usec);
+      
+      /* lock our mutex: */
+      tme_mutex_lock(&bpf->tme_bsd_bpf_mutex);
+      
+      continue;
+    }
+
+    /* if the buffer is not empty, wait until either it is,
+       or we're asked to do a delay: */
     if (bpf->tme_bsd_bpf_buffer_offset
 	< bpf->tme_bsd_bpf_buffer_end) {
       tme_cond_wait_yield(&bpf->tme_bsd_bpf_cond_reader,
 			  &bpf->tme_bsd_bpf_mutex);
+      continue;
     }
 
     /* unlock the mutex: */
@@ -616,6 +663,57 @@ _tme_bsd_bpf_read(struct tme_ethernet_connection *conn_eth,
       continue;
     }
 
+    /* if packets need to be delayed: */
+    if (bpf->tme_bsd_bpf_delay_time > 0) {
+      
+      /* if the current release time is before this packet's time: */
+      if ((bpf->tme_bsd_bpf_delay_release.tv_sec
+	   < the_bpf_header.bh_tstamp.tv_sec)
+	  || ((bpf->tme_bsd_bpf_delay_release.tv_sec
+	       == the_bpf_header.bh_tstamp.tv_sec)
+	      && (bpf->tme_bsd_bpf_delay_release.tv_usec
+		  < the_bpf_header.bh_tstamp.tv_usec))) {
+
+	/* update the current release time, by taking the current time
+	   and subtracting the delay time: */
+	gettimeofday(&bpf->tme_bsd_bpf_delay_release, NULL);
+	if (bpf->tme_bsd_bpf_delay_release.tv_usec < bpf->tme_bsd_bpf_delay_time) {
+	  bpf->tme_bsd_bpf_delay_release.tv_usec += 1000000UL;
+	  bpf->tme_bsd_bpf_delay_release.tv_sec--;
+	}
+	bpf->tme_bsd_bpf_delay_release.tv_usec -= bpf->tme_bsd_bpf_delay_time;
+      }
+
+      /* if the current release time is still before this packet's
+         time: */
+      if ((bpf->tme_bsd_bpf_delay_release.tv_sec
+	   < the_bpf_header.bh_tstamp.tv_sec)
+	  || ((bpf->tme_bsd_bpf_delay_release.tv_sec
+	       == the_bpf_header.bh_tstamp.tv_sec)
+	      && (bpf->tme_bsd_bpf_delay_release.tv_usec
+		  < the_bpf_header.bh_tstamp.tv_usec))) {
+
+	/* set the sleep time: */
+	assert ((bpf->tme_bsd_bpf_delay_release.tv_sec
+		 == the_bpf_header.bh_tstamp.tv_sec)
+		|| ((bpf->tme_bsd_bpf_delay_release.tv_sec + 1)
+		    == the_bpf_header.bh_tstamp.tv_sec));
+	bpf->tme_bsd_bpf_delay_sleep
+	  = (((bpf->tme_bsd_bpf_delay_release.tv_sec
+	       == the_bpf_header.bh_tstamp.tv_sec)
+	      ? 0
+	      : 1000000UL)
+	     + the_bpf_header.bh_tstamp.tv_usec
+	     - bpf->tme_bsd_bpf_delay_release.tv_usec);
+
+	/* rewind the buffer pointer: */
+	bpf->tme_bsd_bpf_buffer_offset -= the_bpf_header.bh_hdrlen;
+
+	/* stop now: */
+	break;
+      }
+    }
+
     /* form the single frame chunk: */
     frame_chunk_buffer.tme_ethernet_frame_chunk_next = NULL;
     frame_chunk_buffer.tme_ethernet_frame_chunk_bytes
@@ -626,8 +724,15 @@ _tme_bsd_bpf_read(struct tme_ethernet_connection *conn_eth,
     /* copy out the frame: */
     count = tme_ethernet_chunks_copy(frame_chunks, &frame_chunk_buffer);
 
-    /* if this isn't a peek: */
-    if (!(flags & TME_ETHERNET_READ_PEEK)) {
+    /* if this is a peek: */
+    if (flags & TME_ETHERNET_READ_PEEK) {
+
+      /* rewind the buffer pointer: */
+      bpf->tme_bsd_bpf_buffer_offset -= the_bpf_header.bh_hdrlen;
+    }
+
+    /* otherwise, this isn't a peek: */
+    else {
 
       /* update the buffer pointer: */
       bpf->tme_bsd_bpf_buffer_offset += the_bpf_header.bh_datalen;
@@ -638,9 +743,11 @@ _tme_bsd_bpf_read(struct tme_ethernet_connection *conn_eth,
     break;
   }
 
-  /* if the buffer is empty, notify the reader that we need more data: */
-  if (bpf->tme_bsd_bpf_buffer_offset
-      >= bpf->tme_bsd_bpf_buffer_end) {
+  /* if the buffer is empty, or if we failed to read a packet,
+     wake up the reader: */
+  if ((bpf->tme_bsd_bpf_buffer_offset
+       >= bpf->tme_bsd_bpf_buffer_end)
+      || rc <= 0) {
     tme_cond_notify(&bpf->tme_bsd_bpf_cond_reader, TRUE);
   }
 
@@ -748,6 +855,7 @@ TME_ELEMENT_SUB_NEW_DECL(tme_host_bsd,bpf) {
   u_int packet_buffer_size;
   const char *ifr_name_user;
   struct ifreq *ifr;
+  unsigned long delay_time;
   int arg_i;
   int usage;
   int rc;
@@ -755,6 +863,7 @@ TME_ELEMENT_SUB_NEW_DECL(tme_host_bsd,bpf) {
   /* check our arguments: */
   usage = 0;
   ifr_name_user = NULL;
+  delay_time = 0;
   arg_i = 1;
   for (;;) {
 
@@ -765,6 +874,12 @@ TME_ELEMENT_SUB_NEW_DECL(tme_host_bsd,bpf) {
       arg_i += 2;
     }
 
+    /* a delay time in microseconds: */
+    else if (TME_ARG_IS(args[arg_i + 0], "delay")
+	     && (delay_time = tme_misc_unumber_parse(args[arg_i + 1], 0)) > 0) {
+      arg_i += 2;
+    }
+    
     /* if we ran out of arguments: */
     else if (args[arg_i + 0] == NULL) {
       break;
@@ -783,10 +898,11 @@ TME_ELEMENT_SUB_NEW_DECL(tme_host_bsd,bpf) {
 
   if (usage) {
     tme_output_append_error(_output,
-			    "%s %s [ interface %s ]",
+			    "%s %s [ interface %s ] [ delay %s ]",
 			    _("usage:"),
 			    args[0],
-			    _("INTERFACE"));
+			    _("INTERFACE"),
+			    _("MICROSECONDS"));
     return (EINVAL);
   }
 
@@ -921,10 +1037,11 @@ TME_ELEMENT_SUB_NEW_DECL(tme_host_bsd,bpf) {
   bpf->tme_bsd_bpf_fd = bpf_fd;
   bpf->tme_bsd_bpf_buffer_size = packet_buffer_size;
   bpf->tme_bsd_bpf_buffer = tme_new(tme_uint8_t, packet_buffer_size);
+  bpf->tme_bsd_bpf_delay_time = delay_time;
 
   /* start the threads: */
   tme_mutex_init(&bpf->tme_bsd_bpf_mutex);
-  tme_cond_init(&bpf->tme_bsd_bpf_cond_writer);
+  tme_cond_init(&bpf->tme_bsd_bpf_cond_reader);
   tme_thread_create((tme_thread_t) _tme_bsd_bpf_th_reader, bpf);
 
   /* fill the element: */

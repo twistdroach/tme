@@ -1,5 +1,5 @@
 %{
-/* $Id: tmesh-input.y,v 1.2 2003/07/29 18:32:55 fredette Exp $ */
+/* $Id: tmesh-input.y,v 1.3 2005/02/18 02:15:47 fredette Exp $ */
 
 /* tmesh/tmesh-input.y - the tme shell scanner and parser: */
 
@@ -35,7 +35,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: tmesh-input.y,v 1.2 2003/07/29 18:32:55 fredette Exp $");
+_TME_RCSID("$Id: tmesh-input.y,v 1.3 2005/02/18 02:15:47 fredette Exp $");
 
 /* includes: */
 #include <tme/threads.h>
@@ -56,6 +56,7 @@ _TME_RCSID("$Id: tmesh-input.y,v 1.2 2003/07/29 18:32:55 fredette Exp $");
 
 #define YYSTYPE struct tmesh_parser_value
 #define YYDEBUG 1
+#define YYMAXDEPTH 10000
 
 /* types: */
 

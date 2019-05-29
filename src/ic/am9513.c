@@ -1,4 +1,4 @@
-/* $Id: am9513.c,v 1.12 2003/10/25 17:07:58 fredette Exp $ */
+/* $Id: am9513.c,v 1.14 2004/04/30 11:51:29 fredette Exp $ */
 
 /* ic/am9513.c - implementation of Am9513 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: am9513.c,v 1.12 2003/10/25 17:07:58 fredette Exp $");
+_TME_RCSID("$Id: am9513.c,v 1.14 2004/04/30 11:51:29 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -263,7 +263,6 @@ _tme_am9513_callout(struct tme_am9513 *am9513)
   int again;
   int pin_high;
   unsigned int signal;
-  unsigned int inverted;
   int rc;
 
   /* if this function is already running in another thread, return
@@ -301,17 +300,8 @@ _tme_am9513_callout(struct tme_am9513 *am9513)
       /* get any bus signal this pin maps to: */
       signal = am9513->tme_am9513_socket.tme_am9513_socket_counter_signals[counter_i];
       
-      /* see if this pin is inverted when it becomes the bus signal: */
-      switch (signal & TME_BUS_SIGNAL_LEVEL_MASK) {
-      case TME_BUS_SIGNAL_LEVEL_NORMAL: inverted = FALSE; break;
-      case TME_BUS_SIGNAL_LEVEL_INVERTED: inverted = TRUE; break;
-      default: abort();
-      }
-      signal &= ~(TME_BUS_SIGNAL_LEVEL_MASK
-		  | TME_BUS_SIGNAL_EDGE);
-      
       /* if this signal is ignored: */
-      if (signal == TME_BUS_SIGNAL_IGNORE) {
+      if (TME_BUS_SIGNAL_WHICH(signal) == TME_BUS_SIGNAL_IGNORE) {
 	rc = TME_OK;
       }
       
@@ -324,10 +314,9 @@ _tme_am9513_callout(struct tme_am9513 *am9513)
 	rc = (*conn_bus->tme_bus_signal)
 	  (conn_bus,
 	   signal
-	   | ((inverted ? !pin_high : pin_high)
+	   ^ (pin_high
 	      ? TME_BUS_SIGNAL_LEVEL_HIGH
-	      : TME_BUS_SIGNAL_LEVEL_LOW)
-	   | TME_BUS_SIGNAL_EDGE);
+	      : TME_BUS_SIGNAL_LEVEL_LOW));
 
 	/* lock our mutex: */
 	tme_mutex_lock(&am9513->tme_am9513_mutex);

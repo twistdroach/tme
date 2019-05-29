@@ -1,4 +1,4 @@
-# $Id: SUN2-MULTIBUS,v 1.8 2003/09/01 14:32:39 fredette Exp $
+# $Id: SUN2-MULTIBUS,v 1.11 2005/04/30 15:12:12 fredette Exp $
 
 ## SUN2-MULTIBUS - example tmesh commands to create a Sun2 Multibus
 ## machine:
@@ -40,13 +40,27 @@ scsibus0 at sc0: tme/scsi/bus
 #ec0 at mbmem0 addr 0xe0000 ipl 3: tme/bus/multibus/3c400 ether "00:01:02:03:04:05"
 #bpf0 at ec0: tme/host/bsd/bpf
 
+## the Sun Intel Ethernet Multibus board:
+##
+## NB that the mie "memory" attachment argument must match the
+## low 20 bits of the address of the memory's bus attachment:
+##
+# uncomment these lines if you have read/write permission on one
+# of your /dev/bpfN devices and you want an Ethernet device:
+#
+#mie0: tme/bus/multibus/sun-mie
+#mie0 csr at mbmem0 addr 0x88000 ipl 3
+#mie0 memory 0xa0000 at mbmem0 addr 0xa0000
+#ie0 at mie0: tme/ic/i82586
+#bpf1 at ie0: tme/host/bsd/bpf delay 10000
+
 ## the Sun bwtwo Multibus board, Sun type-2 keyboard and mouse, and
 ## the GTK-based display to drive them all:
 ##
 # comment out these eight lines if you don't have GTK or you don't
 # want a display console:
 #
-bwtwo0 at obmem0 addr 0x700000 ipl 4: tme/machine/sun2/bwtwo type obmem
+bwtwo0 at obmem0 addr 0x700000 ipl 4: tme/machine/sun2/bwtwo type multibus
 zs1 at obmem0 addr 0x780000 ipl 6: tme/machine/sun2/zs
 kbd0 at zs1 channel A: tme/serial/keyboard type sun-type-2 macros my-sun-macros.txt map sun-keyboards.txt rate 20
 ms0 at zs1 channel B: tme/serial/mouse type mousesystems-5
@@ -75,7 +89,10 @@ disk0 at sd0: tme/host/posix/disk file my-sun2-disk.img
 
 ## a SCSI tape:
 ##
-st0 at scsibus0: tme/scsi/tape id 4 type emulex-mt02
+# if you're using SunOS, remove the vendor EMULEX and product "MT-02 QIC" 
+# to get a 100% Emulex MT-02 compatible tape:
+#
+st0 at scsibus0: tme/scsi/tape id 4 type emulex-mt02 vendor EMULEX product "MT-02 QIC"
 tape0 at st0: tme/host/posix/tape
 
 ## power up the machine:
