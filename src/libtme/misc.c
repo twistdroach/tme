@@ -1,4 +1,4 @@
-/* $Id: misc.c,v 1.1 2003/05/16 21:48:12 fredette Exp $ */
+/* $Id: misc.c,v 1.2 2003/06/27 21:00:21 fredette Exp $ */
 
 /* libtme/misc.c - miscellaneous: */
 
@@ -34,10 +34,13 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: misc.c,v 1.1 2003/05/16 21:48:12 fredette Exp $");
+_TME_RCSID("$Id: misc.c,v 1.2 2003/06/27 21:00:21 fredette Exp $");
 
 /* includes: */
-#include <tme/tme.h>
+#include <tme/threads.h>
+#include <tme/module.h>
+#include <tme/misc.h>
+#include <ctype.h>
 
 /* this initializes libtme: */
 int
@@ -55,3 +58,93 @@ tme_init(void)
   return (rc);
 }
 
+/* this tokenizes a string by whitespace: */
+char **
+tme_misc_tokenize(const char *string,
+		  char comment,
+		  int *_tokens_count)
+{
+  int tokens_count;
+  int tokens_size;
+  char **tokens;
+  const char *p1;
+  const char *p2;
+  char c;
+
+  /* we initially have no tokens: */
+  tokens_count = 0;
+  tokens_size = 1;
+  tokens = tme_new(char *, tokens_size);
+
+  /* tokenize this line by whitespace and watch for comments: */
+  p1 = NULL;
+  for (p2 = string;; p2++) {
+    c = *p2;
+
+    /* if this is a token delimiter: */
+    if (c == '\0'
+	|| isspace(c)
+	|| c == comment) {
+
+      /* if we had been collecting a token, it's finished: */
+      if (p1 != NULL) {
+	  
+	/* save this token: */
+	tokens[tokens_count] = tme_dup(char, p1, (p2 - p1) + 1);
+	tokens[tokens_count][p2 - p1] = '\0';
+	p1 = NULL;
+
+	/* resize the tokens array if needed: */
+	if (++tokens_count == tokens_size) {
+	  tokens_size += (tokens_size >> 1) + 1;
+	  tokens = tme_renew(char *, tokens, tokens_size);
+	}
+      }
+
+      /* stop if this is the end of the line or the beginning of a
+	 comment: */
+      if (c == '\0'
+	  || c == comment) {
+	break;
+      }
+    }
+
+    /* otherwise this is part of a token: */
+    else {
+      if (p1 == NULL) {
+	p1 = p2;
+      }
+    }
+  }
+
+  /* done: */
+  *_tokens_count = tokens_count;
+  tokens[tokens_count] = NULL;
+  return (tokens);
+}
+
+/* this frees an array of strings: */
+void
+tme_free_string_array(char **array, int length)
+{
+  char *string;
+  int i;
+
+  if (length < 0) {
+    for (i = 0;
+	 (string = array[i]) != NULL;
+	 i++) {
+      tme_free(string);
+    }
+  }
+  else {
+    for (i = 0;
+	 i < length;
+	 i++) {
+      tme_free(array[i]);
+    }
+  }
+  tme_free(array);
+}
+    
+    

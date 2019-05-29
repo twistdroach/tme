@@ -1,6 +1,6 @@
-/* $Id: posix-serial.c,v 1.7 2003/05/16 21:48:09 fredette Exp $ */
+/* $Id: posix-serial.c,v 1.8 2003/07/29 18:20:30 fredette Exp $ */
 
-/* host/posix/serial.c - implementation of serial ports on a POSIX system: */
+/* host/posix/posix-serial.c - implementation of serial ports on a POSIX system: */
 
 /*
  * Copyright (c) 2003 Matt Fredette
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: posix-serial.c,v 1.7 2003/05/16 21:48:09 fredette Exp $");
+_TME_RCSID("$Id: posix-serial.c,v 1.8 2003/07/29 18:20:30 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/serial.h>

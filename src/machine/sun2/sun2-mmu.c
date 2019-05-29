@@ -1,4 +1,4 @@
-/* $Id: sun2-mmu.c,v 1.7 2003/05/16 21:48:13 fredette Exp $ */
+/* $Id: sun2-mmu.c,v 1.9 2003/10/16 02:48:24 fredette Exp $ */
 
 /* machine/sun2/sun2-mmu.c - implementation of Sun 2 MMU emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun2-mmu.c,v 1.7 2003/05/16 21:48:13 fredette Exp $");
+_TME_RCSID("$Id: sun2-mmu.c,v 1.9 2003/10/16 02:48:24 fredette Exp $");
 
 /* includes: */
 #include "sun2-impl.h"
@@ -78,6 +78,9 @@ _tme_sun2_bus_fault_log(struct tme_sun2 *sun2, struct tme_bus_tlb *tlb, struct t
   const char *bus_name;
   tme_bus_addr_t physical_address;
   int rc;
+
+  /* this silences gcc -Wuninitialized: */
+  bus_name = NULL;
 
   /* recover the virtual address used: */
   virtual_address = cycle->tme_bus_cycle_address - tlb->tme_bus_tlb_addr_offset;
@@ -364,18 +367,66 @@ _tme_sun2_bus_tlb_fill(struct tme_bus_connection *conn_bus, struct tme_bus_tlb *
 		       tme_uint32_t address, unsigned int cycles)
 {
   struct tme_sun2 *sun2;
+  struct tme_sun2_bus_connection *conn_sun2;
+  tme_uint32_t base, size;
+  struct tme_bus_tlb tlb_bus;
 
   /* recover our sun2: */
   sun2 = (struct tme_sun2 *) conn_bus->tme_bus_connection.tme_connection_element->tme_element_private;
+
+  /* recover the sun2 internal mainbus connection: */
+  conn_sun2 = (struct tme_sun2_bus_connection *) conn_bus;
+
+  /* turn the bus address into a DVMA address: */
+  switch (conn_sun2->tme_sun2_bus_connection_which) {
+
+    /* obio devices can actually see the whole address space: */
+  case TME_SUN2_BUS_OBIO:
+    base = 0x000000;
+    size = 0x1000000;
+    break;
+
+  case TME_SUN2_BUS_MBMEM:
+    base = 0xf00000;
+    size = TME_SUN2_DVMA_SIZE_MBMEM;
+    break;
+
+  case TME_SUN2_BUS_VME:
+    base = 0xf00000;
+    size = TME_SUN2_DVMA_SIZE_VME;
+    break;
+
+  default: abort();
+  }
+
+  assert (!(address & base)
+	  && (address < size));
 
   /* fill this TLB entry from the MMU: */
   tme_sun_mmu_tlb_fill(sun2->tme_sun2_mmu,
 		       tlb,
 		       sun2->tme_sun2_context_system,
-		       address,
+		       address | base,
 		       ((cycles & TME_BUS_CYCLE_WRITE)
 			? TME_SUN_MMU_PTE_PROT_SYSTEM(TME_SUN_MMU_PTE_PROT_RW)
 			: TME_SUN_MMU_PTE_PROT_SYSTEM(TME_SUN_MMU_PTE_PROT_RO)));
+
+  /* create the mapping TLB entry.  we do this even if base == 0,
+     because the TLB entry as currently filled may cover more address
+     space than DVMA space on this machine is supposed to cover: */
+  TME_ATOMIC_WRITE(tme_bus_addr_t,
+		   tlb_bus.tme_bus_tlb_addr_first,
+		   0);
+  TME_ATOMIC_WRITE(tme_bus_addr_t,
+		   tlb_bus.tme_bus_tlb_addr_last,
+		   size - 1);
+  tlb_bus.tme_bus_tlb_cycles_ok
+    = (TME_BUS_CYCLE_READ
+       | TME_BUS_CYCLE_WRITE);
+  
+  /* map the filled TLB entry: */
+  tme_bus_tlb_map(tlb, address | base, &tlb_bus, address);
+
   return (TME_OK);
 }
 
@@ -513,6 +564,9 @@ _tme_sun2_mmu_pte_set(struct tme_sun2 *sun2, tme_uint32_t address, tme_uint32_t 
   const char *bus_name;
   tme_bus_addr_t physical_address;
       
+  /* this silences gcc -Wuninitialized: */
+  bus_name = NULL;
+
   /* log this setting: */
   physical_address = ((pte_sun2 & TME_SUN2_PTE_PGFRAME) << TME_SUN2_PAGE_SIZE_LOG2);
   switch ((pte_sun2 & TME_SUN2_PTE_PGTYPE) / (TME_SUN2_PTE_PGTYPE / TME_SUN2_PTE_PGTYPE_MASK)) {
@@ -625,6 +679,7 @@ _tme_sun2_mmu_pte_set(struct tme_sun2 *sun2, tme_uint32_t address, tme_uint32_t 
     /* with this protection, the system gets a protection error,
        and the user can read and write: */
   case 0x3c000000:
+  case 0x0c000000:
     pte_flags |= 
       (TME_SUN_MMU_PTE_PROT_SYSTEM(TME_SUN_MMU_PTE_PROT_ERROR)
        | TME_SUN_MMU_PTE_PROT_USER(TME_SUN_MMU_PTE_PROT_RW));
@@ -755,7 +810,7 @@ _tme_sun2_reset_cycle(void *_sun2, struct tme_bus_cycle *cycle)
   return (rc);
 }
 
-/* this initialize the context zero part of the CPU's TLB set to
+/* this initializes the context zero part of the CPU's TLB set to
    support four slow 16-bit reads from ROM at addresses 0, 2, 4, 6,
    respectively.  this emulates how the Sun-2 behaves as it comes out
    of reset: */

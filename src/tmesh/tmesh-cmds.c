@@ -1,6 +1,6 @@
-/* $Id: tmesh-cmds.c,v 1.1 2003/05/16 21:48:16 fredette Exp $ */
+/* $Id: tmesh-cmds.c,v 1.5 2003/10/25 17:08:01 fredette Exp $ */
 
-/* tmesh/tmesh-eval.y - the tme shell evaluator: */
+/* tmesh/tmesh-cmds.c - functions implementing the tmesh commands: */
 
 /*
  * Copyright (c) 2003 Matt Fredette
@@ -34,10 +34,11 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: tmesh-cmds.c,v 1.1 2003/05/16 21:48:16 fredette Exp $");
+_TME_RCSID("$Id: tmesh-cmds.c,v 1.5 2003/10/25 17:08:01 fredette Exp $");
 
 /* includes: */
 #include <tme/threads.h>
+#include <stdlib.h>
 #include "tmesh-impl.h"
 
 /* macros: */
@@ -226,7 +227,7 @@ _tmesh_command_pwd(struct tmesh *tmesh, struct tmesh_parser_value *value, char *
 
 /* this outputs an argv: */
 static void
-_tmesh_ls_output_argv(char **_output, struct tmesh_parser_argv *argv, int skip)
+_tmesh_ls_output_argv(char **_output, struct tmesh_parser_argv *argv, unsigned int skip)
 {
   unsigned int argc;
   char **args;
@@ -718,6 +719,86 @@ _tmesh_command_command(struct tmesh *tmesh, struct tmesh_parser_value *value, ch
   return (rc);
 }
 
+/* the "log" command: */
+static int
+_tmesh_command_log(struct tmesh *tmesh, struct tmesh_parser_value *value, char **_output)
+{
+  struct tmesh_fs_dirent *parent, *entry;
+  char *pathname;
+  struct tmesh_fs_element *element;
+  char **element_args;
+#ifndef TME_NO_LOG
+  unsigned long log_level;
+  char *p1;
+#endif /* !TME_NO_LOG */
+  int rc;
+
+  /* look up the element: */
+  element_args = value->tmesh_parser_value_argvs[0].tmesh_parser_argv_argv;
+  assert(element_args != NULL);
+  element_args[value->tmesh_parser_value_argvs[0].tmesh_parser_argv_argc] = NULL;
+  pathname = element_args[0];
+  rc = _tmesh_fs_lookup(tmesh,
+			&pathname,
+			&parent, &entry,
+			_output,
+			TMESH_SEARCH_NORMAL);
+
+  /* if the lookup succeeded: */
+  if (rc == TME_OK) {
+
+    /* if this pathname doesn't refer to an element, we can't
+       set its logging level: */
+    if (entry->tmesh_fs_dirent_type != TMESH_FS_DIRENT_ELEMENT) {
+      rc = ENOTSOCK;
+    }
+
+    /* otherwise, this is an element: */
+    else {
+      element = entry->tmesh_fs_dirent_value;
+
+      /* if logging is not supported: */
+#ifdef TME_NO_LOG
+      rc = EOPNOTSUPP;
+#else  /* !TME_NO_LOG */
+
+      /* assume our arguments are invalid: */
+      rc = EINVAL;
+
+      /* check our arguments: */
+      if (element_args[1] != NULL
+	  && element_args[2] == NULL) {
+
+	/* assume a log level of zero: */
+	log_level = 0;
+
+	/* "off" means a log level of zero: */
+	if (!strcmp(element_args[1], "off")) {
+	  rc = TME_OK;
+	}
+
+	/* any other argument must be a log level: */
+	else {
+	  log_level = strtoul(element_args[1], &p1, 0);
+	  if (p1 != element_args[1]
+	      && *p1 == '\0') {
+	    rc = TME_OK;
+	  }
+	}
+
+	/* set the log level: */
+	if (rc == TME_OK) {
+	  element->tmesh_fs_element_element.tme_element_log_handle.tme_log_handle_level_max
+	    = log_level;
+	}
+      }
+#endif /* !TME_NO_LOG */
+    }
+  }
+
+  return (rc);
+}
+
 /* this evaluates one or more commands: */
 int
 tmesh_eval(void *_tmesh, char **_output, int *_yield)
@@ -756,6 +837,7 @@ tmesh_eval(void *_tmesh, char **_output, int *_yield)
     case TMESH_COMMAND_RM: command_func = _tmesh_command_rm; break;
     case TMESH_COMMAND_MV: command_func = _tmesh_command_mv; break;
     case TMESH_COMMAND_COMMAND: command_func = _tmesh_command_command; break;
+    case TMESH_COMMAND_LOG: command_func = _tmesh_command_log; break;
     }
     
     /* call the function: */

@@ -5,4 +5,15 @@ AUTOMAKE_OPTIONS = 1.4 gnu
 
 tmegenericdir = $(pkgincludedir)/generic
 
-tmegeneric_HEADERS = bus-device.h bus.h ic.h serial.h ethernet.h
+tmegeneric_HEADERS = \
+	bus-device.h \
+	bus.h \
+	ic.h \
+	serial.h \
+	ethernet.h \
+	fb.h \
+	scsi.h \
+	disk.h \
+	tape.h \
+	mouse.h \
+	keyboard.h

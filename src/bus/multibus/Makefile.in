@@ -100,6 +100,9 @@ EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 F77 = @F77@
 FFLAGS = @FFLAGS@
+GTK_CFLAGS = @GTK_CFLAGS@
+GTK_CONFIG = @GTK_CONFIG@
+GTK_LIBS = @GTK_LIBS@
 INCLTDL = @INCLTDL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -127,12 +130,20 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 STRIP = @STRIP@
 TME_BUS_SUBDIRS = @TME_BUS_SUBDIRS@
+TME_FB_XLAT_DST = @TME_FB_XLAT_DST@
+TME_FB_XLAT_SRC = @TME_FB_XLAT_SRC@
 TME_HOSTS = @TME_HOSTS@
 TME_ICS = @TME_ICS@
 TME_IC_SUBDIRS = @TME_IC_SUBDIRS@
 TME_MACHINE_SUBDIRS = @TME_MACHINE_SUBDIRS@
 TME_PREOPEN = @TME_PREOPEN@
+TME_SERIALS = @TME_SERIALS@
+TME_SERIAL_SUBDIRS = @TME_SERIAL_SUBDIRS@
 VERSION = @VERSION@
+X_CFLAGS = @X_CFLAGS@
+X_EXTRA_LIBS = @X_EXTRA_LIBS@
+X_LIBS = @X_LIBS@
+X_PRE_LIBS = @X_PRE_LIBS@
 YACC = @YACC@
 ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
@@ -184,7 +195,9 @@ AUTOMAKE_OPTIONS = 1.4 gnu
 INCLUDES = -I$(top_srcdir) -I$(srcdir) -I. -D_TME_IMPL
 
 pkglib_LTLIBRARIES = tme_bus_multibus.la
-tme_bus_multibus_la_SOURCES = 3c400.c
+tme_bus_multibus_la_SOURCES = 3c400.c \
+	sun-sc.c
+
 tme_bus_multibus_la_LDFLAGS = -module -version-info 0:0:0
 tme_bus_multibus_la_LIBADD = $(top_builddir)/libtme/libtme.la \
 	$(top_builddir)/generic/libtme-generic.la
@@ -197,13 +210,13 @@ LTLIBRARIES = $(pkglib_LTLIBRARIES)
 
 tme_bus_multibus_la_DEPENDENCIES = $(top_builddir)/libtme/libtme.la \
 	$(top_builddir)/generic/libtme-generic.la
-am_tme_bus_multibus_la_OBJECTS = 3c400.lo
+am_tme_bus_multibus_la_OBJECTS = 3c400.lo sun-sc.lo
 tme_bus_multibus_la_OBJECTS = $(am_tme_bus_multibus_la_OBJECTS)
 
 DEFAULT_INCLUDES =  -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
-@AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/3c400.Plo
+@AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/3c400.Plo ./$(DEPDIR)/sun-sc.Plo
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) \
@@ -262,6 +275,7 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/3c400.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sun-sc.Plo@am__quote@
 
 distclean-depend:
 	-rm -rf ./$(DEPDIR)

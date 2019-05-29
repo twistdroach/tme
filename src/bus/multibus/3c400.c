@@ -1,4 +1,4 @@
-/* $Id: 3c400.c,v 1.6 2003/05/18 00:05:12 fredette Exp $ */
+/* $Id: 3c400.c,v 1.7 2003/07/29 18:17:14 fredette Exp $ */
 
 /* bus/multibus/3c400.c - implementation of the Multibus 3c400 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: 3c400.c,v 1.6 2003/05/18 00:05:12 fredette Exp $");
+_TME_RCSID("$Id: 3c400.c,v 1.7 2003/07/29 18:17:14 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -97,7 +97,7 @@ _TME_RCSID("$Id: 3c400.c,v 1.6 2003/05/18 00:05:12 fredette Exp $");
 #define TME_3C400_CSR_GET(_3c400)	\
   tme_betoh_u16(*((tme_uint16_t *) &(_3c400)->tme_3c400_card[TME_3C400_REG_CSR]))
 #define TME_3C400_CSR_PUT(_3c400, csr)	\
-  (*((tme_uint16_t *) &(_3c400)->tme_3c400_card[TME_3C400_REG_CSR]) = tme_betoh_u16(csr))
+  (*((tme_uint16_t *) &(_3c400)->tme_3c400_card[TME_3C400_REG_CSR]) = tme_htobe_u16(csr))
 
 /* the callout flags: */
 #define TME_3C400_CALLOUT_CHECK		(0)

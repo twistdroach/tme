@@ -1,6 +1,6 @@
-/* $Id: posix-memory.c,v 1.4 2003/05/16 21:48:09 fredette Exp $ */
+/* $Id: posix-memory.c,v 1.5 2003/07/29 18:20:30 fredette Exp $ */
 
-/* host/posix/memory.c - implementation of memory on a POSIX system: */
+/* host/posix/posix-memory.c - implementation of memory on a POSIX system: */
 
 /*
  * Copyright (c) 2003 Matt Fredette
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: posix-memory.c,v 1.4 2003/05/16 21:48:09 fredette Exp $");
+_TME_RCSID("$Id: posix-memory.c,v 1.5 2003/07/29 18:20:30 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -176,9 +176,9 @@ TME_ELEMENT_SUB_NEW_DECL(tme_host_posix,memory) {
     arg_i += 2;
   }
 
-  /* we are nonvolatile storage if our arguments are:
+  /* we are persistent storage if our arguments are:
 
-     nonvolatile FILE
+     persistent FILE
 
   */
   else if (TME_ARG_IS(args[arg_i + 0], "persistent")

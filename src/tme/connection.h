@@ -1,4 +1,4 @@
-/* $Id: connection.h,v 1.4 2003/05/16 21:48:14 fredette Exp $ */
+/* $Id: connection.h,v 1.8 2003/08/05 03:39:07 fredette Exp $ */
 
 /* tme/connection.h - public header file for connections: */
 
@@ -37,7 +37,7 @@
 #define _TME_CONNECTION_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: connection.h,v 1.4 2003/05/16 21:48:14 fredette Exp $");
+_TME_RCSID("$Id: connection.h,v 1.8 2003/08/05 03:39:07 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -81,5 +81,11 @@ struct tme_connection {
 #define TME_CONNECTION_BUS_M68K		(1)
 #define TME_CONNECTION_SERIAL		(2)
 #define TME_CONNECTION_ETHERNET		(3)
+#define TME_CONNECTION_KEYBOARD		(4)
+#define TME_CONNECTION_FRAMEBUFFER	(5)
+#define TME_CONNECTION_SCSI		(6)
+#define TME_CONNECTION_DISK		(7)
+#define TME_CONNECTION_MOUSE		(8)
+#define TME_CONNECTION_TAPE		(9)
 
 #endif /* !_TME_CONNECTION_H */

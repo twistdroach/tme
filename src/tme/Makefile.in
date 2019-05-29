@@ -69,6 +69,9 @@ EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 F77 = @F77@
 FFLAGS = @FFLAGS@
+GTK_CFLAGS = @GTK_CFLAGS@
+GTK_CONFIG = @GTK_CONFIG@
+GTK_LIBS = @GTK_LIBS@
 INCLTDL = @INCLTDL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -96,12 +99,20 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 STRIP = @STRIP@
 TME_BUS_SUBDIRS = @TME_BUS_SUBDIRS@
+TME_FB_XLAT_DST = @TME_FB_XLAT_DST@
+TME_FB_XLAT_SRC = @TME_FB_XLAT_SRC@
 TME_HOSTS = @TME_HOSTS@
 TME_ICS = @TME_ICS@
 TME_IC_SUBDIRS = @TME_IC_SUBDIRS@
 TME_MACHINE_SUBDIRS = @TME_MACHINE_SUBDIRS@
 TME_PREOPEN = @TME_PREOPEN@
+TME_SERIALS = @TME_SERIALS@
+TME_SERIAL_SUBDIRS = @TME_SERIAL_SUBDIRS@
 VERSION = @VERSION@
+X_CFLAGS = @X_CFLAGS@
+X_EXTRA_LIBS = @X_EXTRA_LIBS@
+X_LIBS = @X_LIBS@
+X_PRE_LIBS = @X_PRE_LIBS@
 YACC = @YACC@
 ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
@@ -150,7 +161,7 @@ target_vendor = @target_vendor@
 
 AUTOMAKE_OPTIONS = 1.4 gnu
 
-SUBDIRS = generic ic machine
+SUBDIRS = generic ic machine scsi
 
 pkginclude_HEADERS = atomics.h \
 	common.h \
@@ -160,6 +171,8 @@ pkginclude_HEADERS = atomics.h \
 	module.h \
 	log.h \
 	tme.h \
+	misc.h \
+	hash.h \
 	tmesh.h
 
 subdir = tme

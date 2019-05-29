@@ -1,4 +1,4 @@
-/* $Id: module.c,v 1.2 2003/05/17 20:16:04 fredette Exp $ */
+/* $Id: module.c,v 1.5 2003/08/23 13:48:30 fredette Exp $ */
 
 /* libtme/module.c - module management: */
 
@@ -34,18 +34,33 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: module.c,v 1.2 2003/05/17 20:16:04 fredette Exp $");
+_TME_RCSID("$Id: module.c,v 1.5 2003/08/23 13:48:30 fredette Exp $");
 
 /* includes: */
 #include <tme/threads.h>
 #include <tme/module.h>
 #include <tme/log.h>
+#include <tme/misc.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
 #include <ltdl.h>
 #include <shlibvar.h>
+
+/* the libtool 1.5 used in tme development is supposed to add code to
+   configure that decides whether to use an already-installed libltdl
+   instead of the libltdl that comes with tme.  unfortunately, on some
+   systems it appears to decide to use an installed libltdl without
+   checking that the installed ltdl.h is recent enough to define
+   lt_ptr.  we try to compensate for this here: */
+#ifndef lt_ptr
+#ifdef lt_ptr_t
+#define lt_ptr lt_ptr_t
+#else  /* !lt_ptr_t */
+#error "installed libtool is too old"
+#endif /* !lt_ptr_t */
+#endif /* !lt_ptr */
 
 /* types: */
 struct tme_module {
@@ -194,11 +209,11 @@ int
 tme_module_open(const char *module_fake_pathname, void **_module, char **_output)
 {
   char *module_raw_name;
-  char *p1, *p2, c, *first_slash;
+  char *p1, c, *first_slash;
   FILE *modules_index;
   char *modules_dir;
   char line_buffer[1024];
-  char *tokens[5];
+  char **tokens;
   unsigned int tokens_count;
   char *module_basename;
   char *module_pathname;
@@ -243,6 +258,7 @@ tme_module_open(const char *module_fake_pathname, void **_module, char **_output
   }
 
   /* find the requested module in the index: */
+  tokens = NULL;
   for (;;) {
 
     /* get the next line from the index: */
@@ -255,48 +271,8 @@ tme_module_open(const char *module_fake_pathname, void **_module, char **_output
       *p1 = '\0';
     }
 
-    /* tokenize this line by whitespace and watch for comments: */
-    p1 = NULL;
-    for (p2 = line_buffer;; p2++) {
-      c = *p2;
-
-      /* if this is a token delimiter: */
-      if (c == '\0'
-	  || isspace(c)
-	  || c == '#') {
-
-	/* if we had been collecting a token, it's finished: */
-	if (p1 != NULL) {
-
-	  
-	  /* skip this line if it has too many tokens.  XXX we should
-	     report an error: */
-	  if (tokens_count == TME_ARRAY_ELS(tokens)) {
-	    tokens_count = 0;
-	    break;
-	  }
-
-	  /* save this token: */
-	  *p2 = '\0';
-	  tokens[tokens_count++] = p1;
-	  p1 = NULL;
-	}
-
-	/* stop if this is the end of the line or the beginning of a
-           comment: */
-	if (c == '\0'
-	    || c == '#') {
-	  break;
-	}
-      }
-
-      /* otherwise this is part of a token: */
-      else {
-	if (p1 == NULL) {
-	  p1 = p2;
-	}
-      }
-    }
+    /* tokenize this line: */
+    tokens = tme_misc_tokenize(line_buffer, '#', &tokens_count);
 
     /* there must be either one or three tokens, and the first
        token must match the raw module name: */
@@ -305,6 +281,9 @@ tme_module_open(const char *module_fake_pathname, void **_module, char **_output
 	&& !strcmp(tokens[0], module_raw_name)) {
       break;
     }
+
+    /* free the bad tokens: */
+    tme_free_string_array(tokens, -1);
   }
 
   /* close the index: */
@@ -317,6 +296,7 @@ tme_module_open(const char *module_fake_pathname, void **_module, char **_output
   if (tokens_count == 0) {
     tme_output_append_error(_output, module_fake_pathname);
     tme_free(modules_dir);
+    tme_free_string_array(tokens, -1);
     return (ENOENT);
   }
 
@@ -338,9 +318,10 @@ tme_module_open(const char *module_fake_pathname, void **_module, char **_output
   tme_mutex_lock(&_tme_module_mutex);
   handle = lt_dlopenext(module_pathname);
   tme_mutex_unlock(&_tme_module_mutex);
+  tme_free(module_pathname);
   if (handle == NULL) {
     tme_output_append_error(_output, module_fake_pathname);
-    tme_free(module_pathname);
+    tme_free_string_array(tokens, -1);
     return (ENOENT);
   }
 
@@ -351,6 +332,7 @@ tme_module_open(const char *module_fake_pathname, void **_module, char **_output
 				  ? tme_strdup(tokens[2])
 				  : NULL);
   *_module = module;
+  tme_free_string_array(tokens, -1);
   return (TME_OK);
 }
 

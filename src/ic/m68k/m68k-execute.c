@@ -1,8 +1,39 @@
-/* m68k-execute.c - executes m68k instructions: */
+/* $Id: m68k-execute.c,v 1.14 2003/10/25 17:08:00 fredette Exp $ */
 
-/* $Id: m68k-execute.c,v 1.12 2003/05/09 17:44:27 fredette Exp $ */
+/* ic/m68k/m68k-execute.c - executes Motorola 68k instructions: */
 
-_TME_RCSID("$Id: m68k-execute.c,v 1.12 2003/05/09 17:44:27 fredette Exp $");
+/*
+ * Copyright (c) 2002, 2003 Matt Fredette
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *      This product includes software developed by Matt Fredette.
+ * 4. The name of the author may not be used to endorse or promote products
+ *    derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
+
+_TME_RCSID("$Id: m68k-execute.c,v 1.14 2003/10/25 17:08:00 fredette Exp $");
 
 /* includes: */
 #include "m68k-auto.h"
@@ -17,7 +48,6 @@ _TME_M68K_EXECUTE_NAME(struct tme_m68k *ic)
   struct tme_m68k_tlb *tlb;
   tme_uint8_t *emulator_load, *emulator_load_last;
   tme_uint8_t *emulator_load_start;
-  unsigned int instruction_burst;
 #define _TME_M68K_INSN_FETCH_SAVE \
 do { \
   ic->_tme_m68k_insn_buffer_fetch_total = emulator_load - emulator_load_start; \
@@ -77,6 +107,19 @@ do { \
     function_code_data = TME_M68K_FC_UD;
   }
 
+  /* if we have used up our burst: */
+  if (ic->_tme_m68k_instruction_burst_remaining == 0) {
+
+    /* start a new burst: */
+    ic->_tme_m68k_instruction_burst_remaining
+      = ic->_tme_m68k_instruction_burst;
+
+    /* if this is a cooperative threading system, yield: */
+#ifdef TME_THREADS_COOPERATIVE
+    tme_thread_yield();
+#endif /* TME_THREADS_COOPERATIVE */
+  }
+
 #ifdef _TME_M68K_EXECUTE_FAST
 
   /* get our instruction TLB entry and reload it: */
@@ -97,7 +140,6 @@ do { \
   /* set up to do fast reads from the instruction TLB entry: */
   emulator_load_last = tlb->tme_m68k_tlb_emulator_off_read + TME_ATOMIC_READ(tme_bus_addr_t, tlb->tme_m68k_tlb_linear_last);
   ic->_tme_m68k_group0_hook = tme_m68k_group0_hook_fast;
-  instruction_burst = ic->_tme_m68k_instruction_burst;
 #else  /* !_TME_M68K_EXECUTE_FAST */
 
   /* set up to do slow reads from the instruction TLB entry: */
@@ -132,6 +174,7 @@ do { \
 #endif
     insn_fetch_sizes = 0;
     first_ea_extword_offset = sizeof(opw);
+    ic->_tme_m68k_instruction_burst_remaining--;
     
     /* fetch and decode the first word of this instruction: */
     _TME_M68K_EXECUTE_FETCH_U16(opw);
@@ -636,10 +679,9 @@ do { \
 
 #ifdef _TME_M68K_EXECUTE_FAST
     /* if we haven't finished the instruction burst yet, continue: */
-    if (__tme_predict_true(--instruction_burst)) {
+    if (__tme_predict_true(ic->_tme_m68k_instruction_burst_remaining != 0)) {
       continue;
     }
-    instruction_burst = ic->_tme_m68k_instruction_burst;
 #endif /* _TME_M68K_EXECUTE_FAST */
 
     /* try to acquire the external mutex and check for external
@@ -671,14 +713,21 @@ do { \
       tme_m68k_redispatch(ic);
     }
 
-#else  /* _TME_M68K_EXECUTE_FAST */
+    /* otherwise, unless we've used up our burst, continue: */
+    if (ic->_tme_m68k_instruction_burst_remaining != 0) {
+      continue;
+    }
+
+#endif /* !_TME_M68K_EXECUTE_FAST */
+
+    /* start a new burst: */
+    ic->_tme_m68k_instruction_burst_remaining
+      = ic->_tme_m68k_instruction_burst;
 
     /* if this is a cooperative threading system, yield: */
 #ifdef TME_THREADS_COOPERATIVE
     tme_thread_yield();
 #endif /* TME_THREADS_COOPERATIVE */
-
-#endif /* _TME_M68K_EXECUTE_FAST */
 
   }
   /* NOTREACHED */

@@ -69,6 +69,9 @@ EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 F77 = @F77@
 FFLAGS = @FFLAGS@
+GTK_CFLAGS = @GTK_CFLAGS@
+GTK_CONFIG = @GTK_CONFIG@
+GTK_LIBS = @GTK_LIBS@
 INCLTDL = @INCLTDL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -96,12 +99,20 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 STRIP = @STRIP@
 TME_BUS_SUBDIRS = @TME_BUS_SUBDIRS@
+TME_FB_XLAT_DST = @TME_FB_XLAT_DST@
+TME_FB_XLAT_SRC = @TME_FB_XLAT_SRC@
 TME_HOSTS = @TME_HOSTS@
 TME_ICS = @TME_ICS@
 TME_IC_SUBDIRS = @TME_IC_SUBDIRS@
 TME_MACHINE_SUBDIRS = @TME_MACHINE_SUBDIRS@
 TME_PREOPEN = @TME_PREOPEN@
+TME_SERIALS = @TME_SERIALS@
+TME_SERIAL_SUBDIRS = @TME_SERIAL_SUBDIRS@
 VERSION = @VERSION@
+X_CFLAGS = @X_CFLAGS@
+X_EXTRA_LIBS = @X_EXTRA_LIBS@
+X_LIBS = @X_LIBS@
+X_PRE_LIBS = @X_PRE_LIBS@
 YACC = @YACC@
 ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
@@ -161,7 +172,10 @@ libtme_machine_sun_la_LIBADD = $(top_builddir)/libtme/libtme.la \
 
 bin_SCRIPTS = tme-sun-idprom
 
-EXTRA_DIST = tme-sun-idprom.pl
+examplesdir = $(datadir)/examples/tme
+examples_DATA = sun-keyboards.txt my-sun-macros.txt
+
+EXTRA_DIST = tme-sun-idprom.pl $(examples_DATA)
 subdir = machine/sun
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = $(top_builddir)/config.h
@@ -187,6 +201,8 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
 DIST_SOURCES = $(libtme_machine_sun_la_SOURCES)
+DATA = $(examples_DATA)
+
 DIST_COMMON = Makefile.am Makefile.in
 SOURCES = $(libtme_machine_sun_la_SOURCES)
 
@@ -303,6 +319,24 @@ clean-libtool:
 distclean-libtool:
 	-rm -f libtool
 uninstall-info-am:
+examplesDATA_INSTALL = $(INSTALL_DATA)
+install-examplesDATA: $(examples_DATA)
+	@$(NORMAL_INSTALL)
+	$(mkinstalldirs) $(DESTDIR)$(examplesdir)
+	@list='$(examples_DATA)'; for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  f="`echo $$p | sed -e 's|^.*/||'`"; \
+	  echo " $(examplesDATA_INSTALL) $$d$$p $(DESTDIR)$(examplesdir)/$$f"; \
+	  $(examplesDATA_INSTALL) $$d$$p $(DESTDIR)$(examplesdir)/$$f; \
+	done
+
+uninstall-examplesDATA:
+	@$(NORMAL_UNINSTALL)
+	@list='$(examples_DATA)'; for p in $$list; do \
+	  f="`echo $$p | sed -e 's|^.*/||'`"; \
+	  echo " rm -f $(DESTDIR)$(examplesdir)/$$f"; \
+	  rm -f $(DESTDIR)$(examplesdir)/$$f; \
+	done
 
 ETAGS = etags
 ETAGSFLAGS =
@@ -389,10 +423,10 @@ distdir: $(DISTFILES)
 	done
 check-am: all-am
 check: check-am
-all-am: Makefile $(LTLIBRARIES) $(SCRIPTS)
+all-am: Makefile $(LTLIBRARIES) $(SCRIPTS) $(DATA)
 
 installdirs:
-	$(mkinstalldirs) $(DESTDIR)$(pkglibdir) $(DESTDIR)$(bindir)
+	$(mkinstalldirs) $(DESTDIR)$(pkglibdir) $(DESTDIR)$(bindir) $(DESTDIR)$(examplesdir)
 
 install: install-am
 install-exec: install-exec-am
@@ -436,7 +470,7 @@ info: info-am
 
 info-am:
 
-install-data-am:
+install-data-am: install-examplesDATA
 
 install-exec-am: install-binSCRIPTS install-pkglibLTLIBRARIES
 
@@ -463,21 +497,22 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-binSCRIPTS uninstall-info-am \
-	uninstall-pkglibLTLIBRARIES
+uninstall-am: uninstall-binSCRIPTS uninstall-examplesDATA \
+	uninstall-info-am uninstall-pkglibLTLIBRARIES
 
 .PHONY: CTAGS GTAGS all all-am check check-am clean clean-generic \
 	clean-libtool clean-pkglibLTLIBRARIES ctags distclean \
 	distclean-compile distclean-depend distclean-generic \
 	distclean-libtool distclean-tags distdir dvi dvi-am info \
 	info-am install install-am install-binSCRIPTS install-data \
-	install-data-am install-exec install-exec-am install-info \
-	install-info-am install-man install-pkglibLTLIBRARIES \
-	install-strip installcheck installcheck-am installdirs \
-	maintainer-clean maintainer-clean-generic mostlyclean \
-	mostlyclean-compile mostlyclean-generic mostlyclean-libtool pdf \
-	pdf-am ps ps-am tags uninstall uninstall-am \
-	uninstall-binSCRIPTS uninstall-info-am \
+	install-data-am install-examplesDATA install-exec \
+	install-exec-am install-info install-info-am install-man \
+	install-pkglibLTLIBRARIES install-strip installcheck \
+	installcheck-am installdirs maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-compile \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	tags uninstall uninstall-am uninstall-binSCRIPTS \
+	uninstall-examplesDATA uninstall-info-am \
 	uninstall-pkglibLTLIBRARIES
 
 

@@ -100,6 +100,9 @@ EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 F77 = @F77@
 FFLAGS = @FFLAGS@
+GTK_CFLAGS = @GTK_CFLAGS@
+GTK_CONFIG = @GTK_CONFIG@
+GTK_LIBS = @GTK_LIBS@
 INCLTDL = @INCLTDL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -127,12 +130,20 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 STRIP = @STRIP@
 TME_BUS_SUBDIRS = @TME_BUS_SUBDIRS@
+TME_FB_XLAT_DST = @TME_FB_XLAT_DST@
+TME_FB_XLAT_SRC = @TME_FB_XLAT_SRC@
 TME_HOSTS = @TME_HOSTS@
 TME_ICS = @TME_ICS@
 TME_IC_SUBDIRS = @TME_IC_SUBDIRS@
 TME_MACHINE_SUBDIRS = @TME_MACHINE_SUBDIRS@
 TME_PREOPEN = @TME_PREOPEN@
+TME_SERIALS = @TME_SERIALS@
+TME_SERIAL_SUBDIRS = @TME_SERIAL_SUBDIRS@
 VERSION = @VERSION@
+X_CFLAGS = @X_CFLAGS@
+X_EXTRA_LIBS = @X_EXTRA_LIBS@
+X_LIBS = @X_LIBS@
+X_PRE_LIBS = @X_PRE_LIBS@
 YACC = @YACC@
 ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
@@ -184,7 +195,11 @@ AUTOMAKE_OPTIONS = 1.4 gnu
 INCLUDES = -I$(top_srcdir) -I$(srcdir) -I. -D_TME_IMPL
 
 pkglib_LTLIBRARIES = tme_host_posix.la
-tme_host_posix_la_SOURCES = posix-memory.c posix-serial.c
+tme_host_posix_la_SOURCES = posix-memory.c \
+	posix-disk.c \
+	posix-tape.c \
+	posix-serial.c
+
 tme_host_posix_la_LDFLAGS = -module -version-info 0:0:0
 tme_host_posix_la_LIBADD = $(top_builddir)/libtme/libtme.la \
 	$(top_builddir)/generic/libtme-generic.la
@@ -197,14 +212,17 @@ LTLIBRARIES = $(pkglib_LTLIBRARIES)
 
 tme_host_posix_la_DEPENDENCIES = $(top_builddir)/libtme/libtme.la \
 	$(top_builddir)/generic/libtme-generic.la
-am_tme_host_posix_la_OBJECTS = posix-memory.lo posix-serial.lo
+am_tme_host_posix_la_OBJECTS = posix-memory.lo posix-disk.lo \
+	posix-tape.lo posix-serial.lo
 tme_host_posix_la_OBJECTS = $(am_tme_host_posix_la_OBJECTS)
 
 DEFAULT_INCLUDES =  -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
-@AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/posix-memory.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/posix-serial.Plo
+@AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/posix-disk.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/posix-memory.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/posix-serial.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/posix-tape.Plo
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) \
@@ -262,8 +280,10 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/posix-disk.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/posix-memory.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/posix-serial.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/posix-tape.Plo@am__quote@
 
 distclean-depend:
 	-rm -rf ./$(DEPDIR)

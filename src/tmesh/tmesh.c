@@ -1,4 +1,4 @@
-/* $Id: tmesh.c,v 1.1 2003/05/16 21:48:16 fredette Exp $ */
+/* $Id: tmesh.c,v 1.3 2003/10/16 02:48:27 fredette Exp $ */
 
 /* tmesh/tmesh.c - the tme shell: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: tmesh.c,v 1.1 2003/05/16 21:48:16 fredette Exp $");
+_TME_RCSID("$Id: tmesh.c,v 1.3 2003/10/16 02:48:27 fredette Exp $");
 
 /* includes: */
 #include <tme/tme.h>
@@ -343,6 +343,7 @@ main(int argc, char **argv)
   int arg_i;
   const char *pre_threads_filename;
   const char *log_filename;
+  int interactive;
   struct tmesh_io io;
   struct tmesh_support support;
   struct _tmesh_input *input_stdin;
@@ -353,6 +354,7 @@ main(int argc, char **argv)
   usage = FALSE;
   pre_threads_filename = NULL;
   log_filename = "/dev/null";
+  interactive = TRUE;
   if ((argv0 = strrchr(argv[0], '/')) == NULL) argv0 = argv[0]; else argv0++;
   for (arg_i = 1;
        (arg_i < argc
@@ -367,6 +369,10 @@ main(int argc, char **argv)
 	usage = TRUE;
 	break;
       }
+    }
+    else if (!strcmp(opt, "-c")
+	     || !strcmp(opt, "--noninteractive")) {
+      interactive = FALSE;
     }
     else {
       if (strcmp(opt, "-h")
@@ -388,8 +394,9 @@ main(int argc, char **argv)
   if (usage) {
     fprintf(stderr, "\
 usage: %s [OPTIONS] INITIAL-CONFIG\n\
-where OPTIONS are:
+where OPTIONS are:\n\
   --log LOGFILE          log to LOGFILE\n\
+  -c, --noninteractive   read no commands from standard input\n\
 ",
 	    argv0);
     exit(1);
@@ -430,6 +437,7 @@ where OPTIONS are:
   io.tmesh_io_getc = _tmesh_getc;
   io.tmesh_io_close = _tmesh_close;
   io.tmesh_io_open = _tmesh_open;
+  _tmesh_io = &io;
 
   /* the next open we do will be for the pre-threads commands: */
   _tmesh_doing_pre_threads = TRUE;
@@ -456,8 +464,8 @@ where OPTIONS are:
     }
     else {
       fprintf(stderr, "%s:%lu: ",
-	      io.tmesh_io_name,
-	      io.tmesh_io_input_line);
+	      _tmesh_io->tmesh_io_name,
+	      _tmesh_io->tmesh_io_input_line);
       if (output != NULL
 	  && *output != '\0') {
 	fprintf(stderr, "%s: ", output);
@@ -469,15 +477,19 @@ where OPTIONS are:
     }
   }
 
-  /* put up our first prompt: */
-  if (isatty(fileno(stdin))
-      && isatty(fileno(stdout))) {
-    printf("%s> ", argv0);
-    fflush(stdout);
-  }
+  /* if we're interactive: */
+  if (interactive) {
 
-  /* create our thread: */
-  tme_thread_create((tme_thread_t) _tmesh_thread, NULL);
+    /* put up our first prompt: */
+    if (isatty(fileno(stdin))
+	&& isatty(fileno(stdout))) {
+      printf("%s> ", argv0);
+      fflush(stdout);
+    }
+
+    /* create our thread: */
+    tme_thread_create((tme_thread_t) _tmesh_thread, NULL);
+  }
 
   /* run the threads: */
   tme_threads_run();

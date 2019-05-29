@@ -1,4 +1,4 @@
-/* $Id: sun2-mainbus.c,v 1.10 2003/05/17 20:16:06 fredette Exp $ */
+/* $Id: sun2-mainbus.c,v 1.13 2003/07/31 01:43:13 fredette Exp $ */
 
 /* machine/sun2/sun2-mainbus.c - implementation of Sun 2 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun2-mainbus.c,v 1.10 2003/05/17 20:16:06 fredette Exp $");
+_TME_RCSID("$Id: sun2-mainbus.c,v 1.13 2003/07/31 01:43:13 fredette Exp $");
 
 /* includes: */
 #include "sun2-impl.h"
@@ -42,18 +42,6 @@ _TME_RCSID("$Id: sun2-mainbus.c,v 1.10 2003/05/17 20:16:06 fredette Exp $");
 #include <tme/ic/z8530.h>
 #include <tme/ic/mm58167.h>
 #include <stdio.h>
-
-/* macros: */
-
-/* a sun2 mainbus connection: */
-struct tme_sun2_bus_connection {
-
-  /* the generic bus connection: */
-  struct tme_bus_connection tme_sun2_bus_connection;
-
-  /* which bus this is: */
-  unsigned int tme_sun2_bus_connection_which;
-};
 
 /* this possibly updates that the interrupt priority level driven to the CPU: */
 int
@@ -139,7 +127,7 @@ _tme_sun2_bus_signal(struct tme_bus_connection *conn_bus_raiser, unsigned int si
 
   /* reset: */
   else if (signal == TME_BUS_SIGNAL_RESET) {
-    abort();
+    /* XXX reset is just ignored for now: */
   }
 
   /* an interrupt signal: */
@@ -203,6 +191,12 @@ _tme_sun2_bus_intack(struct tme_bus_connection *conn_m68k, unsigned int ipl, int
   /* obio: */
   rc = (*sun2->tme_sun2_obio->tme_bus_intack)
     (sun2->tme_sun2_obio, signal, vector);
+  if (rc != ENOENT) {
+    return (rc);
+  }
+  /* obmem: */
+  rc = (*sun2->tme_sun2_obmem->tme_bus_intack)
+    (sun2->tme_sun2_obmem, signal, vector);
   if (rc != ENOENT) {
     return (rc);
   }
@@ -549,6 +543,14 @@ _tme_sun2_connections_new(struct tme_element *element, const char * const *args,
     conn->tme_connection_break = _tme_sun2_connection_break;
     
     /* fill in the generic bus connection: */
+    if (which_bus == TME_SUN2_BUS_MBMEM) {
+      conn_bus->tme_bus_subregions.tme_bus_subregion_address_last
+	= TME_SUN2_DVMA_SIZE_MBMEM;
+    }
+    else if (which_bus == TME_SUN2_BUS_VME) {
+      conn_bus->tme_bus_subregions.tme_bus_subregion_address_last
+	= TME_SUN2_DVMA_SIZE_VME;
+    }
     conn_bus->tme_bus_signal = _tme_sun2_bus_signal;
     conn_bus->tme_bus_intack = NULL;
     conn_bus->tme_bus_tlb_set_allocate = _tme_sun2_mmu_tlb_set_allocate;

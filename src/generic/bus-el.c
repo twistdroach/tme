@@ -1,6 +1,6 @@
-/* $Id: bus-el.c,v 1.7 2003/05/16 21:48:08 fredette Exp $ */
+/* $Id: bus-el.c,v 1.9 2003/07/29 18:19:12 fredette Exp $ */
 
-/* generic/gen-bus-el.c - a real generic bus element: */
+/* generic/bus-el.c - a real generic bus element: */
 
 /*
  * Copyright (c) 2003 Matt Fredette
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: bus-el.c,v 1.7 2003/05/16 21:48:08 fredette Exp $");
+_TME_RCSID("$Id: bus-el.c,v 1.9 2003/07/29 18:19:12 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus.h>
@@ -398,10 +398,6 @@ _tme_bus_connection_score(struct tme_connection *conn, unsigned int *_score)
   bus = conn->tme_connection_element->tme_element_private;
   conn_int = (struct tme_bus_connection_int *) conn;
 
-  /* get the address mask from the other side: */
-  conn_int->tme_bus_connection_int_address_last = 
-    ((struct tme_bus_connection *) conn->tme_connection_other)->tme_bus_address_last;
-
   /* lock the bus for reading: */
   rc = tme_rwlock_timedrdlock(&bus->tme_bus_rwlock, TME_THREAD_TIMEDLOCK);
   if (TME_THREADS_ERRNO(rc) != TME_OK) {
@@ -538,7 +534,12 @@ _tme_bus_connections_new(struct tme_element *element,
   }
 
   /* fill in the bus connection: */
-  conn_bus->tme_bus_address_last = bus->tme_bus_address_mask;
+  conn_bus->tme_bus_subregions.tme_bus_subregion_address_first
+    = 0;
+  conn_bus->tme_bus_subregions.tme_bus_subregion_address_last
+    = bus->tme_bus_address_mask;
+  conn_bus->tme_bus_subregions.tme_bus_subregion_next
+    = NULL;
   conn_bus->tme_bus_signal = _tme_bus_signal;
   conn_bus->tme_bus_intack = _tme_bus_intack;
   conn_bus->tme_bus_tlb_set_allocate = _tme_bus_tlb_set_allocate;
@@ -587,7 +588,7 @@ TME_ELEMENT_SUB_NEW_DECL(tme_generic,bus) {
   bus->tme_bus_address_mask = bus_size - 1;
   bus->tme_bus_addressables_count = 0;
   bus->tme_bus_addressables_size = 1;
-  bus->tme_bus_addressables = tme_new(struct tme_bus_connection_int *,
+  bus->tme_bus_addressables = tme_new(struct tme_bus_addressable,
 				      bus->tme_bus_addressables_size);
 
   /* fill the element: */

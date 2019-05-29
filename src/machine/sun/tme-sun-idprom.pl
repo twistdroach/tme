@@ -1,6 +1,6 @@
 #! /usr/pkg/bin/perl -w
 
-# $Id: tme-sun-idprom.pl,v 1.1 2003/05/18 00:02:24 fredette Exp $
+# $Id: tme-sun-idprom.pl,v 1.2 2003/07/29 18:21:31 fredette Exp $
 
 # machine/sun/sun-idprom.pl - dumps and makes Sun IDPROM contents:
 
@@ -64,6 +64,7 @@
       '4/390',			'Stingray',
       '4/470',			'Sunray',
       '4/490',			'Sunray',
+      '386i/MB1',		'Roadrunner-MB1',
       '386i/150',		'Roadrunner',
       '386i/250',		'Roadrunner',
       '3/460',			'Pegasus',
@@ -131,6 +132,7 @@
       'Stingray',	0x23,
       'Sunray',		0x24,
       'Roadrunner',	0x31,
+      'Roadrunner-MB1',	0x3a,
       'Pegasus',	0x41,
       'Hydra',		0x42,
       'Campus',		0x51,

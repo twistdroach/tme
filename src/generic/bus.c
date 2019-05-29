@@ -1,4 +1,4 @@
-/* $Id: bus.c,v 1.3 2003/05/16 21:48:08 fredette Exp $ */
+/* $Id: bus.c,v 1.5 2003/10/16 02:48:18 fredette Exp $ */
 
 /* generic/gen-bus.c - generic bus support: */
 
@@ -34,17 +34,12 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: bus.c,v 1.3 2003/05/16 21:48:08 fredette Exp $");
+_TME_RCSID("$Id: bus.c,v 1.5 2003/10/16 02:48:18 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus.h>
 #include <stdlib.h>
 #include <string.h>
-
-/* macros: */
-#define TME_BUS_LINE_RESET	(0)
-#define TME_BUS_LINE_HALT	(1)
-#define TME_BUS_LINE_INT	(2)
 
 /* this does a binary search of the addressable connections: */
 int
@@ -52,6 +47,7 @@ tme_bus_address_search(struct tme_bus *bus, tme_bus_addr_t address)
 {
   int left, right, pivot;
   struct tme_bus_connection_int *conn_int;
+  const struct tme_bus_subregion *subregion;
 
   /* initialize for the search: */
   left = 0;
@@ -63,10 +59,13 @@ tme_bus_address_search(struct tme_bus *bus, tme_bus_addr_t address)
 
     /* get the pivot: */
     pivot = (left + right) / 2;
-    conn_int = bus->tme_bus_addressables[pivot];
+    conn_int = bus->tme_bus_addressables[pivot].tme_bus_addressable_connection;
+    subregion = bus->tme_bus_addressables[pivot].tme_bus_addressable_subregion;
 
     /* if we have to move left: */
-    if (address < conn_int->tme_bus_connection_int_address) {
+    if (address
+	< (conn_int->tme_bus_connection_int_address
+	   + subregion->tme_bus_subregion_address_first)) {
       /* if we're done searching, pivot is already the index of the
 	 first element we need to shift to the right in order to
 	 insert a new element: */
@@ -74,8 +73,9 @@ tme_bus_address_search(struct tme_bus *bus, tme_bus_addr_t address)
     }
 
     /* if we have to move right: */
-    else if (address > (conn_int->tme_bus_connection_int_address
-			+ conn_int->tme_bus_connection_int_address_last)) {
+    else if (address
+	     > (conn_int->tme_bus_connection_int_address
+		+ subregion->tme_bus_subregion_address_last)) {
       /* if we're done searching, pivot + 1 is the index of the
 	 first element we need to shift to the right in order to
 	 insert a new element: */
@@ -102,6 +102,7 @@ tme_bus_tlb_fill(struct tme_bus *bus,
 {
   int pivot;
   struct tme_bus_connection_int *conn_int;
+  const struct tme_bus_subregion *subregion;
   struct tme_bus_connection *conn_bus_other;
   tme_bus_addr_t sourced_address_mask, conn_address;
   tme_bus_addr_t hole_first, hole_last;
@@ -131,13 +132,17 @@ tme_bus_tlb_fill(struct tme_bus *bus,
     pivot = -1 - pivot;
     hole_first = (pivot == 0
 		  ? 0
-		  : (bus->tme_bus_addressables[pivot - 1]->tme_bus_connection_int_address
-		     + bus->tme_bus_addressables[pivot - 1]->tme_bus_connection_int_address_last
+		  : ((bus->tme_bus_addressables[pivot - 1]
+		      .tme_bus_addressable_connection->tme_bus_connection_int_address)
+		     + (bus->tme_bus_addressables[pivot - 1]
+			.tme_bus_addressable_subregion->tme_bus_subregion_address_last)
 		     + 1));
     hole_first = TME_MAX(hole_first, sourced_address_mask);
     hole_last = (pivot == bus->tme_bus_addressables_count
 		 ? bus->tme_bus_address_mask
-		 : bus->tme_bus_addressables[pivot]->tme_bus_connection_int_address - 1);
+		 : ((bus->tme_bus_addressables[pivot]
+		     .tme_bus_addressable_connection->tme_bus_connection_int_address)
+		    - 1));
     hole_last = TME_MIN(hole_last,
 			sourced_address_mask
 			+ conn_int_asker->tme_bus_connection_int_address_last);
@@ -155,7 +160,8 @@ tme_bus_tlb_fill(struct tme_bus *bus,
 
   /* otherwise, this address does exist: */
   else {
-    conn_int = bus->tme_bus_addressables[pivot];
+    conn_int = bus->tme_bus_addressables[pivot].tme_bus_addressable_connection;
+    subregion = bus->tme_bus_addressables[pivot].tme_bus_addressable_subregion;
     conn_bus_other = 
       (struct tme_bus_connection *) conn_int->tme_bus_connection_int.tme_bus_connection.tme_connection_other;
 
@@ -170,10 +176,11 @@ tme_bus_tlb_fill(struct tme_bus *bus,
       /* create the mapping TLB entry: */
       TME_ATOMIC_WRITE(tme_bus_addr_t, tlb_bus.tme_bus_tlb_addr_first, 
 		       (conn_int->tme_bus_connection_int_address
+			+ subregion->tme_bus_subregion_address_first
 			- sourced_address_mask));
       TME_ATOMIC_WRITE(tme_bus_addr_t, tlb_bus.tme_bus_tlb_addr_last, 
 		       (conn_int->tme_bus_connection_int_address
-			+ conn_int->tme_bus_connection_int_address_last
+			+ subregion->tme_bus_subregion_address_last
 			- sourced_address_mask));
       tlb_bus.tme_bus_tlb_cycles_ok = TME_BUS_CYCLE_READ | TME_BUS_CYCLE_WRITE;
   
@@ -209,7 +216,9 @@ tme_bus_tlb_set_allocate(struct tme_bus *bus,
        conn_int_i < bus->tme_bus_addressables_count;
        conn_int_i++) {
     conn_bus_other = 
-      (struct tme_bus_connection *) bus->tme_bus_addressables[conn_int_i]->tme_bus_connection_int.tme_bus_connection.tme_connection_other;
+      ((struct tme_bus_connection *)
+       bus->tme_bus_addressables[conn_int_i].tme_bus_addressable_connection
+       ->tme_bus_connection_int.tme_bus_connection.tme_connection_other);
 
     /* if this bus connection offers a TLB set allocator, it is
        a DMA-controller-like connection to the bus: */
@@ -255,6 +264,8 @@ int
 tme_bus_connection_ok(struct tme_bus *bus,
 		      struct tme_bus_connection_int *conn_int)
 {
+  const struct tme_bus_subregion *subregion;
+  const struct tme_bus_connection *conn_bus_other;
   int pivot_start, pivot_end;
 
   /* if this connection isn't addressable, it's always OK: */
@@ -262,31 +273,52 @@ tme_bus_connection_ok(struct tme_bus *bus,
     return (TRUE);
   }
 
-  /* the connection must fit on the bus: */
-  if (conn_int->tme_bus_connection_int_address_last >
-      (bus->tme_bus_address_mask
-       - conn_int->tme_bus_connection_int_address)) {
-    return (FALSE);
-  }
+  /* all subregions of this connection must fit on the bus,
+     and they must not overlap with any other subregion on 
+     any other existing connection: */
+  /* XXX we should also check that the connection's subregions don't
+     overlap with each other: */
+  conn_bus_other
+    = ((struct tme_bus_connection *)
+       conn_int->tme_bus_connection_int.tme_bus_connection.tme_connection_other);
+  for (subregion = &conn_bus_other->tme_bus_subregions;
+       subregion != NULL;
+       subregion = subregion->tme_bus_subregion_next) {
 
-  /* search for anything covering the start or end of the new
-     addressable: */
-  pivot_start = 
-    tme_bus_address_search(bus, 
-			   conn_int->tme_bus_connection_int_address);
-  pivot_end =
-    tme_bus_address_search(bus,
-			   (conn_int->tme_bus_connection_int_address
-			    + conn_int->tme_bus_connection_int_address_last));
+    /* the subregion's last address cannot be less than
+       the first address: */
+    if (subregion->tme_bus_subregion_address_last
+	< subregion->tme_bus_subregion_address_first) {
+      return (FALSE);
+    }
+    
+    /* this subregion must fit on the bus: */
+    if (subregion->tme_bus_subregion_address_last >
+	(bus->tme_bus_address_mask
+	 - conn_int->tme_bus_connection_int_address)) {
+      return (FALSE);
+    }
 
-  /* both searches must have failed, and they must have stopped at the
-     same point in the sorted addressables, further indicating that no
-     addressable exists anywhere *between* the start and end of the
-     new addressable, either.  otherwise, this connection fails: */
-  if (pivot_start >= 0
-      || pivot_end >= 0
-      || pivot_start != pivot_end) {
-    return (FALSE);
+    /* search for anything covering the start or end of the new
+       addressable subregion: */
+    pivot_start = 
+      tme_bus_address_search(bus, 
+			     (conn_int->tme_bus_connection_int_address
+			      + subregion->tme_bus_subregion_address_first));
+    pivot_end =
+      tme_bus_address_search(bus,
+			     (conn_int->tme_bus_connection_int_address
+			      + subregion->tme_bus_subregion_address_last));
+
+    /* both searches must have failed, and they must have stopped at the
+       same point in the sorted addressables, further indicating that no
+       addressable exists anywhere *between* the start and end of the
+       new addressable, either.  otherwise, this connection fails: */
+    if (pivot_start >= 0
+	|| pivot_end >= 0
+	|| pivot_start != pivot_end) {
+      return (FALSE);
+    }
   }
 
   /* this connection's address space is available: */
@@ -299,6 +331,8 @@ tme_bus_connection_make(struct tme_bus *bus,
 			struct tme_bus_connection_int *conn_int,
 			unsigned int state)
 {
+  const struct tme_bus_connection *conn_bus_other;
+  const struct tme_bus_subregion *subregion;
   int pivot;
 
   /* if this connection is not full, return now: */
@@ -316,30 +350,52 @@ tme_bus_connection_make(struct tme_bus *bus,
   if (conn_int->tme_bus_connection_int_addressable
       && state == TME_CONNECTION_FULL) {
     
-    /* search for the place to insert this new addressable: */
-    pivot = tme_bus_address_search(bus, conn_int->tme_bus_connection_int_address);
-    assert(pivot < 0);
-    pivot = -1 - pivot;
+    /* add all subregions of this connection as addressables: */
+    conn_int->tme_bus_connection_int_address_last = 0;
+    conn_bus_other
+      = ((struct tme_bus_connection *)
+	 conn_int->tme_bus_connection_int.tme_bus_connection.tme_connection_other);
+    for (subregion = &conn_bus_other->tme_bus_subregions;
+	 subregion != NULL;
+	 subregion = subregion->tme_bus_subregion_next) {
+
+      /* search for the place to insert this new addressable: */
+      pivot = tme_bus_address_search(bus, 
+				     (conn_int->tme_bus_connection_int_address
+				      + subregion->tme_bus_subregion_address_first));
+      assert(pivot < 0);
+      pivot = -1 - pivot;
     
-    /* if we have to, grow the addressable array: */
-    if (bus->tme_bus_addressables_count
-	== bus->tme_bus_addressables_size) {
-      bus->tme_bus_addressables_size +=	(bus->tme_bus_addressables_size >> 1) + 1;
-      bus->tme_bus_addressables = tme_renew(struct tme_bus_connection_int *,
-					    bus->tme_bus_addressables,
-					    bus->tme_bus_addressables_size);
+      /* if we have to, grow the addressable array: */
+      if (bus->tme_bus_addressables_count
+	  == bus->tme_bus_addressables_size) {
+	bus->tme_bus_addressables_size += (bus->tme_bus_addressables_size >> 1) + 1;
+	bus->tme_bus_addressables = tme_renew(struct tme_bus_addressable,
+					      bus->tme_bus_addressables,
+					      bus->tme_bus_addressables_size);
+      }
+
+      /* move all of the later addressables down: */
+      memmove(&bus->tme_bus_addressables[pivot + 1],
+	      &bus->tme_bus_addressables[pivot],
+	      sizeof(bus->tme_bus_addressables[pivot])
+	      * (bus->tme_bus_addressables_count
+		 - pivot));
+
+      /* insert this new addressable: */
+      bus->tme_bus_addressables[pivot].tme_bus_addressable_connection = conn_int;
+      bus->tme_bus_addressables[pivot].tme_bus_addressable_subregion = subregion;
+      bus->tme_bus_addressables_count++;
+
+      /* update the last address on this connection.  NB that the
+	 subregion information should be used almost always.
+	 currently this value is only used as the width of the
+	 connection for the purposes of determining TLB entry limits
+	 when the connection itself asks to fill a TLB entry: */
+      conn_int->tme_bus_connection_int_address_last
+	= TME_MAX(conn_int->tme_bus_connection_int_address_last,
+		  subregion->tme_bus_subregion_address_last);
     }
-
-    /* move all of the later addressables down: */
-    memmove(&bus->tme_bus_addressables[pivot + 1],
-	    &bus->tme_bus_addressables[pivot],
-	    sizeof(bus->tme_bus_addressables[pivot])
-	    * (bus->tme_bus_addressables_count
-	       - pivot));
-
-    /* insert this new addressable: */
-    bus->tme_bus_addressables[pivot] = conn_int;
-    bus->tme_bus_addressables_count++;
   }
 
   return (TME_OK);
@@ -747,7 +803,7 @@ tme_bus_cycle_xfer_memory(struct tme_bus_cycle *cycle_init, tme_uint8_t *memory,
   }
   else {
     assert(sizeof(memory_junk)
-	   >= (1 << TME_BUS_CYCLE_PORT_SIZE_LG2(cycle_init->tme_bus_cycle_port)));
+	   >= ((unsigned int) 1 << TME_BUS_CYCLE_PORT_SIZE_LG2(cycle_init->tme_bus_cycle_port)));
     memory = memory_junk;
   }
 

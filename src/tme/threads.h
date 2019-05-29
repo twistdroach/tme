@@ -1,4 +1,4 @@
-/* $Id: threads.h,v 1.5 2003/05/10 13:46:02 fredette Exp $ */
+/* $Id: threads.h,v 1.6 2003/06/27 21:09:10 fredette Exp $ */
 
 /* tme/threads.h - header file for threads: */
 
@@ -37,7 +37,7 @@
 #define _TME_THREADS_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: threads.h,v 1.5 2003/05/10 13:46:02 fredette Exp $");
+_TME_RCSID("$Id: threads.h,v 1.6 2003/06/27 21:09:10 fredette Exp $");
 
 /* includes: */
 #include <errno.h>
@@ -58,6 +58,10 @@ _TME_RCSID("$Id: threads.h,v 1.5 2003/05/10 13:46:02 fredette Exp $");
 /* initializing and starting: */
 void tme_sjlj_threads_init _TME_P((void));
 #define tme_threads_init tme_sjlj_threads_init
+#ifdef _TME_HAVE_GTK
+void tme_sjlj_threads_gtk_init _TME_P((void));
+#define tme_threads_gtk_init tme_sjlj_threads_gtk_init
+#endif /* _TME_HAVE_GTK */
 void tme_sjlj_threads_run _TME_P((void));
 #define tme_threads_run tme_sjlj_threads_run
 

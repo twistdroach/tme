@@ -1,6 +1,6 @@
-/* $Id: bus.h,v 1.4 2003/05/16 21:48:15 fredette Exp $ */
+/* $Id: bus.h,v 1.5 2003/06/27 21:06:28 fredette Exp $ */
 
-/* tme/generic/gen-bus.h - header file for generic bus support: */
+/* tme/generic/bus.h - header file for generic bus support: */
 
 /*
  * Copyright (c) 2002, 2003 Matt Fredette
@@ -37,7 +37,7 @@
 #define _TME_GENERIC_BUS_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: bus.h,v 1.4 2003/05/16 21:48:15 fredette Exp $");
+_TME_RCSID("$Id: bus.h,v 1.5 2003/06/27 21:06:28 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -268,8 +268,19 @@ struct tme_bus_connection {
   /* the generic connection side: */
   struct tme_connection tme_bus_connection;
 
-  /* the last address, starting from zero, of this bus connection: */
-  tme_bus_addr_t tme_bus_address_last;
+  /* the subregions on the bus for this connection.  most connections
+     will only have one subregion, with a first address of zero and a
+     last address of their size on the bus: */
+  struct tme_bus_subregion {
+
+    /* the first and last addresses, starting from zero, of this
+       subregion: */
+    tme_bus_addr_t tme_bus_subregion_address_first;
+    tme_bus_addr_t tme_bus_subregion_address_last;
+
+    /* any other subregions for this bus connection: */
+    _tme_const struct tme_bus_subregion *tme_bus_subregion_next;
+  } tme_bus_subregions;
 
   /* the bus signal handler: */
   int (*tme_bus_signal) _TME_P((struct tme_bus_connection *, unsigned int));
@@ -290,13 +301,15 @@ struct tme_bus_connection_int {
 
   /* the external bus connection: */
   struct tme_bus_connection tme_bus_connection_int;
-#define tme_bus_connection_int_address_last tme_bus_connection_int.tme_bus_address_last
 
   /* this is nonzero iff the bus connection is addressable: */
   int tme_bus_connection_int_addressable;
 
-  /* the address of this connection: */
+  /* the first and last addresses of this connection.  most code
+     should never use the last-address value, and instead should honor
+     the connection's subregions: */
   tme_bus_addr_t tme_bus_connection_int_address;
+  tme_bus_addr_t tme_bus_connection_int_address_last;
 
   /* the mask added to addresses sourced by this connection: */
   tme_bus_addr_t tme_bus_connection_int_sourced;
@@ -332,7 +345,10 @@ struct tme_bus {
   int tme_bus_addressables_size;
 
   /* the addressable connections array: */
-  struct tme_bus_connection_int **tme_bus_addressables;
+  struct tme_bus_addressable {
+    struct tme_bus_connection_int *tme_bus_addressable_connection;
+    _tme_const struct tme_bus_subregion *tme_bus_addressable_subregion;
+  } *tme_bus_addressables;
 
   /* the number of devices asserting the various bus signals: */
   unsigned int tme_bus_signal_asserts[_TME_BUS_SIGNAL_COUNT];

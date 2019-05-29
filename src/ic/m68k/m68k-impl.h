@@ -1,4 +1,4 @@
-/* $Id: m68k-impl.h,v 1.10 2003/05/16 21:48:10 fredette Exp $ */
+/* $Id: m68k-impl.h,v 1.13 2003/10/16 02:48:24 fredette Exp $ */
 
 /* ic/m68k/m68k-impl.h - implementation header file for Motorola 68k emulation: */
 
@@ -37,7 +37,7 @@
 #define _IC_M68K_IMPL_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: m68k-impl.h,v 1.10 2003/05/16 21:48:10 fredette Exp $");
+_TME_RCSID("$Id: m68k-impl.h,v 1.13 2003/10/16 02:48:24 fredette Exp $");
 
 /* includes: */
 #include <tme/ic/m68k.h>
@@ -327,10 +327,10 @@ struct _tme_m68k_decoder_root {
 struct _tme_m68k_sequence {
   
   /* the mode of the emulator: */
-  int _tme_m68k_sequence_mode;
+  unsigned int _tme_m68k_sequence_mode;
 
   /* any mode-specific flags for the sequence: */
-  int _tme_m68k_sequence_mode_flags;
+  unsigned int _tme_m68k_sequence_mode_flags;
   
   /* the ordinal of the next memory transfer.  always starts from one: */
   unsigned short _tme_m68k_sequence_transfer_next;
@@ -385,9 +385,12 @@ struct tme_m68k {
   void (*_tme_m68k_mode_exception) _TME_P((struct tme_m68k *));
   void (*_tme_m68k_mode_rte) _TME_P((struct tme_m68k *));
 
-  /* the instruction decoder root map, and the instruction burst count: */
+  /* the instruction decoder root map: */
   const struct _tme_m68k_decoder_root *_tme_m68k_decoder_root;
+
+  /* the instruction burst count, and the remaining burst: */
   unsigned int _tme_m68k_instruction_burst;
+  unsigned int _tme_m68k_instruction_burst_remaining;
 
   /* the effective address: */
   tme_uint32_t _tme_m68k_ea_address;
@@ -494,6 +497,7 @@ void tme_m68k_bitfield_write_unsigned _TME_P((struct tme_m68k *, tme_uint32_t, i
 #define tme_m68k_bitfield_write_signed(ic, v, sf) tme_m68k_bitfield_write_unsigned(ic, (tme_uint32_t) (v), sf)
 
 /* verification: */
+void tme_m68k_verify_hook _TME_P((void));
 #ifdef _TME_M68K_VERIFY
 void tme_m68k_verify_init _TME_P((void));
 void tme_m68k_verify_begin _TME_P((const struct tme_m68k *, const tme_uint8_t *));
@@ -503,7 +507,6 @@ void tme_m68k_verify_mem_any _TME_P((const struct tme_m68k *,
 void tme_m68k_verify_end_branch _TME_P((const struct tme_m68k *, tme_uint32_t));
 void tme_m68k_verify_end _TME_P((const struct tme_m68k *,
 				 void (*)(struct tme_m68k *, void *, void *)));
-void tme_m68k_verify_hook _TME_P((void));
 #else  /* _TME_M68K_VERIFY */
 #define tme_m68k_verify_init() do { } while (/* CONSTCOND */ 0)
 #define tme_m68k_verify_begin(ic, s) do { } while (/* CONSTCOND */ 0)

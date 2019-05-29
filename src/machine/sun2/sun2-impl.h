@@ -1,4 +1,4 @@
-/* $Id: sun2-impl.h,v 1.6 2003/05/16 21:48:13 fredette Exp $ */
+/* $Id: sun2-impl.h,v 1.7 2003/07/29 18:27:10 fredette Exp $ */
 
 /* machine/sun2/sun2-impl.h - implementation header file for Sun 2 emulation: */
 
@@ -37,7 +37,7 @@
 #define _MACHINE_SUN2_IMPL_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun2-impl.h,v 1.6 2003/05/16 21:48:13 fredette Exp $");
+_TME_RCSID("$Id: sun2-impl.h,v 1.7 2003/07/29 18:27:10 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus.h>
@@ -100,9 +100,25 @@ _TME_RCSID("$Id: sun2-impl.h,v 1.6 2003/05/16 21:48:13 fredette Exp $");
 #define TME_SUN2_BUS_VME	(4)
 #define TME_SUN2_BUS_COUNT	(5)
 
+/* the DVMA sizes: */
+#define TME_SUN2_DVMA_SIZE_MBMEM	(0x00040000)
+#define TME_SUN2_DVMA_SIZE_VME		(0x000F8000)
+
 #define TME_SUN2_LOG_HANDLE(sun2) (&(sun2)->tme_sun2_element->tme_element_log_handle)
 
-/* structures: */
+/* types: */
+
+/* a sun2 mainbus connection: */
+struct tme_sun2_bus_connection {
+
+  /* the generic bus connection: */
+  struct tme_bus_connection tme_sun2_bus_connection;
+
+  /* which bus this is: */
+  unsigned int tme_sun2_bus_connection_which;
+};
+
+/* a sun2: */
 struct tme_sun2 {
 
   /* our IC data structure, containing our various registers: */

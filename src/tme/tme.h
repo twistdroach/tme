@@ -1,4 +1,4 @@
-/* $Id: tme.h,v 1.1 2003/05/16 21:48:14 fredette Exp $ */
+/* $Id: tme.h,v 1.2 2003/06/27 21:08:40 fredette Exp $ */
 
 /* tme/tme.h - public header file for tme: */
 
@@ -37,7 +37,7 @@
 #define _TME_TME_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: tme.h,v 1.1 2003/05/16 21:48:14 fredette Exp $");
+_TME_RCSID("$Id: tme.h,v 1.2 2003/06/27 21:08:40 fredette Exp $");
 
 /* includes: */
 #include <tme/atomics.h>
@@ -46,8 +46,7 @@ _TME_RCSID("$Id: tme.h,v 1.1 2003/05/16 21:48:14 fredette Exp $");
 #include <tme/module.h>
 #include <tme/threads.h>
 #include <tme/tmesh.h>
-
-/* prototypes: */
-int tme_init _TME_P((void));
+#include <tme/hash.h>
+#include <tme/misc.h>
 
 #endif /* !_TME_TME_H */

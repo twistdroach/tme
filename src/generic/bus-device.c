@@ -1,6 +1,6 @@
-/* $Id: bus-device.c,v 1.5 2003/05/16 21:48:08 fredette Exp $ */
+/* $Id: bus-device.c,v 1.7 2003/07/29 18:19:12 fredette Exp $ */
 
-/* bus/bus-device.c - implementation of a generic bus device support: */
+/* generic/bus-device.c - implementation of a generic bus device support: */
 
 /*
  * Copyright (c) 2003 Matt Fredette
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: bus-device.c,v 1.5 2003/05/16 21:48:08 fredette Exp $");
+_TME_RCSID("$Id: bus-device.c,v 1.7 2003/07/29 18:19:12 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -161,7 +161,7 @@ tme_bus_device_connections_new(struct tme_element *element,
   conn->tme_connection_break = tme_bus_device_connection_break;
 
   /* fill in the generic bus connection: */
-  conn_bus->tme_bus_address_last = device->tme_bus_device_address_last;
+  conn_bus->tme_bus_subregions = device->tme_bus_device_subregions;
   if (device->tme_bus_device_signal != NULL) {
     conn_bus->tme_bus_signal = _tme_bus_device_signal;
   }

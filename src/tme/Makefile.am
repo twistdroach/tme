@@ -3,7 +3,7 @@
 
 AUTOMAKE_OPTIONS = 1.4 gnu
 
-SUBDIRS = generic ic machine
+SUBDIRS = generic ic machine scsi
 
 pkginclude_HEADERS = atomics.h \
 	common.h \
@@ -13,6 +13,8 @@ pkginclude_HEADERS = atomics.h \
 	module.h \
 	log.h \
 	tme.h \
+	misc.h \
+	hash.h \
 	tmesh.h
 
 install-exec-local:

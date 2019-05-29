@@ -1,11 +1,42 @@
-/* m68k-insns.c - m68k instruction functions: */
+/* $Id: m68k-insns.c,v 1.9 2003/10/25 17:08:01 fredette Exp $ */
 
-/* $Header: /aquery/home0/fredette/project/tme/TME-CVS-LOCAL/tme/ic/m68k/m68k-insns.c,v 1.6 2003/05/09 17:45:06 fredette Exp $ */
+/* ic/m68k/m68k-insns.c - m68k instruction functions: */
+
+/*
+ * Copyright (c) 2002, 2003 Matt Fredette
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *      This product includes software developed by Matt Fredette.
+ * 4. The name of the author may not be used to endorse or promote products
+ *    derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
 
 /* includes: */
 #include "m68k-impl.h"
 
-_TME_RCSID("$Id: m68k-insns.c,v 1.6 2003/05/09 17:45:06 fredette Exp $");
+_TME_RCSID("$Id: m68k-insns.c,v 1.9 2003/10/25 17:08:01 fredette Exp $");
 
 #define TME_M68K_STD_FLAGS \
 do { \
@@ -283,20 +314,22 @@ TME_M68K_INSN(tme_m68k_movec)
 {
   int ireg;
   tme_uint32_t *creg;
+  tme_uint32_t mask;
   TME_M68K_INSN_PRIV;
   /* in case we're reading the msp or isp and we're on that stack,
      this flushes %a7 to that register: */
   tme_m68k_change_sr(ic, ic->tme_m68k_ireg_sr);
   ireg = TME_M68K_IREG_D0 + TME_FIELD_EXTRACTU(TME_M68K_INSN_SPECOP, 12, 4);
+  mask = 0xffffffff;
   switch (TME_FIELD_EXTRACTU(TME_M68K_INSN_SPECOP, 0, 12)) {
-  case 0x000: creg = &ic->tme_m68k_ireg_sfc; break;
-  case 0x001: creg = &ic->tme_m68k_ireg_dfc; break;
+  case 0x000: creg = &ic->tme_m68k_ireg_sfc; mask = TME_M68K_FC_7; break;
+  case 0x001: creg = &ic->tme_m68k_ireg_dfc; mask = TME_M68K_FC_7; break;
   case 0x800: creg = &ic->tme_m68k_ireg_usp; break;
   case 0x801: creg = &ic->tme_m68k_ireg_vbr; break;
   default: TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_GROUP1_ILL); creg = NULL;
   }
   if (TME_M68K_INSN_OPCODE & TME_BIT(0)) {
-    *creg = ic->tme_m68k_ireg_uint32(ireg);
+    *creg = ic->tme_m68k_ireg_uint32(ireg) & mask;
   }
   else {
     ic->tme_m68k_ireg_uint32(ireg) = *creg;
@@ -310,8 +343,34 @@ TME_M68K_INSN(tme_m68k_movec)
 /* this cannot fault: */
 TME_M68K_INSN(tme_m68k_reset)
 {
+  struct tme_bus_connection *conn_bus;
+  int rc;
+
   TME_M68K_INSN_PRIV;
-  abort();
+  
+  /* get the bus connection: */
+  conn_bus = &ic->_tme_m68k_bus_connection->tme_m68k_bus_connection;
+
+  /* assert the RESET line: */
+  rc = (*conn_bus->tme_bus_signal)
+    (conn_bus,
+     (TME_BUS_SIGNAL_RESET
+      | TME_BUS_SIGNAL_LEVEL_ASSERTED
+      | TME_BUS_SIGNAL_EDGE));
+  assert (rc == TME_OK);
+
+  /* XXX RESET is supposed to be asserted for 512 clocks, 
+     so a sleep is needed here: */
+
+  /* negate the RESET line: */
+  rc = (*conn_bus->tme_bus_signal)
+    (conn_bus,
+     (TME_BUS_SIGNAL_RESET
+      | TME_BUS_SIGNAL_LEVEL_NEGATED
+      | TME_BUS_SIGNAL_EDGE));
+  assert (rc == TME_OK);
+  
+  TME_M68K_INSN_OK;
 }
 
 /* this can fault: */

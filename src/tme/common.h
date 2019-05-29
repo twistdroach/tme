@@ -1,4 +1,4 @@
-/* $Id: common.h,v 1.3 2003/05/16 21:48:14 fredette Exp $ */
+/* $Id: common.h,v 1.7 2003/10/16 02:55:24 fredette Exp $ */
 
 /* tme/common.h - header file for common things: */
 
@@ -47,6 +47,9 @@
 #endif /* _TME_IMPL */
 #include <sys/types.h>
 
+/* netinet/in.h is needed to get the hton and ntoh functions: */
+#include <netinet/in.h>
+
 /* macros: */
 #undef FALSE
 #undef TRUE
@@ -56,7 +59,7 @@
 /* RCS IDs: */
 #ifdef notyet
 #define _TME_RCSID(x) static const char _tme_rcsid[] = x
-_TME_RCSID("$Id: common.h,v 1.3 2003/05/16 21:48:14 fredette Exp $");
+_TME_RCSID("$Id: common.h,v 1.7 2003/10/16 02:55:24 fredette Exp $");
 #else  /* !_TME_IMPL */
 #define _TME_RCSID(x)
 #endif /* !_TME_IMPL */
@@ -159,9 +162,60 @@ _TME_RCSID("$Id: common.h,v 1.3 2003/05/16 21:48:14 fredette Exp $");
 #endif /* !_TME_WORDS_BIGENDIAN */
 #define tme_betoh_u16(x) tme_htobe_u16(x)
 #define tme_betoh_u32(x) tme_htobe_u32(x)
+#define tme_letoh_u16(x) tme_htole_u16(x)
+#define tme_letoh_u32(x) tme_htole_u32(x)
 
 /* i18n: */
 #define _(x) x
+
+/* 64-bit values: */
+#ifndef TME_HAVE_INT64_T
+
+/* gcc has a `long long' type that is defined to be twice as long as
+   an int: */
+/* XXX when exactly did this feature appear? */
+#if defined(__GNUC__) && (__GNUC__ >= 2) && (_TME_SIZEOF_INT == 4)
+#define TME_HAVE_INT64_T
+typedef signed long long int tme_int64_t;
+typedef unsigned long long int tme_uint64_t;
+#endif /* __GNUC__ && __GNUC__ >= 2 */
+
+#endif /* TME_HAVE_INT64_T */
+union tme_value64 {
+#ifdef TME_HAVE_INT64_T
+  tme_int64_t tme_value64_int;
+  tme_uint64_t tme_value64_uint;
+#endif /* TME_HAVE_INT64_T */
+  tme_int32_t tme_value64_int32s[2];
+  tme_int32_t tme_value64_uint32s[2];
+#ifndef _TME_WORDS_BIGENDIAN
+#define tme_value64_int32_lo tme_value64_int32s[0]
+#define tme_value64_int32_hi tme_value64_int32s[1]
+#define tme_value64_uint32_lo tme_value64_int32s[0]
+#define tme_value64_uint32_hi tme_value64_int32s[1]
+#else  /* _TME_WORDS_BIGENDIAN */
+#define tme_value64_int32_lo tme_value64_int32s[1]
+#define tme_value64_int32_hi tme_value64_int32s[0]
+#define tme_value64_uint32_lo tme_value64_int32s[1]
+#define tme_value64_uint32_hi tme_value64_int32s[0]
+#endif /* _TME_WORDS_BIGENDIAN */
+};
+
+/* 64-bit math: */
+union tme_value64 *tme_value64_add _TME_P((union tme_value64 *, _tme_const union tme_value64 *));
+union tme_value64 *tme_value64_sub _TME_P((union tme_value64 *, _tme_const union tme_value64 *));
+union tme_value64 *tme_value64_mul _TME_P((union tme_value64 *, _tme_const union tme_value64 *));
+union tme_value64 *tme_value64_div _TME_P((union tme_value64 *, _tme_const union tme_value64 *));
+union tme_value64 *_tme_value64_set _TME_P((union tme_value64 *, _tme_const tme_uint8_t *, int));
+#ifdef TME_HAVE_INT64_T
+#define tme_value64_add(a, b) (((a)->tme_value64_uint += (b)->tme_value64_uint), (a))
+#define tme_value64_sub(a, b) (((a)->tme_value64_uint -= (b)->tme_value64_uint), (a))
+#define tme_value64_mul(a, b) (((a)->tme_value64_uint *= (b)->tme_value64_uint), (a))
+#define tme_value64_div(a, b) (((a)->tme_value64_uint /= (b)->tme_value64_uint), (a))
+#define tme_value64_set(a, b) (((b) >= 0) ? ((a)->tme_value64_uint = (b), (a)) : ((a)->tme_value64_int = (b), (a)))
+#else  /* !TME_HAVE_INT64_T */
+#define tme_value64_set(a, b) _tme_value64_set(a, (_tme_const tme_uint8_t *) &(b), ((b) >= 0 ? sizeof(b) : -sizeof(b)))
+#endif /* !TME_HAVE_INT64_T */
 
 /* miscellaneous: */
 #define TME_ARRAY_ELS(x)	(sizeof(x) / sizeof(x[0]))
@@ -178,6 +232,19 @@ void *tme_malloc0 _TME_P((unsigned int));
 void *tme_realloc _TME_P((void *, unsigned int));
 void *tme_memdup _TME_P((_tme_const void *, unsigned int));
 void tme_free _TME_P((void *));
+void tme_free_string_array _TME_P((char **, int));
 char *tme_strdup _TME_P((_tme_const char *));
+
+#ifdef _TME_IMPL
+/* string and memory prototypes: */
+#ifdef STDC_HEADERS
+#include <stdlib.h>
+#include <string.h>
+#else  /* !STDC_HEADERS */
+void *memcpy _TME_P((void *, _tme_const void *, size_t));
+void *memset _TME_P((void *, int, size_t));
+void *memmove _TME_P((void *, _tme_const void *, size_t));
+#endif /* !STDC_HEADERS */
+#endif /* _TME_IMPL */
 
 #endif /* !_TME_COMMON_H */

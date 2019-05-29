@@ -1,4 +1,4 @@
-/* $Id: bsd-bpf.c,v 1.3 2003/05/18 00:06:06 fredette Exp $ */
+/* $Id: bsd-bpf.c,v 1.4 2003/10/16 02:48:23 fredette Exp $ */
 
 /* host/bsd/bsd-bpf.c - BSD Berkeley Packet Filter Ethernet support: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: bsd-bpf.c,v 1.3 2003/05/18 00:06:06 fredette Exp $");
+_TME_RCSID("$Id: bsd-bpf.c,v 1.4 2003/10/16 02:48:23 fredette Exp $");
 
 /* includes: */
 #include "bsd-impl.h"
@@ -204,7 +204,7 @@ _tme_bsd_bpf_filter(struct tme_ethernet_config *config,
 void
 _tme_bsd_bpf_dump_filter(const struct bpf_program *program)
 {
-  int pc;
+  unsigned int pc;
   FILE *fp;
   const struct bpf_insn *insn;
   char ldsize;
@@ -212,7 +212,7 @@ _tme_bsd_bpf_dump_filter(const struct bpf_program *program)
 
   fp = stderr;
   for (pc = 0, insn = program->bf_insns;
-       pc < program->bf_len;
+       pc < (unsigned int) program->bf_len;
        pc++, insn++) {
     
     /* the PC: */

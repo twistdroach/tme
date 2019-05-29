@@ -1,6 +1,6 @@
-/* $Id: tmesh-util.c,v 1.1 2003/05/16 21:48:16 fredette Exp $ */
+/* $Id: tmesh-util.c,v 1.2 2003/10/25 17:08:02 fredette Exp $ */
 
-/* tmesh/tmesh-util.y - the tme shell utility functions: */
+/* tmesh/tmesh-util.c - the tme shell utility functions: */
 
 /*
  * Copyright (c) 2003 Matt Fredette
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: tmesh-util.c,v 1.1 2003/05/16 21:48:16 fredette Exp $");
+_TME_RCSID("$Id: tmesh-util.c,v 1.2 2003/10/25 17:08:02 fredette Exp $");
 
 /* includes: */
 #include "tmesh-impl.h"

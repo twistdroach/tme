@@ -1,11 +1,42 @@
-/* m68k-misc.c - miscellaneous things for the m68k emulator: */
+/* $Id: m68k-misc.c,v 1.15 2003/10/25 17:08:01 fredette Exp $ */
 
-/* $Id: m68k-misc.c,v 1.11 2003/05/16 21:48:11 fredette Exp $ */
+/* ic/m68k/m68k-misc.c - miscellaneous things for the m68k emulator: */
+
+/*
+ * Copyright (c) 2002, 2003 Matt Fredette
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *      This product includes software developed by Matt Fredette.
+ * 4. The name of the author may not be used to endorse or promote products
+ *    derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
 
 /* includes: */
 #include "m68k-impl.h"
 
-_TME_RCSID("$Id: m68k-misc.c,v 1.11 2003/05/16 21:48:11 fredette Exp $");
+_TME_RCSID("$Id: m68k-misc.c,v 1.15 2003/10/25 17:08:01 fredette Exp $");
 
 /* small immediates: */
 const tme_uint32_t _tme_m68k_imm32[9] = {
@@ -487,6 +518,8 @@ tme_m68k_new(struct tme_m68k *ic, const char * const *args, const void *extra, c
   /* calculate the instruction burst size: */
   /* XXX TBD: */
   ic->_tme_m68k_instruction_burst = 20;
+  ic->_tme_m68k_instruction_burst_remaining
+    = ic->_tme_m68k_instruction_burst;
 
   /* force the processor to be halted: */
   ic->_tme_m68k_mode = TME_M68K_MODE_HALT;
@@ -694,7 +727,7 @@ tme_m68k_exception_process_start(struct tme_m68k *ic, unsigned int ipl)
      T, and update I: */
   if (!TME_M68K_SEQUENCE_RESTARTING) {
     ic->tme_m68k_ireg_shadow_sr = ic->tme_m68k_ireg_sr;
-    sr = (ic->tme_m68k_ireg_sr | TME_M68K_FLAG_S) ^ TME_M68K_FLAG_T(ic->tme_m68k_ireg_sr);
+    sr = (ic->tme_m68k_ireg_sr | TME_M68K_FLAG_S) & ~(0x3 << 14);
     if (ipl > TME_M68K_IPL_NONE) {
       assert(ipl == TME_M68K_IPL_NMI
 	     || ipl > TME_M68K_FLAG_IPM(sr));
@@ -1421,13 +1454,12 @@ tme_m68k_bitfield_write_unsigned(struct tme_m68k *ic, tme_uint32_t bf_value, int
 #undef first_memory
 }
 
-#ifdef _TME_M68K_VERIFY
 /* our global verify hook function: */
+#undef tme_m68k_verify_hook
 void
 tme_m68k_verify_hook(void)
 {
 }
-#endif /* _TME_M68K_VERIFY */
 
 #if 1
 #include <stdio.h>

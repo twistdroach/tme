@@ -1,4 +1,4 @@
-/* $Id: bsd-if.c,v 1.2 2003/05/18 00:06:06 fredette Exp $ */
+/* $Id: bsd-if.c,v 1.3 2003/10/16 02:48:23 fredette Exp $ */
 
 /* host/bsd/bsd-if.c - BSD interface support: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: bsd-if.c,v 1.2 2003/05/18 00:06:06 fredette Exp $");
+_TME_RCSID("$Id: bsd-if.c,v 1.3 2003/10/16 02:48:23 fredette Exp $");
 
 /* includes: */
 #include "bsd-impl.h"
@@ -98,7 +98,7 @@ tme_bsd_if_find(const char *ifr_name_user, struct ifreq **_ifreq, tme_uint8_t **
 
   /* make a dummy socket so we can read the interface list: */
   if ((dummy_fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-    return (NULL);
+    return (-1);
   }
 
   /* read the interface list: */
@@ -128,10 +128,10 @@ tme_bsd_if_find(const char *ifr_name_user, struct ifreq **_ifreq, tme_uint8_t **
     if (((ifr_offset
 	 + sizeof(ifr->ifr_name)
 	 + sizeof(struct sockaddr))
-	 > ifc.ifc_len)
+	 > (size_t) ifc.ifc_len)
 	|| ((ifr_offset
 	     + SIZEOF_IFREQ(ifr))
-	    > ifc.ifc_len)) {
+	    > (size_t) ifc.ifc_len)) {
       errno = ENOENT;
       break;
     }

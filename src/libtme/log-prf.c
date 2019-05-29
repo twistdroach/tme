@@ -1,4 +1,4 @@
-/* $Id: log-prf.c,v 1.2 2003/05/17 20:16:04 fredette Exp $ */
+/* $Id: log-prf.c,v 1.3 2003/10/16 02:48:24 fredette Exp $ */
 
 /* libtme/log-prf.c - a printf function body: */
 
@@ -204,7 +204,7 @@
 
 	/* the 'c' conversion: */
       case 'c':
-	prf_value_c = va_arg(prf_args, char);
+	prf_value_c = va_arg(prf_args, int);
 	PRF_OUT_CHAR(prf_value_c);
 
 	/* enter state zero: */

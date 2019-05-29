@@ -1,6 +1,6 @@
-/* $Id: z8530reg.h,v 1.2 2003/05/07 02:33:30 fredette Exp $ */
+/* $Id: z8530reg.h,v 1.3 2003/10/25 17:07:58 fredette Exp $ */
 
-/* ic/ic-vol0/z8530reg.h - register definitions for Zilog 8530 emulation: */
+/* ic/z8530reg.h - register definitions for Zilog 8530 emulation: */
 
 /*
  * Copyright (c) 2003 Matt Fredette
@@ -37,7 +37,7 @@
 #define _TME_Z8530REG_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: z8530reg.h,v 1.2 2003/05/07 02:33:30 fredette Exp $");
+_TME_RCSID("$Id: z8530reg.h,v 1.3 2003/10/25 17:07:58 fredette Exp $");
 
 /* macros: */
 

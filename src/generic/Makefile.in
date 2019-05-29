@@ -100,6 +100,9 @@ EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 F77 = @F77@
 FFLAGS = @FFLAGS@
+GTK_CFLAGS = @GTK_CFLAGS@
+GTK_CONFIG = @GTK_CONFIG@
+GTK_LIBS = @GTK_LIBS@
 INCLTDL = @INCLTDL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -127,12 +130,20 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 STRIP = @STRIP@
 TME_BUS_SUBDIRS = @TME_BUS_SUBDIRS@
+TME_FB_XLAT_DST = @TME_FB_XLAT_DST@
+TME_FB_XLAT_SRC = @TME_FB_XLAT_SRC@
 TME_HOSTS = @TME_HOSTS@
 TME_ICS = @TME_ICS@
 TME_IC_SUBDIRS = @TME_IC_SUBDIRS@
 TME_MACHINE_SUBDIRS = @TME_MACHINE_SUBDIRS@
 TME_PREOPEN = @TME_PREOPEN@
+TME_SERIALS = @TME_SERIALS@
+TME_SERIAL_SUBDIRS = @TME_SERIAL_SUBDIRS@
 VERSION = @VERSION@
+X_CFLAGS = @X_CFLAGS@
+X_EXTRA_LIBS = @X_EXTRA_LIBS@
+X_LIBS = @X_LIBS@
+X_PRE_LIBS = @X_PRE_LIBS@
 YACC = @YACC@
 ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
@@ -184,13 +195,25 @@ AUTOMAKE_OPTIONS = 1.4 gnu
 INCLUDES = -I$(top_srcdir) -I$(srcdir) -I. -D_TME_IMPL
 
 lib_LTLIBRARIES = libtme-generic.la
-libtme_generic_la_SOURCES = bus.c bus-device.c serial.c ethernet.c
+libtme_generic_la_SOURCES = bus.c \
+	bus-device.c \
+	serial.c \
+	ethernet.c \
+	fb.c \
+	scsi.c \
+	disk.c \
+	tape.c \
+	mouse.c \
+	keyboard.c
+
 libtme_generic_la_LDFLAGS = -version-info 0:0:0
 
 pkglib_LTLIBRARIES = tme_generic.la
 tme_generic_la_SOURCES = bus-el.c
 tme_generic_la_LDFLAGS = -module -version-info 0:0:0
 tme_generic_la_LIBADD = libtme-generic.la
+
+EXTRA_DIST = fb-xlat-auto.sh
 subdir = generic
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = $(top_builddir)/config.h
@@ -199,7 +222,7 @@ LTLIBRARIES = $(lib_LTLIBRARIES) $(pkglib_LTLIBRARIES)
 
 libtme_generic_la_LIBADD =
 am_libtme_generic_la_OBJECTS = bus.lo bus-device.lo serial.lo \
-	ethernet.lo
+	ethernet.lo fb.lo scsi.lo disk.lo tape.lo mouse.lo keyboard.lo
 libtme_generic_la_OBJECTS = $(am_libtme_generic_la_OBJECTS)
 tme_generic_la_DEPENDENCIES = libtme-generic.la
 am_tme_generic_la_OBJECTS = bus-el.lo
@@ -210,7 +233,10 @@ depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
 @AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/bus-device.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/bus-el.Plo ./$(DEPDIR)/bus.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/ethernet.Plo ./$(DEPDIR)/serial.Plo
+@AMDEP_TRUE@	./$(DEPDIR)/disk.Plo ./$(DEPDIR)/ethernet.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/fb.Plo ./$(DEPDIR)/keyboard.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/mouse.Plo ./$(DEPDIR)/scsi.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/serial.Plo ./$(DEPDIR)/tape.Plo
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) \
@@ -301,8 +327,14 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bus-device.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bus-el.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bus.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/disk.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ethernet.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fb.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/keyboard.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mouse.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scsi.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/serial.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tape.Plo@am__quote@
 
 distclean-depend:
 	-rm -rf ./$(DEPDIR)
@@ -527,6 +559,13 @@ uninstall-am: uninstall-info-am uninstall-libLTLIBRARIES \
 	pdf-am ps ps-am tags uninstall uninstall-am uninstall-info-am \
 	uninstall-libLTLIBRARIES uninstall-pkglibLTLIBRARIES
 
+
+# target to make fb-xlat-auto.c:
+fb-xlat-auto.c: fb-xlat-auto.sh
+	$(SHELL) $(srcdir)/fb-xlat-auto.sh src @TME_FB_XLAT_SRC@ dst @TME_FB_XLAT_DST@ > $@
+
+# fb.lo depends on fb-xlat-auto.c:
+fb.lo: fb-xlat-auto.c
 
 # this automake include file must be included in all directories that
 # build modules.  it updates the modules index that will be installed

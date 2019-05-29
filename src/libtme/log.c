@@ -1,4 +1,4 @@
-/* $Id: log.c,v 1.1 2003/05/16 21:48:12 fredette Exp $ */
+/* $Id: log.c,v 1.2 2003/09/01 14:58:57 fredette Exp $ */
 
 /* libtme/log.c - logging functions: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: log.c,v 1.1 2003/05/16 21:48:12 fredette Exp $");
+_TME_RCSID("$Id: log.c,v 1.2 2003/09/01 14:58:57 fredette Exp $");
 
 /* includes: */
 #include <tme/log.h>
@@ -150,7 +150,7 @@ tme_output_xpend_char(char **_output, char output_char, int prepend)
 #ifdef HAVE_STDARG_H
 void tme_output_append(char **_output, const char *prf_format, ...)
 #else  /* HAVE_STDARG_H */
-void tme_output_append(_output, format, va_alist)
+void tme_output_append(_output, prf_format, va_alist)
      char **_output;
      const char *prf_format;
      va_dcl
@@ -173,7 +173,7 @@ void tme_output_append(_output, format, va_alist)
 #ifdef HAVE_STDARG_H
 void tme_output_append_error(char **_output, const char *prf_format, ...)
 #else  /* HAVE_STDARG_H */
-void tme_output_append_error(_output, format, va_alist)
+void tme_output_append_error(_output, prf_format, va_alist)
      char **_output;
      const char *prf_format;
      va_dcl
@@ -196,7 +196,7 @@ void tme_output_append_error(_output, format, va_alist)
 #ifdef HAVE_STDARG_H
 void tme_output_prepend(char **_output, const char *prf_format, ...)
 #else  /* HAVE_STDARG_H */
-void tme_output_prepend(_output, format, va_alist)
+void tme_output_prepend(_output, prf_format, va_alist)
      char **_output;
      const char *prf_format;
      va_dcl
@@ -219,7 +219,7 @@ void tme_output_prepend(_output, format, va_alist)
 #ifdef HAVE_STDARG_H
 void tme_output_prepend_error(char **_output, const char *prf_format, ...)
 #else  /* HAVE_STDARG_H */
-void tme_output_prepend_error(_output, format, va_alist)
+void tme_output_prepend_error(_output, prf_format, va_alist)
      char **_output;
      const char *prf_format;
      va_dcl
@@ -242,7 +242,7 @@ void tme_output_prepend_error(_output, format, va_alist)
 #ifdef HAVE_STDARG_H
 void tme_log_part(struct tme_log_handle *handle, const char *prf_format, ...)
 #else  /* HAVE_STDARG_H */
-void tme_log_part(handle, format, va_alist)
+void tme_log_part(handle, prf_format, va_alist)
      struct tme_log_handle *handle;
      const char *prf_format;
      va_dcl

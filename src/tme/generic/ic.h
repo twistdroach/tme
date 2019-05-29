@@ -1,4 +1,4 @@
-/* $Id: ic.h,v 1.1 2003/04/26 21:46:16 fredette Exp $ */
+/* $Id: ic.h,v 1.3 2003/07/29 18:11:24 fredette Exp $ */
 
 /* tme/generic/ic/ic-impl.h - header file for generic IC support: */
 
@@ -37,7 +37,7 @@
 #define _TME_GENERIC_IC_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: ic.h,v 1.1 2003/04/26 21:46:16 fredette Exp $");
+_TME_RCSID("$Id: ic.h,v 1.3 2003/07/29 18:11:24 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus.h>
@@ -61,7 +61,7 @@ _TME_RCSID("$Id: ic.h,v 1.1 2003/04/26 21:46:16 fredette Exp $");
 
    so, registers that are exactly the port size are always easy to deal
    with.  their tme_ic_ireg_uintN positions are simply their bus
-   address divided by the port size.
+   addresses divided by the port size.
 
    the tme_ic_ireg_uintN indices of registers that are smaller than
    the port size need to take endianness into account.  the
@@ -156,10 +156,10 @@ struct tme_ic {
 
   /* the IC's addressable register file: */
   union {
-#ifdef HAVE_UINT64_T
+#ifdef TME_HAVE_INT64_T
     tme_uint64_t	tme_ic_iregs_uint64s[TME_IC_REGS_SIZE >> 4];
     tme_int64_t		tme_ic_iregs_int64s[TME_IC_REGS_SIZE >> 4];
-#endif /* HAVE_UINT64_T */
+#endif /* TME_HAVE_INT64_T */
     tme_uint32_t	tme_ic_iregs_uint32s[TME_IC_REGS_SIZE >> 2];
     tme_int32_t		tme_ic_iregs_int32s[TME_IC_REGS_SIZE >> 2];
     tme_uint16_t	tme_ic_iregs_uint16s[TME_IC_REGS_SIZE >> 1];
@@ -168,7 +168,7 @@ struct tme_ic {
     tme_int8_t		tme_ic_iregs_int8s[TME_IC_REGS_SIZE];
   } tme_ic_iregs;
 #ifdef WORDS_BIGENDIAN
-#ifdef HAVE_UINT64_T
+#ifdef TME_HAVE_INT64_T
 #define tme_ic_ireg_uint64(x)	tme_ic_iregs.tme_ic_iregs_uint64s[x]
 #define tme_ic_ireg_int64(x)	tme_ic_iregs.tme_ic_iregs_int64s[x]
 #define tme_ic_ireg_uint32(x)	tme_ic_iregs.tme_ic_iregs_uint32s[(x) ^ 1]
@@ -177,19 +177,19 @@ struct tme_ic {
 #define tme_ic_ireg_int16(x)	tme_ic_iregs.tme_ic_iregs_int16s[(x) ^ 3]
 #define tme_ic_ireg_uint8(x)	tme_ic_iregs.tme_ic_iregs_uint8s[(x) ^ 7]
 #define tme_ic_ireg_int8(x)	tme_ic_iregs.tme_ic_iregs_int8s[(x) ^ 7]
-#else  /* !HAVE_UINT64_T */
+#else  /* !TME_HAVE_INT64_T */
 #define tme_ic_ireg_uint32(x)	tme_ic_iregs.tme_ic_iregs_uint32s[x]
 #define tme_ic_ireg_int32(x)	tme_ic_iregs.tme_ic_iregs_int32s[x]
 #define tme_ic_ireg_uint16(x)	tme_ic_iregs.tme_ic_iregs_uint16s[(x) ^ 1]
 #define tme_ic_ireg_int16(x)	tme_ic_iregs.tme_ic_iregs_int16s[(x) ^ 1]
 #define tme_ic_ireg_uint8(x)	tme_ic_iregs.tme_ic_iregs_uint8s[(x) ^ 3]
 #define tme_ic_ireg_int8(x)	tme_ic_iregs.tme_ic_iregs_int8s[(x) ^ 3]
-#endif /* !HAVE_UINT64_T */
+#endif /* !TME_HAVE_INT64_T */
 #else  /* !WORDS_BIGENDIAN */
-#ifdef HAVE_UINT64_T
+#ifdef TME_HAVE_INT64_T
 #define tme_ic_ireg_uint64(x)	tme_ic_iregs.tme_ic_iregs_uint64s[x]
 #define tme_ic_ireg_int64(x)	tme_ic_iregs.tme_ic_iregs_int64s[x]
-#endif /* HAVE_UINT64_T */
+#endif /* TME_HAVE_INT64_T */
 #define tme_ic_ireg_uint32(x)	tme_ic_iregs.tme_ic_iregs_uint32s[x]
 #define tme_ic_ireg_int32(x)	tme_ic_iregs.tme_ic_iregs_int32s[x]
 #define tme_ic_ireg_uint16(x)	tme_ic_iregs.tme_ic_iregs_uint16s[x]

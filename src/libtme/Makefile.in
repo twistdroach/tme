@@ -69,6 +69,9 @@ EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 F77 = @F77@
 FFLAGS = @FFLAGS@
+GTK_CFLAGS = @GTK_CFLAGS@
+GTK_CONFIG = @GTK_CONFIG@
+GTK_LIBS = @GTK_LIBS@
 INCLTDL = @INCLTDL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -96,12 +99,20 @@ SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 STRIP = @STRIP@
 TME_BUS_SUBDIRS = @TME_BUS_SUBDIRS@
+TME_FB_XLAT_DST = @TME_FB_XLAT_DST@
+TME_FB_XLAT_SRC = @TME_FB_XLAT_SRC@
 TME_HOSTS = @TME_HOSTS@
 TME_ICS = @TME_ICS@
 TME_IC_SUBDIRS = @TME_IC_SUBDIRS@
 TME_MACHINE_SUBDIRS = @TME_MACHINE_SUBDIRS@
 TME_PREOPEN = @TME_PREOPEN@
+TME_SERIALS = @TME_SERIALS@
+TME_SERIAL_SUBDIRS = @TME_SERIAL_SUBDIRS@
 VERSION = @VERSION@
+X_CFLAGS = @X_CFLAGS@
+X_EXTRA_LIBS = @X_EXTRA_LIBS@
+X_LIBS = @X_LIBS@
+X_PRE_LIBS = @X_PRE_LIBS@
 YACC = @YACC@
 ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
@@ -150,7 +161,7 @@ target_vendor = @target_vendor@
 
 AUTOMAKE_OPTIONS = 1.4 gnu
 
-INCLUDES = -I$(top_srcdir) -I$(srcdir) -I. $(INCLTDL) -D_TME_IMPL
+INCLUDES = -I$(top_srcdir) -I$(srcdir) -I. $(INCLTDL) $(GTK_CFLAGS) -D_TME_IMPL
 
 lib_LTLIBRARIES = libtme.la
 libtme_la_SOURCES = misc.c \
@@ -158,6 +169,7 @@ libtme_la_SOURCES = misc.c \
 	module.c \
 	element.c \
 	log.c \
+	hash.c \
 	alloc.c
 
 libtme_la_LDFLAGS = -version-info 0:0:0
@@ -171,15 +183,16 @@ LTLIBRARIES = $(lib_LTLIBRARIES)
 
 libtme_la_DEPENDENCIES =
 am_libtme_la_OBJECTS = misc.lo threads-sjlj.lo module.lo element.lo \
-	log.lo alloc.lo
+	log.lo hash.lo alloc.lo
 libtme_la_OBJECTS = $(am_libtme_la_OBJECTS)
 
 DEFAULT_INCLUDES =  -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
 @AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/alloc.Plo ./$(DEPDIR)/element.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/log.Plo ./$(DEPDIR)/misc.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/module.Plo ./$(DEPDIR)/threads-sjlj.Plo
+@AMDEP_TRUE@	./$(DEPDIR)/hash.Plo ./$(DEPDIR)/log.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/misc.Plo ./$(DEPDIR)/module.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/threads-sjlj.Plo
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) \
@@ -239,6 +252,7 @@ distclean-compile:
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/alloc.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/element.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hash.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/log.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/misc.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/module.Plo@am__quote@

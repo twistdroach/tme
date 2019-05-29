@@ -1,6 +1,6 @@
-/* $Id: am9513.c,v 1.9 2003/05/16 21:48:10 fredette Exp $ */
+/* $Id: am9513.c,v 1.12 2003/10/25 17:07:58 fredette Exp $ */
 
-/* ic/ic-vol0/am9513.c - implementation of Am9513 emulation: */
+/* ic/am9513.c - implementation of Am9513 emulation: */
 
 /*
  * Copyright (c) 2003 Matt Fredette
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: am9513.c,v 1.9 2003/05/16 21:48:10 fredette Exp $");
+_TME_RCSID("$Id: am9513.c,v 1.12 2003/10/25 17:07:58 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -177,7 +177,7 @@ static const tme_bus_lane_t tme_am9513_router[TME_BUS_ROUTER_SIZE(TME_BUS16_LOG2
 static void
 _tme_am9513_reset(struct tme_am9513 *am9513)
 {
-  int counter_i;
+  unsigned int counter_i;
   struct tme_am9513_counter *counter;
 
   /* disarm all counters: */
@@ -204,7 +204,7 @@ _tme_am9513_reset(struct tme_am9513 *am9513)
 static void
 _tme_am9513_counters_load(struct tme_am9513 *am9513, tme_uint16_t counters_mask)
 {
-  int counter_i;
+  unsigned int counter_i;
   struct tme_am9513_counter *counter;
 
   /* load all selected counters: */
@@ -222,7 +222,7 @@ _tme_am9513_counters_load(struct tme_am9513 *am9513, tme_uint16_t counters_mask)
 static void
 _tme_am9513_counters_arm(struct tme_am9513 *am9513, tme_uint16_t counters_mask)
 {
-  int counter_i;
+  unsigned int counter_i;
   struct tme_am9513_counter *counter;
 
   /* load all selected counters: */
@@ -240,7 +240,7 @@ _tme_am9513_counters_arm(struct tme_am9513 *am9513, tme_uint16_t counters_mask)
 static void
 _tme_am9513_counters_disarm(struct tme_am9513 *am9513, tme_uint16_t counters_mask)
 {
-  int counter_i;
+  unsigned int counter_i;
   struct tme_am9513_counter *counter;
 
   /* load all selected counters: */
@@ -259,7 +259,7 @@ static void
 _tme_am9513_callout(struct tme_am9513 *am9513)
 {
   struct tme_bus_connection *conn_bus;
-  int counter_i;
+  unsigned int counter_i;
   int again;
   int pin_high;
   unsigned int signal;
@@ -357,7 +357,7 @@ _tme_am9513_th_timer(struct tme_am9513 *am9513)
   tme_uint32_t basic_elapsed;
   tme_uint32_t basic_sleep;
   tme_uint32_t divisor;
-  int counter_i;
+  unsigned int counter_i;
   struct tme_am9513_counter *counter;
   tme_uint32_t counter_elapsed;
 
@@ -494,7 +494,7 @@ _tme_am9513_th_timer(struct tme_am9513 *am9513)
 	  tme_log(TME_AM9513_LOG_HANDLE(am9513),
 		  0, TME_OK,
 		  (TME_AM9513_LOG_HANDLE(am9513),
-		   "timer %d interrupt rate: %ld/sec\n",
+		   "timer %d interrupt rate: %ld/sec",
 		   counter_i,
 		   (counter->tme_am9513_counter_int_sample
 		    / counter->tme_am9513_counter_int_sample_time.tv_sec)));

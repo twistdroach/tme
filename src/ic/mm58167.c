@@ -1,6 +1,6 @@
-/* $Id: mm58167.c,v 1.4 2003/05/16 21:48:10 fredette Exp $ */
+/* $Id: mm58167.c,v 1.6 2003/10/25 17:07:58 fredette Exp $ */
 
-/* ic/ic-vol0/mm58167.c - implementation of National Semiconductor MM58167 emulation: */
+/* ic/mm58167.c - implementation of National Semiconductor MM58167 emulation: */
 
 /*
  * Copyright (c) 2003 Matt Fredette
@@ -34,12 +34,13 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: mm58167.c,v 1.4 2003/05/16 21:48:10 fredette Exp $");
+_TME_RCSID("$Id: mm58167.c,v 1.6 2003/10/25 17:07:58 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
 #include <tme/ic/mm58167.h>
 #include <time.h>
+#include <sys/time.h>
 
 /* macros: */
 
@@ -77,8 +78,10 @@ struct tme_mm58167 {
   /* the mutex protecting the chip: */
   tme_mutex_t tme_mm58167_mutex;
 
-  /* the last time sampled: */
-  time_t tme_mm58167_sampled_time;
+  /* the last time sampled.  the tv_usec field is actually a value in
+     milliseconds, since we divide it by 1000 right after
+     gettimeofday() returns: */
+  struct timeval tme_mm58167_sampled_time;
 
   /* the struct tm for the last time sampled: */
   struct tm tme_mm58167_sampled_tm;
@@ -104,7 +107,8 @@ _tme_mm58167_bus_cycle(void *_mm58167, struct tme_bus_cycle *cycle_init)
   tme_uint8_t buffer, value;
   struct tme_bus_cycle cycle_resp;
   unsigned int reg;
-  time_t now;
+  struct timeval now;
+  time_t _now;
   struct tm *now_tm;
   int reg_is_bcd;
 
@@ -124,20 +128,36 @@ _tme_mm58167_bus_cycle(void *_mm58167, struct tme_bus_cycle *cycle_init)
   /* lock the mutex: */
   tme_mutex_lock(&mm58167->tme_mm58167_mutex);
 
-  /* sample the time.  if it's changed, update our status: */
-  now = time(NULL);
-  if (now == mm58167->tme_mm58167_sampled_time) {
-    now_tm = &mm58167->tme_mm58167_sampled_tm;
-  }
-  else {
+  /* sample the time, and drop from microsecond accuracy to
+     millisecond accuracy: */
+  gettimeofday(&now, NULL);
+  now.tv_usec /= 1000;
+
+  /* if the seconds value has changed, convert it, and an update is
+     rippling through the system: */
+  if (now.tv_sec
+      != mm58167->tme_mm58167_sampled_time.tv_sec) {
     mm58167->tme_mm58167_status |= TME_MM58167_STATUS_RIPPLING;
-    mm58167->tme_mm58167_sampled_time = now;
-    now_tm = gmtime_r(&now, &mm58167->tme_mm58167_sampled_tm);
+    _now = now.tv_sec;
+    now_tm = gmtime_r(&_now, &mm58167->tme_mm58167_sampled_tm);
     if (now_tm != &mm58167->tme_mm58167_sampled_tm) {
       mm58167->tme_mm58167_sampled_tm = *now_tm;
     }
   }
 
+  /* otherwise, if the centiseconds value has changed, an update
+     is also rippling through the system: */
+  else if ((now.tv_usec / 10)
+	   != (mm58167->tme_mm58167_sampled_time.tv_usec / 10)) {
+    mm58167->tme_mm58167_status |= TME_MM58167_STATUS_RIPPLING;
+  }
+
+  /* save the sampled time: */
+  mm58167->tme_mm58167_sampled_time = now;
+
+  /* get the converted time: */
+  now_tm = &mm58167->tme_mm58167_sampled_tm;
+    
   /* if this is a write: */
   if (cycle_init->tme_bus_cycle_type == TME_BUS_CYCLE_WRITE) {
 
@@ -171,8 +191,10 @@ _tme_mm58167_bus_cycle(void *_mm58167, struct tme_bus_cycle *cycle_init)
     /* dispatch on the register: */
     switch (reg) {
     case TME_MM58167_REG_MSEC_XXX:
+      value = (now.tv_usec % 10) * 10;
+      break;
     case TME_MM58167_REG_CSEC:
-      value = 0;
+      value = (now.tv_usec / 10);
       break;
     case TME_MM58167_REG_SEC:
       value = now_tm->tm_sec;
@@ -303,7 +325,7 @@ TME_ELEMENT_NEW_DECL(tme_ic_mm58167) {
   mm58167->tme_mm58167_socket = socket_real;
 
   /* figure our address mask, up to the nearest power of two: */
-  address_mask = TME_MM58167_REG_BANK_SZ * mm58167->tme_mm58167_addr_shift;
+  address_mask = TME_MM58167_REG_BANK_SZ << mm58167->tme_mm58167_addr_shift;
   if (address_mask & (address_mask - 1)) {
     for (; address_mask & (address_mask - 1); address_mask &= (address_mask - 1));
     address_mask <<= 1;

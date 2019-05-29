@@ -13,7 +13,10 @@ libtme_machine_sun_la_LIBADD = $(top_builddir)/libtme/libtme.la \
 
 bin_SCRIPTS = tme-sun-idprom
 
-EXTRA_DIST = tme-sun-idprom.pl
+examplesdir = $(datadir)/examples/tme
+examples_DATA = sun-keyboards.txt my-sun-macros.txt
+
+EXTRA_DIST = tme-sun-idprom.pl $(examples_DATA)
 
 # target to make tme-sun-idprom:
 tme-sun-idprom: tme-sun-idprom.pl

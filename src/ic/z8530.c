@@ -1,6 +1,6 @@
-/* $Id: z8530.c,v 1.9 2003/05/16 21:48:10 fredette Exp $ */
+/* $Id: z8530.c,v 1.14 2003/10/25 17:07:58 fredette Exp $ */
 
-/* ic/ic-vol0/z8530.c - implementation of Zilog 8530 emulation: */
+/* ic/z8530.c - implementation of Zilog 8530 emulation: */
 
 /*
  * Copyright (c) 2003 Matt Fredette
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: z8530.c,v 1.9 2003/05/16 21:48:10 fredette Exp $");
+_TME_RCSID("$Id: z8530.c,v 1.14 2003/10/25 17:07:58 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -59,17 +59,16 @@ _TME_RCSID("$Id: z8530.c,v 1.9 2003/05/16 21:48:10 fredette Exp $");
 
 /* interrupt types.  note that the nonnegative values are chosen to
    correspond to the interrupt vector modification values for the
-   given interrupt.  the nonnegative values are strangely ordered, to
-   follow the the strange Table 5-6 in my SCC manual: */
+   given interrupt.  the nonnegative values correspond to the
+   "status high/status low = 0" (TME_Z8530_WR9_INTVEC_STATUS = 0)
+   case given in Table 5-6 in my SCC manual: */
 #define TME_Z8530_INT_UNDEF		(-1)
-#define TME_Z8530_INT_CHAN_B_TX	(0)
-#define TME_Z8530_INT_CHAN_B_STATUS	(4)
-#define TME_Z8530_INT_CHAN_B_RX	(2)
-#define TME_Z8530_INT_CHAN_B_RX_SPCL	(6)
-#define TME_Z8530_INT_CHAN_A_TX	(1)
-#define TME_Z8530_INT_CHAN_A_STATUS	(5)
-#define TME_Z8530_INT_CHAN_A_RX	(3)
-#define TME_Z8530_INT_CHAN_A_RX_SPCL	(7)
+#define TME_Z8530_INT_CHAN_TX		(0)
+#define TME_Z8530_INT_CHAN_STATUS	(1)
+#define TME_Z8530_INT_CHAN_RX		(2)
+#define TME_Z8530_INT_CHAN_RX_SPCL	(3)
+#define TME_Z8530_INT_CHAN_A		(4)
+#define TME_Z8530_INT_CHAN_B		(0)
 
 #define TME_Z8530_LOG_HANDLE(z) (&(z)->tme_z8530_element->tme_element_log_handle)
 
@@ -186,7 +185,7 @@ _tme_z8530_channel_reset(struct tme_z8530_chan *chan, int hardware_reset)
   chan->tme_z8530_chan_wrreg[15] = 0xf8;
   chan->tme_z8530_chan_rdreg[0] = 0x44;
   chan->tme_z8530_chan_rdreg[1] = 0x06;
-  chan->tme_z8530_chan_rdreg[3] = 0x10;
+  chan->tme_z8530_chan_rdreg[3] = 0x00;
   chan->tme_z8530_chan_rdreg[10] = 0x00;
 
   /* the raw (unlatched) RR0 status bits: */
@@ -443,7 +442,7 @@ _tme_z8530_intack(struct tme_z8530 *z8530, int *_vector)
 {
   tme_uint8_t rr3, wr9;
   struct tme_z8530_chan *chan;
-  int int_type, int_type_chan_a;
+  int int_type;
   int vector;
 
   /* get the current RR3 and WR9 values: */
@@ -473,37 +472,45 @@ _tme_z8530_intack(struct tme_z8530 *z8530, int *_vector)
   if (rr3 <= TME_Z8530_RR3_CHAN_B_IP_RX) {    
     chan = &z8530->tme_z8530_chan_b;
     rr3 /= TME_Z8530_RR3_CHAN_B_IP_STATUS;
-    int_type_chan_a = 0;
+    int_type = TME_Z8530_INT_CHAN_B;
   }
   else {
     chan = &z8530->tme_z8530_chan_a;
     rr3 /= TME_Z8530_RR3_CHAN_A_IP_STATUS;
-    int_type_chan_a = 1;
+    int_type = TME_Z8530_INT_CHAN_A;
   }
 
   /* map that bit into an interrupt type: */
-  int_type = 0;
   switch (rr3) {
   case TME_Z8530_RR3_CHAN_B_IP_RX:
-    int_type = (_tme_z8530_rx_fifo_special(chan)
-	      ? TME_Z8530_INT_CHAN_B_RX_SPCL
-	      : TME_Z8530_INT_CHAN_B_RX) | int_type_chan_a;
+    int_type
+      |= (_tme_z8530_rx_fifo_special(chan)
+	  ? TME_Z8530_INT_CHAN_RX_SPCL
+	  : TME_Z8530_INT_CHAN_RX);
     break;
   case TME_Z8530_RR3_CHAN_B_IP_TX:
-    int_type = TME_Z8530_INT_CHAN_B_TX | int_type_chan_a;
+    int_type
+      |= TME_Z8530_INT_CHAN_TX;
     break;
   case TME_Z8530_RR3_CHAN_B_IP_STATUS:
-    int_type = TME_Z8530_INT_CHAN_B_STATUS | int_type_chan_a;
+    int_type
+      |= TME_Z8530_INT_CHAN_STATUS;
     break;
   default: abort();
   }
 
   /* come up with the modified interrupt vector.  iff
-     TME_Z8530_WR9_INTVEC_STATUS, bits 4, 5, and 6 are modified, else
-     bits 1, 2, and 3 are modified: */
+     TME_Z8530_WR9_INTVEC_STATUS, bits 4, 5, and 6 respectively take
+     bits 2, 1, and 0 of the interrupt type, otherwise bits 1, 2, and
+     3 respectively take bits 0, 1, and 2 of the interrupt type.  this
+     strangness is found in Table 5-6 of my SCC manual: */
   vector = z8530->tme_z8530_chan_a.tme_z8530_chan_wrreg[2];
   if (wr9 & TME_Z8530_WR9_INTVEC_STATUS) {
-    vector = (vector & 0x8f) | (int_type << 4);
+    vector
+      = ((vector & 0x8f)
+	 | ((vector << 6) & 0x40)
+	 | ((vector << 4) & 0x20)
+	 | ((vector << 3) & 0x10));
   }
   else {
     vector = (vector & 0xf1) | (int_type << 1);
@@ -518,6 +525,14 @@ _tme_z8530_intack(struct tme_z8530 *z8530, int *_vector)
     /* if we're not supposed to acknowledge hard interrupts with any
        vector, return no vector: */
     if (wr9 & TME_Z8530_WR9_NV) {
+      *_vector = TME_BUS_INTERRUPT_VECTOR_UNDEF;
+    }
+
+    /* XXX we currently have no emulation of the chip's IEI pin.  for
+       now, we behave as if this pin is tied *low*, which means we
+       never drive an interrupt vector on the bus.  when we do have
+       some IEI support, this else statement should be removed: */
+    else if (TRUE) {
       *_vector = TME_BUS_INTERRUPT_VECTOR_UNDEF;
     }
 
@@ -586,7 +601,7 @@ _tme_z8530_callout(struct tme_z8530 *z8530, struct tme_z8530_chan *chan, int new
       _later_callouts = &later_callouts_a;
     }
     else if ((callouts
-	      = z8530->tme_z8530_chan_a.tme_z8530_chan_callout_flags)
+	      = z8530->tme_z8530_chan_b.tme_z8530_chan_callout_flags)
 	     & TME_Z8530_CALLOUTS_MASK) {
       chan = &z8530->tme_z8530_chan_b;
       _later_callouts = &later_callouts_b;
@@ -851,6 +866,7 @@ _tme_z8530_bus_cycle(void *_z8530, struct tme_bus_cycle *cycle_init)
   int new_callouts;
   unsigned int rr3_chan_shift;
   tme_uint8_t rr3_ip_tx;
+  tme_uint8_t rr3_ip_rx;
   tme_uint8_t ius;
 
   /* recover our data structure: */
@@ -937,12 +953,10 @@ _tme_z8530_bus_cycle(void *_z8530, struct tme_bus_cycle *cycle_init)
       /* dispatch on the CRC reset code: */
       switch (value & TME_Z8530_WR0_CRC_RESET_MASK) {
       case TME_Z8530_WR0_CRC_RESET_NULL:
-	break;
       case TME_Z8530_WR0_CRC_RESET_RX:
       case TME_Z8530_WR0_CRC_RESET_TX:
       case TME_Z8530_WR0_CRC_RESET_TX_EOM:
-	/* XXX TBD: */
-	abort();
+	break;
       }
 
       /* dispatch on the command code: */
@@ -992,9 +1006,38 @@ _tme_z8530_bus_cycle(void *_z8530, struct tme_bus_cycle *cycle_init)
 	new_callouts |= TME_Z8530_CALLOUT_INT;
 	break;
 
-      case TME_Z8530_WR0_CMD_SEND_ABORT:
-      case TME_Z8530_WR0_CMD_INT_NEXT_RX:
       case TME_Z8530_WR0_CMD_RESET_TX:
+	
+	/* get the IP_TX bit for this channel: */
+	rr3_ip_tx = ((chan == &z8530->tme_z8530_chan_a)
+		     ? TME_Z8530_RR3_CHAN_A_IP_TX
+		     : TME_Z8530_RR3_CHAN_B_IP_TX);
+
+	/* if the IP_TX bit is set for this channel, clear it: */
+	if (z8530->tme_z8530_rr3 & rr3_ip_tx) {
+	  z8530->tme_z8530_rr3 &= ~rr3_ip_tx;
+	  new_callouts |= TME_Z8530_CALLOUT_INT;
+	}
+	break;
+
+      case TME_Z8530_WR0_CMD_INT_NEXT_RX:
+
+	/* if the receive FIFO is not empty: */
+	if (chan->tme_z8530_chan_rdreg[0]
+	    & TME_Z8530_RR0_RX_AVAIL) {
+
+	  /* get the IP_RX bit for this channel: */
+	  rr3_ip_rx = ((chan == &z8530->tme_z8530_chan_a)
+		       ? TME_Z8530_RR3_CHAN_A_IP_RX
+		       : TME_Z8530_RR3_CHAN_B_IP_RX);
+
+	  /* call out another receive interrupt: */
+	  z8530->tme_z8530_rr3 |= rr3_ip_rx;
+	  new_callouts |= TME_Z8530_CALLOUT_INT;
+	}
+	break;
+
+      case TME_Z8530_WR0_CMD_SEND_ABORT:
 	/* XXX TBD: */
 	abort();
       }
@@ -1004,6 +1047,9 @@ _tme_z8530_bus_cycle(void *_z8530, struct tme_bus_cycle *cycle_init)
     case 1:
       chan->tme_z8530_chan_wrreg[1] = value;
 
+      /* XXX since we fixed the RR3 initialization bug present through
+	 revision 1.9, this may now be unnecessary, and might even
+	 be incorrect for non-NetBSD systems: */
       /* NB: some serial drivers, like NetBSD's z8530tty.c (at least
 	 as recently as rev 1.79), never issue
 	 TME_Z8530_WR0_CMD_RESET_TX when they have no more data to
@@ -1187,7 +1233,8 @@ _tme_z8530_bus_cycle(void *_z8530, struct tme_bus_cycle *cycle_init)
       /* RR14 (an image of RR10 on the 8530): */
     case 10:
     case 14:
-      abort();
+      value = 0;
+      break;
 
       /* RR12: */
     case 12:
@@ -1258,7 +1305,8 @@ static int
 _tme_z8530_config(struct tme_serial_connection *conn_serial, 
 		  struct tme_serial_config *config)
 {
-  abort();
+  /* do nothing: */
+  return (TME_OK);
 }
 
 /* this is called when control lines change: */
