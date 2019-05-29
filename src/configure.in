@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 
-dnl $Id: configure.in,v 1.16 2005/05/15 01:24:11 fredette Exp $
+dnl $Id: configure.in,v 1.17 2007/08/26 13:57:12 fredette Exp $
 
 dnl Copyright (c) 2001, 2003 Matt Fredette
 dnl All rights reserved.
@@ -34,7 +34,7 @@ dnl POSSIBILITY OF SUCH DAMAGE.
 dnl Checks that we are given a good source directory.
 AC_INIT(ic/m68k/m68k-impl.h)
 AC_CANONICAL_SYSTEM
-AM_INIT_AUTOMAKE(tme, 0.4)
+AM_INIT_AUTOMAKE(tme, 0.6)
 
 dnl Write configuration out to config.h through config.h.in.
 AM_CONFIG_HEADER(config.h)
@@ -73,6 +73,9 @@ if test $ac_cv_sizeof_int != 4 && test $ac_cv_sizeof_long != 4; then
 fi
 if test $ac_cv_sizeof_int != 2 && test $ac_cv_sizeof_short != 2; then
   AC_MSG_ERROR([can't find a 16-bit type])
+fi
+if test $ac_cv_sizeof_long = 8; then
+  AC_CHECK_ALIGNOF(64)
 fi
 AC_CHECK_ALIGNOF(32)
 AC_CHECK_ALIGNOF(16)
@@ -350,7 +353,7 @@ AC_SUBST(TME_FB_XLAT_DST)
 dnl Configures for the system(s) to emulate.
 systems=all
 if echo " ${systems} " | grep ' all ' > /dev/null 2>&1; then
-  systems="sun2 sun3"
+  systems="sun2 sun3 sun4"
 fi
 TME_MACHINE_SUBDIRS=
 TME_IC_SUBDIRS=
@@ -378,6 +381,14 @@ for system in $systems; do
 	machines="sun sun3"
 	ics="m68k isil7170 z8530 i825x6 ieee754 ncr5380"
 	buses="multibus"
+	fb_xlats="1152x900d1b1s0p32om 1152x900d8b8s0p32ommi8 1152x900d1b1s0p32omccmi8"
+	;;
+
+    # the sun4:
+    sun4)
+	machines="sun sun4"
+	ics="sparc isil7170 z8530 am7930 am7990 ieee754 ncr53c9x mk48txx lsi64854 nec765"
+	buses="sbus"
 	fb_xlats="1152x900d1b1s0p32om 1152x900d8b8s0p32ommi8 1152x900d1b1s0p32omccmi8"
 	;;
 
@@ -497,7 +508,7 @@ AC_SUBST(TME_PREOPEN)
 
 dnl Configure debugging and/or warnings.
 AC_ARG_ENABLE(debug,
-[  --disable-debug         don't compile debuggable libraries and programs (default=do)],
+[  --enable-debug          compile debuggable libraries and programs (default=don't)],
 [ ], [enable_debug=no])
 if test "x$enable_debug" = "xyes"; then
   CFLAGS="${CFLAGS-} -g -O0"
@@ -626,16 +637,19 @@ AC_OUTPUT(Makefile
 	  ic/Makefile
 	  ic/m68k/Makefile
 	  ic/ieee754/Makefile
+	  ic/sparc/Makefile
 	  machine/Makefile
 	  machine/sun/Makefile
 	  machine/sun2/Makefile
 	  machine/sun3/Makefile
+	  machine/sun4/Makefile
           host/Makefile
           host/posix/Makefile
           host/bsd/Makefile
           host/gtk/Makefile
           bus/Makefile
           bus/multibus/Makefile
+          bus/sbus/Makefile
           serial/Makefile
           scsi/Makefile
           generic/Makefile

@@ -1,4 +1,4 @@
-/* $Id: scsi-tape.h,v 1.2 2003/08/07 22:14:46 fredette Exp $ */
+/* $Id: scsi-tape.h,v 1.3 2006/11/15 23:10:33 fredette Exp $ */
 
 /* tme/scsi/scsi-tape.h - header file for generic SCSI tape emulation: */
 
@@ -37,7 +37,7 @@
 #define _TME_SCSI_SCSI_TAPE_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: scsi-tape.h,v 1.2 2003/08/07 22:14:46 fredette Exp $");
+_TME_RCSID("$Id: scsi-tape.h,v 1.3 2006/11/15 23:10:33 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/tape.h>
@@ -121,6 +121,13 @@ struct tme_scsi_tape {
   tme_uint8_t (*tme_scsi_tape_xfer_status) _TME_P((struct tme_scsi_tape *,
 						   int flags,
 						   unsigned long));
+
+  /* the minimum and maximum block sizes, in bytes: */
+  tme_uint32_t tme_scsi_tape_block_size_min;
+  tme_uint32_t tme_scsi_tape_block_size_max;
+
+  /* the current block size, in bytes: */
+  tme_uint32_t tme_scsi_tape_block_size_current;
 };
 
 /* prototypes: */

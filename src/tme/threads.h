@@ -1,4 +1,4 @@
-/* $Id: threads.h,v 1.6 2003/06/27 21:09:10 fredette Exp $ */
+/* $Id: threads.h,v 1.8 2007/08/24 01:12:44 fredette Exp $ */
 
 /* tme/threads.h - header file for threads: */
 
@@ -37,10 +37,11 @@
 #define _TME_THREADS_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: threads.h,v 1.6 2003/06/27 21:09:10 fredette Exp $");
+_TME_RCSID("$Id: threads.h,v 1.8 2007/08/24 01:12:44 fredette Exp $");
 
 /* includes: */
 #include <errno.h>
+#include <sys/time.h>
 
 /* note that our locking model never allows recursive locking. */
 
@@ -48,7 +49,7 @@ _TME_RCSID("$Id: threads.h,v 1.6 2003/06/27 21:09:10 fredette Exp $");
 #ifdef TME_THREADS_SJLJ
 
 /* setjmp/longjmp threads are cooperative: */
-#define TME_THREADS_COOPERATIVE
+#define TME_THREADS_COOPERATIVE		(TRUE)
 
 /* our errno convention: */
 #define TME_EDEADLK		EBUSY
@@ -64,6 +65,10 @@ void tme_sjlj_threads_gtk_init _TME_P((void));
 #endif /* _TME_HAVE_GTK */
 void tme_sjlj_threads_run _TME_P((void));
 #define tme_threads_run tme_sjlj_threads_run
+
+/* thread suspension: */
+#define tme_thread_suspend_others()	do { } while (/* CONSTCOND */ 0)
+#define tme_thread_resume_others()	do { } while (/* CONSTCOND */ 0)
 
 /* if we want speed over lock debugging, we can compile very simple
    rwlock operations: */
@@ -96,9 +101,9 @@ int tme_sjlj_rwlock_unlock _TME_P((struct tme_sjlj_rwlock *, _tme_const char *, 
 #define tme_rwlock_tryrdlock(l) tme_sjlj_rwlock_lock(l, __FILE__, __LINE__, TRUE)
 #define tme_rwlock_unlock(l) tme_sjlj_rwlock_unlock(l, __FILE__, __LINE__)
 #else  /* !defined(__FILE__) || !defined(__LINE__) */
-#define tme_rwlock_rdlock(l) tme_sjlj_rwlock_lock(l, NULL, NULL, FALSE)
-#define tme_rwlock_tryrdlock(l) tme_sjlj_rwlock_lock(l, NULL, NULL, TRUE)
-#define tme_rwlock_unlock(l) tme_sjlj_rwlock_unlock(l, NULL, NULL)
+#define tme_rwlock_rdlock(l) tme_sjlj_rwlock_lock(l, NULL, 0, FALSE)
+#define tme_rwlock_tryrdlock(l) tme_sjlj_rwlock_lock(l, NULL, 0, TRUE)
+#define tme_rwlock_unlock(l) tme_sjlj_rwlock_unlock(l, NULL, 0)
 #endif /* !defined(__FILE__) || !defined(__LINE__) */
 
 #endif /* TME_NO_DEBUG_LOCKS */
@@ -125,8 +130,10 @@ int tme_sjlj_rwlock_unlock _TME_P((struct tme_sjlj_rwlock *, _tme_const char *, 
 typedef int tme_cond_t;
 #define tme_cond_init(x) do { } while (/* CONSTCOND */ 0)
 void tme_sjlj_cond_wait_yield _TME_P((tme_cond_t *, tme_mutex_t *));
+void tme_sjlj_cond_sleep_yield _TME_P((tme_cond_t *, tme_mutex_t *, const struct timeval *));
 void tme_sjlj_cond_notify _TME_P((tme_cond_t *, int));
 #define tme_cond_wait_yield tme_sjlj_cond_wait_yield
+#define tme_cond_sleep_yield tme_sjlj_cond_sleep_yield
 #define tme_cond_notify tme_sjlj_cond_notify
 
 /* deadlock sleeping: */
@@ -160,77 +167,5 @@ ssize_t tme_sjlj_write_yield _TME_P((int, void *, size_t));
 #define tme_thread_write_yield tme_sjlj_write_yield
 
 #endif /* TME_THREADS_SJLJ */
-
-/* on virtually all architectures, regardless of threading, or
-   multiprocessing, or caching, or whatever, C assignments to and from
-   size-aligned values in memory are atomic - i.e., it is not possible
-   for any thread on any processor to see anything other than a
-   completed update to an aligned value in memory.  however, just in
-   case someday there is an architecture (or possibly a compiler!)
-   where this isn't true, we try to capture all of the places where we
-   make this assumption.
-
-   it is much more likely that an architecture may not guarantee that
-   an unaligned access (for those architectures that allow unaligned
-   access) be atomic, so we try capture all of the places where we make
-   that weaker assumption:
-
-   with certain threading models, atomic writes are guaranteed
-   because there's no preemption: */
-#ifdef TME_THREADS_COOPERATIVE
-#define TME_ALIGNED_ACCESS_ATOMIC
-#define TME_UNALIGNED_ACCESS_ATOMIC
-#define tme_memory_sequence_rdlock(l) do { } while (/* CONSTCOND */ 0)
-#define tme_memory_sequence_wrlock(l) do { } while (/* CONSTCOND */ 0)
-#define tme_memory_sequence_unlock(l) do { } while (/* CONSTCOND */ 0)
-#else  /* !TME_THREADS_COOPERATIVE */
-#define tme_memory_sequence_rdlock(l) tme_rwlock_rdlock(l)
-#define tme_memory_sequence_wrlock(l) tme_rwlock_wrlock(l)
-#define tme_memory_sequence_unlock(l) tme_rwlock_unlock(l)
-#endif /* TME_THREADS_COOPERATIVE */
-
-#ifdef TME_UNALIGNED_ACCESS_ATOMIC
-#ifndef TME_ALIGNED_ACCESS_ATOMIC
-#error "if unaligned access is always atomic, aligned access must always be atomic"
-#endif /* !TME_ALIGNED_ACCESS_ATOMIC */
-#endif /* TME_UNALIGNED_ACCESS_ATOMIC */
-
-#ifdef TME_ALIGNED_ACCESS_ATOMIC
-#define tme_memory_aligned_rdlock(l) do { } while (/* CONSTCOND */ 0)
-#define tme_memory_aligned_wrlock(l) do { } while (/* CONSTCOND */ 0)
-#define tme_memory_aligned_unlock(l) do { } while (/* CONSTCOND */ 0)
-#else  /* !TME_ALIGNED_ACCESS_ATOMIC */
-#define tme_memory_aligned_rdlock(l) tme_rwlock_rdlock(l)
-#define tme_memory_aligned_wrlock(l) tme_rwlock_wrlock(l)
-#define tme_memory_aligned_unlock(l) tme_rwlock_unlock(l)
-#endif /* !TME_ALIGNED_ACCESS_ATOMIC */
-
-#ifdef TME_UNALIGNED_ACCESS_ATOMIC
-#define tme_memory_unaligned_rdlock(l) do { } while (/* CONSTCOND */ 0)
-#define tme_memory_unaligned_wrlock(l) do { } while (/* CONSTCOND */ 0)
-#define tme_memory_unaligned_unlock(l) do { } while (/* CONSTCOND */ 0)
-#else  /* !TME_UNALIGNED_ACCESS_ATOMIC */
-#define tme_memory_unaligned_rdlock(l) tme_rwlock_rdlock(l)
-#define tme_memory_unaligned_wrlock(l) tme_rwlock_wrlock(l)
-#define tme_memory_unaligned_unlock(l) tme_rwlock_unlock(l)
-#endif /* !TME_UNALIGNED_ACCESS_ATOMIC */
-
-/* on a host with strict alignment requirements, the alignment of a
-   memory address being accessed makes us choose one of two
-   strategies: if the address is misaligned we must do a sequence of
-   memory accesses, with the memory rwlock locked for a sequence, else
-   the address is aligned and we can do a single memory access with
-   the memory rwlock locked for an aligned memory access.
-
-   this choosing means branching, and when locking for an aligned
-   access and locking for a sequence have the same cost (they're
-   either both no-ops or both locks), we assume that always doing the
-   sequence access is not costlier than the branching that would be
-   needed for the choice: */
-#if defined(TME_THREADS_COOPERATIVE) || !defined(TME_ALIGNED_ACCESS_ATOMIC)
-#define TME_SEQUENCE_ACCESS_NOT_COSTLIER (TRUE)
-#else  /* !TME_THREADS_COOPERATIVE && TME_ALIGNED_ACCESS_ATOMIC */
-#define TME_SEQUENCE_ACCESS_NOT_COSTLIER (FALSE)
-#endif /* TME_THREADS_COOPERATIVE || !TME_ALIGNED_ACCESS_ATOMIC */
 
 #endif /* !_TME_THREADS_H */

@@ -163,7 +163,7 @@ target_vendor = @target_vendor@
 AUTOMAKE_OPTIONS = 1.4 gnu
 
 SUBDIRS = @TME_BUS_SUBDIRS@
-DIST_SUBDIRS = multibus
+DIST_SUBDIRS = multibus sbus
 subdir = bus
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = $(top_builddir)/config.h

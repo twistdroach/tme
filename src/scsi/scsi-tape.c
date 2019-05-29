@@ -1,4 +1,4 @@
-/* $Id: scsi-tape.c,v 1.4 2005/02/18 03:00:30 fredette Exp $ */
+/* $Id: scsi-tape.c,v 1.8 2007/09/06 23:19:06 fredette Exp $ */
 
 /* scsi/scsi-tape.c - implementation of SCSI tape emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: scsi-tape.c,v 1.4 2005/02/18 03:00:30 fredette Exp $");
+_TME_RCSID("$Id: scsi-tape.c,v 1.8 2007/09/06 23:19:06 fredette Exp $");
 
 /* includes: */
 #include <tme/scsi/scsi-tape.h>
@@ -58,10 +58,8 @@ const struct {
   int (*_tme_scsi_tape_list_init) _TME_P((struct tme_scsi_tape *));
 } _tme_scsi_tape_list[] = {
   
-#if 0
-  /* the generic TME SCSI-2 tape: */
-  { "tme-scsi-2", tme_scsi_tape_tme_init },
-#endif
+  /* the generic TME SCSI-1 tape: */
+  { "tme-scsi-1", tme_scsi_tape_tme_init },
   
   /* the Emulex MT02 emulation: */
   { "emulex-mt02", tme_scsi_tape_emulexmt02_init },
@@ -310,6 +308,7 @@ tme_scsi_tape_cdb_xfer0(struct tme_scsi_device *scsi_device,
   int lun;
   tme_uint8_t *cdb;
   unsigned long count_xfer;
+  unsigned int bytes_xfer;
   int flags;
   tme_uint8_t status;
   int rc;
@@ -336,6 +335,10 @@ tme_scsi_tape_cdb_xfer0(struct tme_scsi_device *scsi_device,
   count_xfer = cdb[2];
   count_xfer = (count_xfer << 8) | cdb[3];
   count_xfer = (count_xfer << 8) | cdb[4];
+  bytes_xfer = count_xfer;
+  if (flags & TME_TAPE_FLAG_FIXED) {
+    bytes_xfer *= scsi_tape->tme_scsi_tape_block_size_current;
+  }
   
   /* if this is a read: */
   if (read) {
@@ -350,6 +353,44 @@ tme_scsi_tape_cdb_xfer0(struct tme_scsi_device *scsi_device,
 	  &scsi_device->tme_scsi_device_dma.tme_scsi_dma_out));
     scsi_device->tme_scsi_device_dma.tme_scsi_dma_in = NULL;
 
+    /* XXX FIXME - this is a big hack.  the tme_tape_connection_read
+       function always reads one or more whole tape blocks, but we
+       call it for every READ CDB, even when the initiator hasn't set
+       a block size with MODE SELECT (which allows the initiator to
+       issue reads without regard to block size - reads smaller than
+       the tape block size don't discard the remainder of a block and
+       advance to the next tape block, but instead just return
+       successive parts of the same tape block).
+       
+       this entire function needs to be rewritten, to handle this mode
+       by only issuing tme_tape_connection_read calls when the block
+       buffer has been exhausted, and also honor the SILI bit.  as it
+       is, this code definitely has no chance of working with a real 
+       tape drive.
+
+       but to fix the immediate problem, if the read has transferred
+       some bytes with an underrun, we just pad the read out with
+       zeroes.  this fixes NetBSD PR pkg/34536: */
+    if (scsi_device->tme_scsi_device_dma.tme_scsi_dma_resid > 0
+	&& scsi_device->tme_scsi_device_dma.tme_scsi_dma_resid < bytes_xfer
+	&& (flags
+	    & ~(TME_TAPE_FLAG_ILI
+		| TME_TAPE_FLAG_MARK)) == 0) {
+      /* XXX this breaks const: */
+      /* XXX writing into the tape buffer breaks the tape abstraction,
+	 and only works because we know that posix-tape.c has
+	 allocated this buffer to be at least as big as the read we
+	 requested: */
+      memset(((tme_uint8_t *) 
+	      (scsi_device->tme_scsi_device_dma.tme_scsi_dma_out
+	       + scsi_device->tme_scsi_device_dma.tme_scsi_dma_resid)),
+	     0,
+	     (bytes_xfer
+	      - scsi_device->tme_scsi_device_dma.tme_scsi_dma_resid));
+      scsi_device->tme_scsi_device_dma.tme_scsi_dma_resid = bytes_xfer;
+      flags &= ~TME_TAPE_FLAG_ILI;
+    }
+    
     /* get the status: */
     status
       = ((*scsi_tape->tme_scsi_tape_xfer_status)
@@ -434,7 +475,47 @@ _TME_SCSI_DEVICE_CDB_DECL(tme_scsi_tape_cdb_rewind)
 /* this implements the tape READ BLOCK LIMITS command: */
 _TME_SCSI_DEVICE_CDB_DECL(tme_scsi_tape_cdb_block_limits)
 {
-  abort();
+  struct tme_scsi_tape *scsi_tape;
+  tme_uint8_t *data;
+  int lun;
+  tme_uint32_t block_size;
+
+  /* recover our tape: */
+  scsi_tape = (struct tme_scsi_tape *) scsi_device;
+  
+  /* get the addressed LUN: */
+  lun = scsi_device->tme_scsi_device_addressed_lun;
+
+  data = &scsi_device->tme_scsi_device_data[0];
+
+  /* a reserved byte: */
+  data++;
+
+  /* the Maximum Block Length: */
+  block_size = scsi_tape->tme_scsi_tape_block_size_max;
+  *(data++) = (block_size >> 16) & 0xff;
+  *(data++) = (block_size >>  8) & 0xff;
+  *(data++) = (block_size >>  0) & 0xff;
+
+  /* the Minimum Block Length: */
+  block_size = scsi_tape->tme_scsi_tape_block_size_min;
+  assert (block_size > 0);
+  *(data++) = (block_size >>  8) & 0xff;
+  *(data++) = (block_size >>  0) & 0xff;
+
+  /* set the DMA pointer and length: */
+  scsi_device->tme_scsi_device_dma.tme_scsi_dma_resid
+    = (data
+       - &scsi_device->tme_scsi_device_data[0]);
+  scsi_device->tme_scsi_device_dma.tme_scsi_dma_out
+    = &scsi_device->tme_scsi_device_data[0];
+  scsi_device->tme_scsi_device_dma.tme_scsi_dma_in
+    = NULL;
+
+  /* finish the command: */
+  tme_scsi_device_target_do_dsmf(scsi_device,
+				 TME_SCSI_STATUS_GOOD,
+				 TME_SCSI_MSG_CMD_COMPLETE);
 }
 
 /* this implements the tape Group 0 READ command: */
@@ -574,16 +655,228 @@ _TME_SCSI_DEVICE_CDB_DECL(tme_scsi_tape_cdb_space)
 				TME_SCSI_MSG_CMD_COMPLETE);
 }
 
+/* this processes the parameter list from a tape MODE SELECT command: */
+_TME_SCSI_DEVICE_PHASE_DECL(_tme_scsi_tape_mode_select_data)
+{
+  struct tme_scsi_tape *scsi_tape;
+  int lun;
+  struct tme_scsi_tape_connection *conn_scsi_tape;
+  struct tme_tape_connection *conn_tape;
+  const tme_uint8_t *data;
+  const tme_uint8_t *data_end;
+  tme_uint8_t status;
+  unsigned int block_descriptors;
+  tme_uint32_t blocks;
+  tme_uint32_t block_size;
+  tme_uint32_t length;
+  unsigned long sizes[3];
+  int rc;
+  
+  /* recover our tape: */
+  scsi_tape = (struct tme_scsi_tape *) scsi_device;
+  
+  /* get the addressed LUN: */
+  lun = scsi_device->tme_scsi_device_addressed_lun;
+
+  /* get a pointer to the first byte of data, and a pointer past the
+     last byte of data: */
+  data = &scsi_device->tme_scsi_device_data[0];
+  length = scsi_device->tme_scsi_device_cdb[4];
+  data_end = (data
+	      + TME_MIN(sizeof(scsi_device->tme_scsi_device_data),
+			length));
+
+  /* assume that this command will succeed: */
+  status = TME_SCSI_STATUS_GOOD;
+
+  /* skip the two reserved bytes: */
+  data += (data < data_end);
+  data += (data < data_end);
+
+  /* we ignore the buffered mode and speed byte: */
+  data += (data < data_end);
+
+  /* get the count of bytes in block descriptors: */
+  block_descriptors
+    = (data < data_end
+       ? *(data++)
+       : 0);
+
+  /* check the block descriptors: */
+  block_size = 0;
+  for (;
+       block_descriptors >= 8; 
+       block_descriptors -= 8) {
+
+    /* if this block descriptor is short: */
+    if ((data_end - data) < 8) {
+
+      /* XXX FIXME - we need to assemble a sense and return a CHECK
+         CONDITION here: */
+      abort();
+    }
+
+    /* we ignore the density code: */
+    data++;
+
+    /* get the block count: */
+    blocks = *(data++);
+    blocks = (blocks << 8) + *(data++);
+    blocks = (blocks << 8) + *(data++);
+
+    /* skip the reserved byte: */
+    data++;
+
+    /* get the block length: */
+    block_size = *(data++);
+    block_size = (block_size << 8) + *(data++);
+    block_size = (block_size << 8) + *(data++);
+
+    /* if this block descriptor doesn't describe the entire tape: */
+    if (blocks != 0) {
+
+      /* XXX FIXME - we need to assemble a sense and return a CHECK
+         CONDITION here: */
+      abort();
+    }
+
+    /* set the new current block size: */
+    scsi_tape->tme_scsi_tape_block_size_current = block_size;
+  }
+
+  /* if the parameter list was good: */
+  if (status == TME_SCSI_STATUS_GOOD) {
+
+    /* get the tape connection: */
+    conn_scsi_tape
+      = scsi_tape->tme_scsi_tape_connections[lun];
+    conn_tape
+      = ((struct tme_tape_connection *)
+	 conn_scsi_tape->tme_scsi_tape_connection.tme_tape_connection.tme_connection_other);
+
+    /* set the block size: */
+    if (block_size != 0) {
+      sizes[0] = block_size;
+      sizes[1] = block_size;
+      sizes[2] = block_size;
+    }
+    else {
+      sizes[0] = scsi_tape->tme_scsi_tape_block_size_min;
+      sizes[1] = scsi_tape->tme_scsi_tape_block_size_max;
+      sizes[2] = 0;
+    }
+    rc
+      = ((*conn_tape->tme_tape_connection_control)
+	 (conn_tape,
+	  TME_TAPE_CONTROL_BLOCK_SIZE_SET,
+	  sizes));
+    assert (rc == TME_OK);
+  }
+
+  tme_scsi_device_target_do_smf(scsi_device,
+				status,
+				TME_SCSI_MSG_CMD_COMPLETE);
+}
+
 /* this implements the tape MODE SELECT command: */
 _TME_SCSI_DEVICE_CDB_DECL(tme_scsi_tape_cdb_mode_select)
 {
-  abort();
+  
+  /* read in the parameter list: */
+  scsi_device->tme_scsi_device_dma.tme_scsi_dma_resid
+    = scsi_device->tme_scsi_device_cdb[4];
+  scsi_device->tme_scsi_device_dma.tme_scsi_dma_resid
+    = TME_MIN(scsi_device->tme_scsi_device_dma.tme_scsi_dma_resid,
+	      sizeof(scsi_device->tme_scsi_device_data));
+  scsi_device->tme_scsi_device_dma.tme_scsi_dma_in
+    = &scsi_device->tme_scsi_device_data[0];
+  scsi_device->tme_scsi_device_dma.tme_scsi_dma_out
+    = NULL;
+
+  /* transfer the parameter list: */
+  tme_scsi_device_target_phase(scsi_device,
+			       (TME_SCSI_SIGNAL_BSY
+				| TME_SCSI_PHASE_DATA_OUT));
+  scsi_device->tme_scsi_device_phase
+    = _tme_scsi_tape_mode_select_data;
 }
 
 /* this implements the tape MODE SENSE command: */
 _TME_SCSI_DEVICE_CDB_DECL(tme_scsi_tape_cdb_mode_sense)
 {
-  abort();
+  struct tme_scsi_tape *scsi_tape;
+  tme_uint8_t *data;
+  tme_uint32_t blocks, block_size;
+  int lun;
+
+  /* recover our tape: */
+  scsi_tape = (struct tme_scsi_tape *) scsi_device;
+  
+  /* get the addressed LUN: */
+  lun = scsi_device->tme_scsi_device_addressed_lun;
+
+  /* get the current block size: */
+  block_size = scsi_tape->tme_scsi_tape_block_size_current;
+
+  data = &scsi_device->tme_scsi_device_data[0];
+
+  /* the sense data length.  we will fill this in later: */
+  data++;
+
+  /* byte 1 is the medium type: */
+  *(data++) = 0x00; /* default (only one medium type supported) */
+
+  /* byte 2 is the WP (Write Protect), Buffered Mode, and Speed: */
+  *(data++) = 0x80; /* write protected, unbuffered, default speed */
+
+  /* byte 3 is the Block Descriptor Length.  we will fill this in
+     later: */
+  data++;
+
+  /* the first Block Descriptor: */
+  
+  /* the Block Descriptor density code: */
+  *(data++) = 0x05; /* QIC-24 */
+
+  /* the Number of Blocks: */
+  /* XXX FIXME - we assume a 60MB tape: */
+  blocks = (60 * 1024 * 1024) / block_size;
+  *(data++) = (blocks >> 16) & 0xff;
+  *(data++) = (blocks >>  8) & 0xff;
+  *(data++) = (blocks >>  0) & 0xff;
+
+  /* a reserved byte: */
+  data++;
+
+  /* the Block Length: */
+  *(data++) = (block_size >> 16) & 0xff;
+  *(data++) = (block_size >>  8) & 0xff;
+  *(data++) = (block_size >>  0) & 0xff;
+
+  /* fill in the Block Descriptor Length: */
+  scsi_device->tme_scsi_device_data[3]
+    = (data - &scsi_device->tme_scsi_device_data[4]);
+
+  /* there are no vendor-unique bytes or mode pages: */
+
+  /* fill in the sense data length: */
+  scsi_device->tme_scsi_device_data[0]
+    = (data - &scsi_device->tme_scsi_device_data[1]);
+
+  /* set the DMA pointer and length: */
+  scsi_device->tme_scsi_device_dma.tme_scsi_dma_resid
+    = TME_MIN((data
+	       - &scsi_device->tme_scsi_device_data[0]),
+	      scsi_device->tme_scsi_device_cdb[4]);
+  scsi_device->tme_scsi_device_dma.tme_scsi_dma_out
+    = &scsi_device->tme_scsi_device_data[0];
+  scsi_device->tme_scsi_device_dma.tme_scsi_dma_in
+    = NULL;
+
+  /* finish the command: */
+  tme_scsi_device_target_do_dsmf(scsi_device,
+				 TME_SCSI_STATUS_GOOD,
+				 TME_SCSI_MSG_CMD_COMPLETE);
 }
 
 /* this implements the tape LOAD/UNLOAD command: */

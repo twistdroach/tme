@@ -1,4 +1,4 @@
-/* $Id: gtk-display.c,v 1.2 2003/07/31 01:42:13 fredette Exp $ */
+/* $Id: gtk-display.c,v 1.3 2007/08/25 20:09:32 fredette Exp $ */
 
 /* host/gtk/gtk-display.c - GTK display support: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: gtk-display.c,v 1.2 2003/07/31 01:42:13 fredette Exp $");
+_TME_RCSID("$Id: gtk-display.c,v 1.3 2007/08/25 20:09:32 fredette Exp $");
 
 /* includes: */
 #include "gtk-display.h"
@@ -163,6 +163,49 @@ _tme_gtk_display_enter_focus(GtkWidget *widget,
 
   /* continue normal event processing: */
   return (FALSE);
+}
+
+/* this creates a menu of radio buttons: */
+GtkWidget *
+_tme_gtk_display_menu_radio(void *state,
+			    tme_gtk_display_menu_items_t menu_items)
+{
+  GtkWidget *menu;
+  GSList *menu_group;
+  struct tme_gtk_display_menu_item menu_item_buffer;
+  GtkSignalFunc menu_func;
+  GtkWidget *menu_item;
+
+  /* create the menu: */
+  menu = gtk_menu_new();
+
+  /* create the menu items: */
+  menu_group = NULL;
+  for (menu_item_buffer.tme_gtk_display_menu_item_which = 0;
+       ;
+       menu_item_buffer.tme_gtk_display_menu_item_which++) {
+    menu_func = (*menu_items)(state, &menu_item_buffer);
+    if (menu_func == GTK_SIGNAL_FUNC(NULL)) {
+      break;
+    }
+    menu_item
+      = gtk_radio_menu_item_new_with_label(menu_group,
+					   menu_item_buffer.tme_gtk_display_menu_item_string);
+    if (menu_item_buffer.tme_gtk_display_menu_item_widget != NULL) {
+      *menu_item_buffer.tme_gtk_display_menu_item_widget = menu_item;
+    }
+    menu_group
+      = gtk_radio_menu_item_group(GTK_RADIO_MENU_ITEM(menu_item));
+    gtk_signal_connect(GTK_OBJECT(menu_item), 
+		       "activate",
+		       menu_func,
+		       (gpointer) state);
+    gtk_menu_append(GTK_MENU(menu), menu_item);
+    gtk_widget_show(menu_item);
+  }
+
+  /* return the menu: */
+  return (menu);
 }
 
 /* this makes a new connection side for a GTK display: */

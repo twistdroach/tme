@@ -1,4 +1,4 @@
-/* $Id: posix-memory.c,v 1.5 2003/07/29 18:20:30 fredette Exp $ */
+/* $Id: posix-memory.c,v 1.6 2006/09/30 12:43:35 fredette Exp $ */
 
 /* host/posix/posix-memory.c - implementation of memory on a POSIX system: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: posix-memory.c,v 1.5 2003/07/29 18:20:30 fredette Exp $");
+_TME_RCSID("$Id: posix-memory.c,v 1.6 2006/09/30 12:43:35 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -114,8 +114,8 @@ _tme_posix_memory_tlb_fill(void *_memory, struct tme_bus_tlb *tlb,
   tme_bus_tlb_initialize(tlb);
 
   /* this TLB entry can cover the whole device: */
-  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first, 0);
-  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last, memory_address_last);
+  tlb->tme_bus_tlb_addr_first = 0;
+  tlb->tme_bus_tlb_addr_last = memory_address_last;
 
   /* all memory devices allow fast reading.  all memory devices except
      ROMs allow fast writing: */

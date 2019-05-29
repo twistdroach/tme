@@ -1,4 +1,4 @@
-/* $Id: sun2-control.c,v 1.3 2003/05/03 19:26:38 fredette Exp $ */
+/* $Id: sun2-control.c,v 1.4 2007/02/15 01:37:32 fredette Exp $ */
 
 /* machine/sun2/sun2-control.c - implementation of Sun 2 emulation control space: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun2-control.c,v 1.3 2003/05/03 19:26:38 fredette Exp $");
+_TME_RCSID("$Id: sun2-control.c,v 1.4 2007/02/15 01:37:32 fredette Exp $");
 
 /* includes: */
 #include "sun2-impl.h"
@@ -63,12 +63,15 @@ _tme_sun2_control_cycle_handler(void *_sun2, struct tme_bus_cycle *cycle_init)
   /* this macro evaluates to TRUE whenever a register is maybe being
      accessed: */
 #define _TME_SUN2_REG_ACCESSED(icreg)				\
-  TME_RANGES_OVERLAP(reg,					\
-		     reg					\
-		     + cycle_init->tme_bus_cycle_size - 1,	\
-		     TME_SUN2_CONTROL_ADDRESS(icreg),		\
-		     TME_SUN2_CONTROL_ADDRESS(icreg)		\
-		     + sizeof(sun2->icreg) - 1)
+  ((TME_SUN2_CONTROL_ADDRESS(icreg) == 0)			\
+   ? (reg < sizeof(sun2->icreg))				\
+   : TME_RANGES_OVERLAP(reg,					\
+			reg					\
+			+ cycle_init->tme_bus_cycle_size - 1,	\
+			!TME_SUN2_CONTROL_ADDRESS(icreg) +	\
+			TME_SUN2_CONTROL_ADDRESS(icreg),	\
+			TME_SUN2_CONTROL_ADDRESS(icreg)		\
+			+ sizeof(sun2->icreg) - 1))
 
   /* whenever the page map register is accessed, we need to fill it
      before running the cycle: */

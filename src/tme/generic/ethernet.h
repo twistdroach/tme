@@ -1,4 +1,4 @@
-/* $Id: ethernet.h,v 1.3 2004/04/30 01:46:01 fredette Exp $ */
+/* $Id: ethernet.h,v 1.6 2007/02/15 01:27:13 fredette Exp $ */
 
 /* tme/generic/ethernet.h - header file for generic ethernet support: */
 
@@ -37,7 +37,7 @@
 #define _TME_GENERIC_ETHERNET_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: ethernet.h,v 1.3 2004/04/30 01:46:01 fredette Exp $");
+_TME_RCSID("$Id: ethernet.h,v 1.6 2007/02/15 01:27:13 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -60,6 +60,11 @@ _TME_RCSID("$Id: ethernet.h,v 1.3 2004/04/30 01:46:01 fredette Exp $");
    complete header and CRC: */
 #define TME_ETHERNET_FRAME_MIN		(64)
 #define TME_ETHERNET_FRAME_MAX		(1518)
+
+/* Ethernet types: */
+#define TME_ETHERNET_TYPE_IPV4		(0x0800)
+#define TME_ETHERNET_TYPE_ARP		(0x0806)
+#define TME_ETHERNET_TYPE_RARP		(0x8035)
    
 /* Ethernet config flags: */
 #define TME_ETHERNET_CONFIG_NORMAL	(0)
@@ -87,7 +92,7 @@ struct tme_ethernet_header {
   tme_uint8_t tme_ethernet_header_dst[TME_ETHERNET_ADDR_SIZE];
 
   /* the source address: */
-  tme_uint8_t tme_ethernet_header_size[TME_ETHERNET_ADDR_SIZE];
+  tme_uint8_t tme_ethernet_header_src[TME_ETHERNET_ADDR_SIZE];
 
   /* the type: */
   tme_uint8_t tme_ethernet_header_type[2];
@@ -144,6 +149,7 @@ extern _tme_const tme_uint8_t tme_ethernet_addr_broadcast[TME_ETHERNET_ADDR_SIZE
 /* prototypes: */
 int tme_ethernet_addr_parse _TME_P((_tme_const char *, tme_uint8_t *));
 int tme_ethernet_connection_score _TME_P((struct tme_connection *, unsigned int *));
-unsigned int tme_ethernet_chunks_copy _TME_P((struct tme_ethernet_frame_chunk *, _tme_const struct tme_ethernet_frame_chunk *));
+unsigned int tme_ethernet_chunks_copy _TME_P((_tme_const struct tme_ethernet_frame_chunk *, _tme_const struct tme_ethernet_frame_chunk *));
+tme_uint32_t tme_ethernet_crc32_el _TME_P((_tme_const tme_uint8_t *, unsigned int));
 
 #endif /* !_TME_GENERIC_ETHERNET_H */

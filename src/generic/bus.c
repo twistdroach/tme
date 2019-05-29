@@ -1,4 +1,4 @@
-/* $Id: bus.c,v 1.9 2005/04/30 15:00:48 fredette Exp $ */
+/* $Id: bus.c,v 1.13 2007/02/12 23:36:18 fredette Exp $ */
 
 /* generic/gen-bus.c - generic bus support: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: bus.c,v 1.9 2005/04/30 15:00:48 fredette Exp $");
+_TME_RCSID("$Id: bus.c,v 1.13 2007/02/12 23:36:18 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus.h>
@@ -115,8 +115,50 @@ tme_bus_tlb_fill(struct tme_bus *bus,
   /* get the sourced address mask: */
   sourced_address_mask = conn_int_asker->tme_bus_connection_int_sourced;
 
+  /* get the asked address on the bus: */
+  conn_address = (sourced_address_mask | address);
+
+  /* start the mapping TLB entry: */
+  tlb_bus.tme_bus_tlb_addr_first = 0;
+  tlb_bus.tme_bus_tlb_addr_last = TME_MIN(((sourced_address_mask
+					    | (sourced_address_mask - 1))
+					   ^ sourced_address_mask),
+					  bus->tme_bus_address_mask);
+  tlb_bus.tme_bus_tlb_cycles_ok = TME_BUS_CYCLE_READ | TME_BUS_CYCLE_WRITE;
+
+  /* if this bus has a controller, and this request isn't coming from
+     the controller: */
+  conn_int = bus->tme_bus_controller;
+  if (conn_int != NULL
+      && conn_int != conn_int_asker) {
+
+    /* get the controller's connection: */
+    conn_bus_other = 
+      (struct tme_bus_connection *) conn_int->tme_bus_connection_int.tme_bus_connection.tme_connection_other;
+
+    /* unlock the bus: */
+    tme_rwlock_unlock(&bus->tme_bus_rwlock);
+
+    /* call the controller's TLB fill function: */
+    rc = (*conn_bus_other->tme_bus_tlb_fill)(conn_bus_other, tlb,
+					     conn_address, cycles);
+
+    /* relock the bus: */
+    /* XXX FIXME - we assume that this succeeds: */
+    (void) tme_rwlock_timedrdlock(&bus->tme_bus_rwlock, TME_THREAD_TIMEDLOCK);
+
+    /* if the TLB fill succeeded: */
+    if (rc == TME_OK) {
+
+      /* map the filled TLB entry: */
+      tme_bus_tlb_map(tlb, conn_address, &tlb_bus, address);
+    }
+
+    return (rc);
+  }
+
   /* search for this address on the bus: */
-  pivot = tme_bus_address_search(bus, sourced_address_mask | address);
+  pivot = tme_bus_address_search(bus, conn_address);
 
   /* if this address doesn't exist: */
   if (pivot < 0) {
@@ -128,8 +170,7 @@ tme_bus_tlb_fill(struct tme_bus *bus,
     /* initialize the TLB entry: */
     tme_bus_tlb_initialize(tlb);
 
-    /* this TLB entry can cover the entire hole in the address space,
-       limited by the sourced address mask of this device: */
+    /* this TLB entry can cover the entire hole in the address space: */
     pivot = -1 - pivot;
     hole_first = (pivot == 0
 		  ? 0
@@ -138,17 +179,13 @@ tme_bus_tlb_fill(struct tme_bus *bus,
 		     + (bus->tme_bus_addressables[pivot - 1]
 			.tme_bus_addressable_subregion->tme_bus_subregion_address_last)
 		     + 1));
-    hole_first = TME_MAX(hole_first, sourced_address_mask);
     hole_last = (pivot == bus->tme_bus_addressables_count
 		 ? bus->tme_bus_address_mask
 		 : ((bus->tme_bus_addressables[pivot]
 		     .tme_bus_addressable_connection->tme_bus_connection_int_address)
 		    - 1));
-    hole_last = TME_MIN(hole_last,
-			sourced_address_mask
-			+ conn_int_asker->tme_bus_connection_int_address_last);
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first, hole_first);
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last, hole_last);
+    tlb->tme_bus_tlb_addr_first = hole_first;
+    tlb->tme_bus_tlb_addr_last = hole_last;
 
     /* reads and writes are allowed: */
     tlb->tme_bus_tlb_cycles_ok = TME_BUS_CYCLE_READ | TME_BUS_CYCLE_WRITE;
@@ -167,7 +204,7 @@ tme_bus_tlb_fill(struct tme_bus *bus,
       (struct tme_bus_connection *) conn_int->tme_bus_connection_int.tme_bus_connection.tme_connection_other;
 
     /* call the TLB fill function for the connection: */
-    conn_address = (sourced_address_mask | address) - conn_int->tme_bus_connection_int_address;
+    conn_address -= conn_int->tme_bus_connection_int_address;
     rc = (*conn_bus_other->tme_bus_tlb_fill)(conn_bus_other, tlb,
 					     conn_address, cycles);
 
@@ -175,19 +212,26 @@ tme_bus_tlb_fill(struct tme_bus *bus,
     if (rc == TME_OK) {
       
       /* create the mapping TLB entry: */
-      TME_ATOMIC_WRITE(tme_bus_addr_t, tlb_bus.tme_bus_tlb_addr_first, 
-		       (conn_int->tme_bus_connection_int_address
-			+ subregion->tme_bus_subregion_address_first
-			- sourced_address_mask));
-      TME_ATOMIC_WRITE(tme_bus_addr_t, tlb_bus.tme_bus_tlb_addr_last, 
-		       (conn_int->tme_bus_connection_int_address
-			+ subregion->tme_bus_subregion_address_last
-			- sourced_address_mask));
-      tlb_bus.tme_bus_tlb_cycles_ok = TME_BUS_CYCLE_READ | TME_BUS_CYCLE_WRITE;
-  
-      /* map the filled TLB entry: */
-      tme_bus_tlb_map(tlb, conn_address, &tlb_bus, address);
+      tlb_bus.tme_bus_tlb_addr_first =
+	(TME_MAX((conn_int->tme_bus_connection_int_address
+		  + subregion->tme_bus_subregion_address_first),
+		 (sourced_address_mask
+		  | tlb_bus.tme_bus_tlb_addr_first))
+	 - sourced_address_mask);
+      tlb_bus.tme_bus_tlb_addr_last = 
+	(TME_MIN((conn_int->tme_bus_connection_int_address
+		  + subregion->tme_bus_subregion_address_last),
+		 (sourced_address_mask
+		  | tlb_bus.tme_bus_tlb_addr_last))
+	 - sourced_address_mask);
     }
+  }
+
+  /* if the TLB fill succeeded: */
+  if (rc == TME_OK) {
+
+    /* map the filled TLB entry: */
+    tme_bus_tlb_map(tlb, conn_address, &tlb_bus, address);
   }
 
   /* done: */
@@ -199,7 +243,8 @@ int
 tme_bus_tlb_set_allocate(struct tme_bus *bus,
 			 struct tme_bus_connection_int *conn_int_asker,
 			 unsigned int count, unsigned int sizeof_one, 
-			 TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb *) _tlbs)
+			 struct tme_bus_tlb * tme_shared *_tlbs,
+			 tme_rwlock_t *_tlbs_rwlock)
 {
   struct tme_bus_connection *conn_bus_other, *conn_bus_dma;
   int conn_int_i;
@@ -241,7 +286,7 @@ tme_bus_tlb_set_allocate(struct tme_bus *bus,
      let it allocate the TLB set: */
   if (conn_bus_dma != NULL) {
     rc = (*conn_bus_dma->tme_bus_tlb_set_allocate)
-      (conn_bus_dma, count, sizeof_one, _tlbs);
+      (conn_bus_dma, count, sizeof_one, _tlbs, _tlbs_rwlock);
   }
 
   /* otherwise, allocate and initialize a singleton set ourselves: */
@@ -249,10 +294,10 @@ tme_bus_tlb_set_allocate(struct tme_bus *bus,
     tlbs = (struct tme_bus_tlb *) tme_malloc(count * sizeof_one);
     tlb = tlbs;
     for (tlb_i = 0; tlb_i < count; tlb_i++) {
-      tme_bus_tlb_invalidate(tlb);
+      tme_bus_tlb_construct(tlb);
       tlb = (struct tme_bus_tlb *) (((tme_uint8_t *) tlb) + sizeof_one);
     }
-    TME_ATOMIC_WRITE(struct tme_bus_tlb *, *_tlbs, tlbs);
+    tme_memory_atomic_pointer_write(struct tme_bus_tlb *, *_tlbs, tlbs, _tlbs_rwlock);
     rc = TME_OK;
   }
       
@@ -270,7 +315,8 @@ tme_bus_connection_ok(struct tme_bus *bus,
   int pivot_start, pivot_end;
 
   /* if this connection isn't addressable, it's always OK: */
-  if (!conn_int->tme_bus_connection_int_addressable) {
+  if (!(conn_int->tme_bus_connection_int_flags
+	& TME_BUS_CONNECTION_INT_FLAG_ADDRESSABLE)) {
     return (TRUE);
   }
 
@@ -341,6 +387,21 @@ tme_bus_connection_make(struct tme_bus *bus,
     return (TME_OK);
   }
 
+  /* if this connection is to a bus controller: */
+  if (conn_int->tme_bus_connection_int_flags
+      & TME_BUS_CONNECTION_INT_FLAG_CONTROLLER) {
+
+    /* if this bus already has a controller: */
+    if (bus->tme_bus_controller != NULL) {
+
+      /* we can't make this connection: */
+      return (EEXIST);
+    }
+
+    /* this connection is to the bus controller: */
+    bus->tme_bus_controller = conn_int;
+  }
+
   /* add this connection to our list: */
   conn_int->tme_bus_connection_int.tme_bus_connection.tme_connection_next
     = (struct tme_connection *) bus->tme_bus_connections;
@@ -348,7 +409,8 @@ tme_bus_connection_make(struct tme_bus *bus,
 
   /* if this connection is addressable, and this is connection is now
      fully made, add it to our list of addressables: */
-  if (conn_int->tme_bus_connection_int_addressable
+  if ((conn_int->tme_bus_connection_int_flags
+       & TME_BUS_CONNECTION_INT_FLAG_ADDRESSABLE)
       && state == TME_CONNECTION_FULL) {
     
     /* add all subregions of this connection as addressables: */
@@ -419,21 +481,20 @@ tme_bus_tlb_map(struct tme_bus_tlb *tlb0, tme_bus_addr_t addr0,
 {
   tme_bus_addr_t extra_before0, extra_after0;
   tme_bus_addr_t extra_before1, extra_after1;
-  tme_bus_addr_t addr_offset;
+  long addr_offset;
   unsigned int cycles_ok;
 
   /* get the address offset: */
-  addr_offset = addr1 - addr0;
+  addr_offset = addr1;
+  addr_offset -= addr0;
 
   /* intersect the amount of bus address space covered: */
-  extra_before0 = addr0 - TME_ATOMIC_READ(tme_bus_addr_t, tlb0->tme_bus_tlb_addr_first);
-  extra_after0 = TME_ATOMIC_READ(tme_bus_addr_t, tlb0->tme_bus_tlb_addr_last) - addr0;
-  extra_before1 = addr1 - TME_ATOMIC_READ(tme_bus_addr_t, tlb1->tme_bus_tlb_addr_first);
-  extra_after1 = TME_ATOMIC_READ(tme_bus_addr_t, tlb1->tme_bus_tlb_addr_last) - addr1;
-  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb0->tme_bus_tlb_addr_first, 
-		   addr1 - TME_MIN(extra_before0, extra_before1));
-  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb0->tme_bus_tlb_addr_last, 
-		   addr1 + TME_MIN(extra_after0, extra_after1));
+  extra_before0 = addr0 - tlb0->tme_bus_tlb_addr_first;
+  extra_after0 = tlb0->tme_bus_tlb_addr_last - addr0;
+  extra_before1 = addr1 - tlb1->tme_bus_tlb_addr_first;
+  extra_after1 = tlb1->tme_bus_tlb_addr_last - addr1;
+  tlb0->tme_bus_tlb_addr_first = addr1 - TME_MIN(extra_before0, extra_before1);
+  tlb0->tme_bus_tlb_addr_last = addr1 + TME_MIN(extra_after0, extra_after1);
 
   /* intersect the kinds of bus cycles allowed: */
   cycles_ok = (tlb0->tme_bus_tlb_cycles_ok &= tlb1->tme_bus_tlb_cycles_ok);
@@ -454,44 +515,35 @@ tme_bus_tlb_map(struct tme_bus_tlb *tlb0, tme_bus_addr_t addr0,
   tlb0->tme_bus_tlb_addr_offset -= addr_offset;
 }
 
-/* this reserves a TLB entry in backing storage: */
+/* this constructs a new global TLB entry: */
 void
-tme_bus_tlb_reserve(struct tme_bus_tlb *tlb_backing,
-		    struct tme_bus_tlb *tlb_local)
+tme_bus_tlb_construct(struct tme_bus_tlb *tlb)
 {
-  TME_ATOMIC_WRITE(struct tme_bus_tlb *, tlb_backing->tme_bus_tlb_backing_reservation,
-		   tlb_local);
-  TME_ATOMIC_WRITE(struct tme_bus_tlb *, tlb_local->tme_bus_tlb_backing_reservation,
-		   tlb_backing);
+  /* a new global TLB entry is invalid and not busy: */
+  tlb->tme_bus_tlb_invalid = TRUE;
+  tme_rwlock_init(&tlb->tme_bus_tlb_invalid_rwlock);
+  tlb->tme_bus_tlb_busy = FALSE;
+  tme_rwlock_init(&tlb->tme_bus_tlb_busy_rwlock);
+  tlb->tme_bus_tlb_global = tlb;
 }
 
-/* this saves a bus TLB entry in automatic storage into a reserved TLB
-   entry in backing storage, but only if the backing storage
-   reservation has not been broken, and only if the TLB entry hasn't
-   been invalidated since it was filled: */
+/* this saves a bus TLB entry in automatic storage into a backing
+   global bus TLB entry: */
 void
 tme_bus_tlb_back(const struct tme_bus_tlb *tlb_local)
 {
   struct tme_bus_tlb *tlb_backing;
 
   /* get the backing TLB entry: */
-  tlb_backing = TME_ATOMIC_READ(struct tme_bus_tlb *, tlb_local->tme_bus_tlb_backing_reservation);
-
-  /* if the backing storage reservation has been broken, return now: */
-  if (TME_ATOMIC_READ(struct tme_bus_tlb *, tlb_backing->tme_bus_tlb_backing_reservation)
-      != tlb_local) {
-    return;
-  }
+  tlb_backing = tlb_local->tme_bus_tlb_global;
 
 #define TLB_BACK(f) tlb_backing->f = tlb_local->f
 
   /* the first address covered: */
-  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb_backing->tme_bus_tlb_addr_first,
-		   TME_ATOMIC_READ(tme_bus_addr_t, tlb_local->tme_bus_tlb_addr_first));
+  TLB_BACK(tme_bus_tlb_addr_first);
 
   /* the last address covered: */
-  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb_backing->tme_bus_tlb_addr_last,
-		   TME_ATOMIC_READ(tme_bus_addr_t, tlb_local->tme_bus_tlb_addr_last));
+  TLB_BACK(tme_bus_tlb_addr_last);
 
   /* the fast (memory) transfers: */
   TLB_BACK(tme_bus_tlb_emulator_off_read);
@@ -523,17 +575,6 @@ tme_bus_tlb_back(const struct tme_bus_tlb *tlb_local)
 	  * tlb_local->tme_bus_tlb_fault_handler_count);
 
 #undef TLB_BACK
-
-  /* XXX FIXME - serializing would be useful here: */
-
-  /* if this TLB entry has been invalidated while we were writing,
-     complete the invalidation: */
-  /* if the backing storage reservation has been broken, return now: */
-  if (TME_ATOMIC_READ(struct tme_bus_tlb *, tlb_backing->tme_bus_tlb_backing_reservation)
-      != tlb_local) {
-    assert (TME_ATOMIC_READ(struct tme_bus_tlb *, tlb_backing->tme_bus_tlb_backing_reservation) == NULL);
-    tme_bus_tlb_invalidate(tlb_backing);
-  }
 }
 
 /* this invalidates a bus TLB entry: */
@@ -541,23 +582,25 @@ void
 tme_bus_tlb_invalidate(struct tme_bus_tlb *tlb)
 {
 
-  /* clear the backing-reservation pointer.  this will invalidate TLB
-     entries that have not yet been copied from local to global
-     storage: */
-  TME_ATOMIC_WRITE(struct tme_bus_tlb *, tlb->tme_bus_tlb_backing_reservation, NULL);
+  /* lock this TLB entry for invalidation: */
+  tme_rwlock_wrlock(&tlb->tme_bus_tlb_invalid_rwlock);
 
-  /* XXX FIXME - serializing would be useful here: */
-  
-  /* make the first address covered all-bits-one.  the only bus TLB
-     entries this will not invalidate are those that have a last
-     address covered of all-bits one: */
-  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first, -1);
-  
-  /* XXX FIXME - serializing would be useful here: */
+  /* invalidate this TLB entry: */
+  tlb->tme_bus_tlb_invalid = TRUE;
 
-  /* make the last address covered all-bits-zero.  this will
-     invalidate the TLB entries we didn't catch above: */
-  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last, 0);
+#if TME_THREADS_COOPERATIVE
+#ifndef TME_NO_DEBUG_LOCKS
+  assert(!tme_memory_atomic_read_flag(&tlb->tme_bus_tlb_busy,
+				      &tlb->tme_bus_tlb_busy_rwlock));
+#endif /* !TME_NO_DEBUG_LOCKS */
+#else  /* !TME_THREADS_COOPERATIVE */
+  /* spin while the TLB entry is busy: */
+  do { } while(tme_memory_atomic_read_flag(&tlb->tme_bus_tlb_busy,
+				           &tlb->tme_bus_tlb_busy_rwlock));
+#endif /* !TME_THREADS_COOPERATIVE */
+
+  /* unlock this TLB entry for invalidation: */
+  tme_rwlock_unlock(&tlb->tme_bus_tlb_invalid_rwlock);
 }
 
 /* this initializes a bus TLB entry: */
@@ -566,10 +609,10 @@ tme_bus_tlb_initialize(struct tme_bus_tlb *tlb)
 {
   
   /* make the first address covered all-bits-one: */
-  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first, -1);
+  tlb->tme_bus_tlb_addr_first = (((tme_bus_addr_t) 0) - 1);
   
   /* make the last address covered all-bits-zero: */
-  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last, 0);
+  tlb->tme_bus_tlb_addr_last = 0;
 
   /* no fast (memory) transfers allowed: */
   tlb->tme_bus_tlb_emulator_off_read = TME_EMULATOR_OFF_UNDEF;

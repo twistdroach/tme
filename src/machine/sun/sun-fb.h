@@ -1,9 +1,9 @@
-/* $Id: sun-fb.h,v 1.1 2004/08/19 11:34:14 fredette Exp $ */
+/* $Id: sun-fb.h,v 1.3 2007/03/29 01:48:13 fredette Exp $ */
 
 /* machine/sun/sun-fb.h - header file for Sun framebuffer emulation: */
 
 /*
- * Copyright (c) 2004 Matt Fredette
+ * Copyright (c) 2004, 2006 Matt Fredette
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,55 +37,178 @@
 #define _MACHINE_SUN_FB_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun-fb.h,v 1.1 2004/08/19 11:34:14 fredette Exp $");
+_TME_RCSID("$Id: sun-fb.h,v 1.3 2007/03/29 01:48:13 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus.h>
+#include <tme/generic/bus-device.h>
+#include <tme/generic/fb.h>
+#include <tme/ic/bt458.h>
 
 /* macros: */
 
+/* Sun framebuffer sizes: */
+/* NB: TME_SUNFB_SIZE_1152_900 should be first, since whatever size is
+   first is what most framebuffers will default to: */
+#define TME_SUNFB_SIZE_NULL			(0)
+#define TME_SUNFB_SIZE_1152_900			TME_BIT(0)
+#define TME_SUNFB_SIZE_1024_1024		TME_BIT(1)
+#define TME_SUNFB_SIZE_1280_1024		TME_BIT(2)
+#define TME_SUNFB_SIZE_1600_1280		TME_BIT(3)
+#define TME_SUNFB_SIZE_1440_1440		TME_BIT(4)
+#define TME_SUNFB_SIZE_1024_768			TME_BIT(5)
+#define TME_SUNFB_SIZE_640_480			TME_BIT(6)
+
 /* P4 register framebuffer identifiers: */
-#define TME_SUN_P4_ID_MASK		(0xff000000)
-#define  TME_SUN_P4_ID_BWTWO		(0x00000000)
-#define  TME_SUN_P4_ID_CGFOUR		(0x40000000)
-#define  TME_SUN_P4_ID_CGEIGHT		(0x45000000)
-#define  TME_SUN_P4_ID_CGSIX		(0x60000000)
+#define TME_SUNFB_P4_ID_MASK			(0xf0000000)
+#define  TME_SUNFB_P4_ID_BWTWO			(0x00000000)
+#define  TME_SUNFB_P4_ID_CGFOUR			(0x40000000)
+#define  TME_SUNFB_P4_ID_CGEIGHT		(0x45000000)
+#define  TME_SUNFB_P4_ID_CGSIX			(0x60000000)
 
-/* P4 register framebuffer sizes: */
-#define TME_SUN_P4_SIZE_NULL		(0xffffffff)
-#define TME_SUN_P4_SIZE_MASK		(0x0f000000)
-#define  TME_SUN_P4_SIZE_1600_1280	(0x00000000)
-#define  TME_SUN_P4_SIZE_1152_900	(0x01000000)
-#define  TME_SUN_P4_SIZE_1024_1024	(0x02000000)
-#define  TME_SUN_P4_SIZE_1280_1024	(0x03000000)
-#define  TME_SUN_P4_SIZE_1440_1440	(0x04000000)
-#define  TME_SUN_P4_SIZE_640_480	(0x05000000)
+/* offsets in many P4 framebuffers: */
+#define TME_SUNFB_P4_OFFSET_P4			(0x00000000)
+#define TME_SUNFB_P4_OFFSET_BITMAP		(0x00100000)
 
-/* P4 register bits: */
-					/* 0x00000080 is the diagnostic bit (?) */
-					/* 0x00000040 is the readback bit (?) */
-#define TME_SUN_P4_REG_ENABLE_VIDEO	(0x00000020)
-#define TME_SUN_P4_REG_SYNC_RAMDAC	(0x00000010)
-#define TME_SUN_P4_REG_IN_VTRACE	(0x00000008)
-#define TME_SUN_P4_REG_INT_ACTIVE	(0x00000004)
-#define TME_SUN_P4_REG_INT_RESET	(0x00000004)
-#define TME_SUN_P4_REG_ENABLE_INT	(0x00000002)
-#define TME_SUN_P4_REG_IN_VTRACE_1H	(0x00000001)
-#define TME_SUN_P4_REG_RESET		(0x00000001)
+/* offsets in many S4 framebuffers: */
+#define TME_SUNFB_S4_OFFSET_REGS		(0x00400000)
+#define TME_SUNFB_S4_OFFSET_MEMORY		(0x00800000)
 
-/* P4 register read-only bits: */
-#define TME_SUN_P4_RO_MASK		(TME_SUN_P4_ID_MASK \
-					 | TME_SUN_P4_SIZE_MASK \
-					 | TME_SUN_P4_REG_IN_VTRACE \
-					 | TME_SUN_P4_REG_INT_ACTIVE \
-					 | TME_SUN_P4_REG_IN_VTRACE_1H)
+/* flags: */
+#define TME_SUNFB_FLAG_BT458_CMAP_PACKED	TME_BIT(0)
+#define TME_SUNFB_FLAG_BT458_BYTE_D0_D7		(0)
+#define TME_SUNFB_FLAG_BT458_BYTE_D24_D31	TME_BIT(1)
 
-/* offsets from a P4 register: */
-#define	TME_SUN_P4_OFFSET_BWTWO		(0x00100000)
+/* callout flags: */
+#define TME_SUNFB_CALLOUT_RUNNING		TME_BIT(0)
+#define TME_SUNFB_CALLOUTS_MASK			(-2)
+#define  TME_SUNFB_CALLOUT_MODE_CHANGE		TME_BIT(1)
+#define	 TME_SUNFB_CALLOUT_INT			TME_BIT(2)
+
+/* the maximum number of bus subregions for registers that a Sun
+   framebuffer can have: */
+#define TME_SUNFB_BUS_SUBREGIONS_MAX	(8)
+
+/* a Sun framebuffer: */
+struct tme_sunfb {
+
+  /* our simple bus device header: */
+  struct tme_bus_device tme_sunfb_device;
+#define tme_sunfb_element tme_sunfb_device.tme_bus_device_element
+
+  /* the mutex protecting the card: */
+  tme_mutex_t tme_sunfb_mutex;
+
+  /* the rwlock protecting the card: */
+  tme_rwlock_t tme_sunfb_rwlock;
+
+  /* the framebuffer connection: */
+  struct tme_fb_connection *tme_sunfb_fb_connection;
+
+  /* more bus subregions: */
+  struct tme_bus_subregion tme_sunfb_bus_subregions[TME_SUNFB_BUS_SUBREGIONS_MAX];
+
+  /* bus cycle handlers for the subregions: */
+  tme_bus_cycle_handler tme_sunfb_bus_handlers[TME_SUNFB_BUS_SUBREGIONS_MAX];
+
+  /* some of the bus subregions have specific purposes: */
+#define tme_sunfb_bus_subregion_memory tme_sunfb_device.tme_bus_device_subregions
+#define tme_sunfb_bus_subregion_regs tme_sunfb_bus_subregions[0]
+#define tme_sunfb_bus_handler_regs tme_sunfb_bus_handlers[0]
+
+  /* the class of the framebuffer: */
+  unsigned int tme_sunfb_class;
+
+  /* the depth of the framebuffer: */
+  unsigned int tme_sunfb_depth;
+
+  /* the size of the framebuffer: */
+  tme_uint32_t tme_sunfb_size;
+
+  /* framebuffer flags: */
+  tme_uint32_t tme_sunfb_flags;
+
+  /* the callout flags: */
+  int tme_sunfb_callout_flags;
+
+  /* this is nonzero if the interrupt is asserted: */
+  int tme_sunfb_int_asserted;
+
+  /* the callout thread condition: */
+  tme_cond_t tme_sunfb_callout_cond;
+
+  /* the (relative) bus address of the last byte of displayed
+     framebuffer memory: */
+  tme_bus_addr_t tme_sunfb_memory_address_last_displayed;
+
+  /* the memory.  usually, this memory is displayed directly, but this
+     won't be the case when there is an overlay plane, for example: */
+  tme_uint8_t *tme_sunfb_memory;
+
+  /* any memory pad: */
+  tme_uint8_t *tme_sunfb_memory_pad;
+
+  /* a framebuffer memory update function: */
+  int (*tme_sunfb_memory_update)(struct tme_fb_connection *conn_fb);
+
+  /* this forces the next update to be a full one: */
+  void (*tme_sunfb_update_full) _TME_P((struct tme_sunfb *));
+
+  /* these are used for index-mapping pixel values or pixel subfield
+     values to intensities, or vice-versa.  if these are NULL,
+     everything is linearly mapped: */
+  void *tme_sunfb_cmap_primaries[3];
+#define tme_sunfb_cmap_g tme_sunfb_cmap_primaries[0]
+#define tme_sunfb_cmap_r tme_sunfb_cmap_primaries[1]
+#define tme_sunfb_cmap_b tme_sunfb_cmap_primaries[2]
+
+  /* a P4 register: */
+  tme_uint32_t tme_sunfb_p4;
+
+  /* many Sun 8-bit framebuffers use the Brooktree Bt458 RAMDAC: */
+  struct tme_bt458 tme_sunfb_bt458;
+
+  /* S4 basic registers: */
+  struct {
+    tme_uint8_t tme_sunfb_s4_regs_control;
+#define tme_sunfb_s4_regs_first tme_sunfb_s4_regs_control
+    tme_uint8_t tme_sunfb_s4_regs_status;
+    tme_uint8_t tme_sunfb_s4_regs_cursor_start;
+    tme_uint8_t tme_sunfb_s4_regs_cursor_end;
+    tme_uint8_t tme_sunfb_s4_regs_h_blank_set;
+    tme_uint8_t tme_sunfb_s4_regs_h_blank_clear;
+    tme_uint8_t tme_sunfb_s4_regs_h_sync_set;
+    tme_uint8_t tme_sunfb_s4_regs_h_sync_clear;
+    tme_uint8_t tme_sunfb_s4_regs_comp_sync_clear;
+    tme_uint8_t tme_sunfb_s4_regs_v_blank_set_high;
+    tme_uint8_t tme_sunfb_s4_regs_v_blank_set_low;
+    tme_uint8_t tme_sunfb_s4_regs_v_blank_clear;
+    tme_uint8_t tme_sunfb_s4_regs_v_sync_set;
+    tme_uint8_t tme_sunfb_s4_regs_v_sync_clear;
+    tme_uint8_t tme_sunfb_s4_regs_xfer_holdoff_set;
+    tme_uint8_t tme_sunfb_s4_regs_xfer_holdoff_clear;
+  } tme_sunfb_s4_regs;
+
+  /* if the given type is valid, it returns NULL and updates the
+     framebuffer structure, else it returns a string of valid types: */
+  const char *(*tme_sunfb_type_set) _TME_P((struct tme_sunfb *, const char *));
+};
 
 /* prototypes: */
-tme_uint32_t tme_sun_fb_p4_size _TME_P((const char *));
-tme_uint32_t tme_sun_fb_p4_size_width _TME_P((tme_uint32_t));
-tme_uint32_t tme_sun_fb_p4_size_height _TME_P((tme_uint32_t));
+
+/* miscellaneous: */
+tme_uint32_t tme_sunfb_size _TME_P((const char *));
+tme_uint32_t tme_sunfb_size_width _TME_P((tme_uint32_t));
+tme_uint32_t tme_sunfb_size_height _TME_P((tme_uint32_t));
+
+/* this creates a new Sun framebuffer: */
+int tme_sunfb_new(struct tme_sunfb *sunfb, const char * const *args, char **_output);
+
+/* some standard register bus cycle handlers: */
+int tme_sunfb_bus_cycle_p4 _TME_P((void *, struct tme_bus_cycle *));
+int tme_sunfb_bus_cycle_s4 _TME_P((void *, struct tme_bus_cycle *));
+
+/* this is called before the framebuffer's display is updated: */
+int tme_sunfb_memory_update _TME_P((struct tme_fb_connection *));
 
 #endif /* !_MACHINE_SUN_FB_H */

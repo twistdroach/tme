@@ -1,4 +1,4 @@
-/* $Id: m68k-insns.c,v 1.14 2005/03/23 11:53:02 fredette Exp $ */
+/* $Id: m68k-insns.c,v 1.16 2007/08/25 22:05:02 fredette Exp $ */
 
 /* ic/m68k/m68k-insns.c - m68k instruction functions: */
 
@@ -36,7 +36,7 @@
 /* includes: */
 #include "m68k-impl.h"
 
-_TME_RCSID("$Id: m68k-insns.c,v 1.14 2005/03/23 11:53:02 fredette Exp $");
+_TME_RCSID("$Id: m68k-insns.c,v 1.16 2007/08/25 22:05:02 fredette Exp $");
 
 #define TME_M68K_STD_FLAGS \
 do { \
@@ -186,6 +186,10 @@ _tme_m68k_bsr(struct tme_m68k *ic, tme_int32_t disp)
      restarting here, because after this point, nothing can fault for
      the remainder of this instruction (the executor makes no stores
      on behalf of a bsr): */
+  tme_m68k_log(ic, 250, TME_OK,
+	       (TME_M68K_LOG_HANDLE(ic),
+		_("bsr 0x%08x"),
+		(ic->tme_m68k_ireg_pc + 2 + disp)));
   TME_M68K_INSN_BRANCH(ic->tme_m68k_ireg_pc + 2 + disp);
   TME_M68K_INSN_OK;
 }
@@ -225,24 +229,67 @@ TME_M68K_INSN(tme_m68k_illegal)
 /* this can fault: */
 TME_M68K_INSN(tme_m68k_tas)
 {
+  struct tme_m68k_rmw rmw;
   struct tme_m68k_tlb *tlb;
+  tme_shared tme_int8_t *mem;
   tme_uint8_t flags;
   tme_int8_t value;
-
-  TME_M68K_INSN_CANFAULT;
+  tme_int8_t value_written;
+  tme_int8_t value_verify;
 
   /* start the read/modify/write cycle: */
-  tlb = tme_m68k_rmw_start(ic);
-  if (tlb == NULL)
+  rmw.tme_m68k_rmw_addresses[0] = ic->_tme_m68k_ea_address;
+  rmw.tme_m68k_rmw_address_count = 1;
+  rmw.tme_m68k_rmw_size = sizeof(tme_uint8_t);
+  if (tme_m68k_rmw_start(ic,
+			 &rmw))
     TME_M68K_INSN_OK;
 
-  /* the read part of the read/modify/write cycle: */
-  tme_m68k_read8(ic, tlb,
-		 &ic->_tme_m68k_ea_function_code,
-		 &ic->_tme_m68k_ea_address,
-		 &ic->tme_m68k_ireg_memx8,
-		 TME_M68K_BUS_CYCLE_RMW);
+  /* if this TLB entry allows fast reading: */
+  if (!rmw.tme_m68k_rmw_slow_reads[0]) {
 
+    /* get this TLB entry: */
+    tlb = rmw.tme_m68k_rmw_tlbs[0];
+
+    /* make the emulator memory pointer: */
+    mem = (tme_shared tme_int8_t *) (tlb->tme_m68k_tlb_emulator_off_read + ic->_tme_m68k_ea_address);
+
+    /* read memory: */
+    value
+      = tme_memory_atomic_read8((tme_shared tme_uint8_t *) mem,
+				tlb->tme_m68k_tlb_bus_rwlock,
+				sizeof(tme_uint8_t));
+
+    /* spin the tas in a compare-and-exchange loop: */
+    for (;;) {
+
+      /* make the value to write: */
+      value_written = value | 0x80;
+
+      /* try the compare-and-exchange: */
+      value_verify
+	= tme_memory_atomic_cx8((tme_shared tme_uint8_t *) mem,
+				value,
+				value_written,
+				tlb->tme_m68k_tlb_bus_rwlock,
+				sizeof(tme_uint8_t));
+
+      /* if the compare-and-exchange failed: */
+      if (__tme_predict_false(value_verify != value)) {
+	
+	/* loop with the new value read from the memory: */
+	value = value_verify;
+	continue;
+      }
+
+      /* stop now: */
+      break;
+    }
+
+    /* store the value read: */
+    ic->tme_m68k_ireg_memx8 = value;
+  }
+      
   /* the modify part of the read/modify/write cycle: */
   value = ic->tme_m68k_ireg_memx8;
   flags = ic->tme_m68k_ireg_ccr & TME_M68K_FLAG_X;
@@ -251,15 +298,10 @@ TME_M68K_INSN(tme_m68k_tas)
   ic->tme_m68k_ireg_ccr = flags;
   ic->tme_m68k_ireg_memx8 |= 0x80;
 
-  /* the write part of the read/modify/write cycle: */
-  tme_m68k_write8(ic, tlb,
-		  &ic->_tme_m68k_ea_function_code,
-		  &ic->_tme_m68k_ea_address,
-		  &ic->tme_m68k_ireg_memx8,
-		  TME_M68K_BUS_CYCLE_RMW);
-
   /* finish the read/modify/write cycle: */
-  tme_m68k_rmw_finish(ic, tlb);
+  tme_m68k_rmw_finish(ic,
+		      &rmw,
+		      TRUE);
 
   TME_M68K_INSN_OK;
 }
@@ -379,6 +421,9 @@ TME_M68K_INSN(tme_m68k_reset)
   /* get the bus connection: */
   conn_bus = &ic->_tme_m68k_bus_connection->tme_m68k_bus_connection;
 
+  /* unlock for the callout: */
+  tme_m68k_callout_unlock(ic);
+
   /* assert the RESET line: */
   rc = (*conn_bus->tme_bus_signal)
     (conn_bus,
@@ -395,6 +440,9 @@ TME_M68K_INSN(tme_m68k_reset)
      (TME_BUS_SIGNAL_RESET
       | TME_BUS_SIGNAL_LEVEL_NEGATED));
   assert (rc == TME_OK);
+
+  /* relock after the callout: */
+  tme_m68k_callout_relock(ic);
   
   TME_M68K_INSN_OK;
 }
@@ -435,6 +483,10 @@ TME_M68K_INSN(tme_m68k_rts)
 {
   TME_M68K_INSN_CANFAULT;
   tme_m68k_pop32(ic, &ic->tme_m68k_ireg_memx32);
+  tme_m68k_log(ic, 250, TME_OK,
+	       (TME_M68K_LOG_HANDLE(ic),
+		_("rts 0x%08x"),
+		ic->tme_m68k_ireg_memx32));
   TME_M68K_INSN_BRANCH(ic->tme_m68k_ireg_memx32);
   TME_M68K_INSN_OK;
 }
@@ -444,6 +496,10 @@ TME_M68K_INSN(tme_m68k_jsr)
 {
   TME_M68K_INSN_CANFAULT;
   tme_m68k_push32(ic, ic->tme_m68k_ireg_pc_next);
+  tme_m68k_log(ic, 250, TME_OK,
+	       (TME_M68K_LOG_HANDLE(ic),
+		_("jsr 0x%08x"),
+		ic->_tme_m68k_ea_address));
   TME_M68K_INSN_BRANCH(ic->_tme_m68k_ea_address);
   TME_M68K_INSN_OK;
 }
@@ -487,7 +543,6 @@ TME_M68K_INSN(tme_m68k_cmp2_chk2)
   tme_uint32_t ireg;
   unsigned int size_bytes, size_name, size_ireg;
   tme_uint32_t uvalue, ulower, uupper;
-  tme_int32_t value, lower, upper;
 
   TME_M68K_INSN_CANFAULT;
 
@@ -495,8 +550,17 @@ TME_M68K_INSN(tme_m68k_cmp2_chk2)
   ireg = TME_M68K_IREG_D0 + TME_FIELD_EXTRACTU(TME_M68K_INSN_SPECOP, 12, 4);
   size_bytes = TME_FIELD_EXTRACTU(TME_M68K_INSN_OPCODE, 9, 2);
   size_ireg = 2 - size_bytes;
-  size_name = TME_M68K_SIZE_8 + size_bytes;
   size_bytes = 1 << size_bytes;
+#if TME_M68K_SIZE_8 != 1
+#error "TME_M68K_SIZE_8 must be 1"
+#endif
+#if TME_M68K_SIZE_16 != 2
+#error "TME_M68K_SIZE_16 must be 2"
+#endif
+#if TME_M68K_SIZE_32 != 4
+#error "TME_M68K_SIZE_32 must be 4"
+#endif
+  size_name = size_bytes;
 
   /* read in the two bounds: */
   (*_tme_m68k_read_mem[size_name])(ic, TME_M68K_IREG_MEMX32 << size_ireg);
@@ -523,28 +587,19 @@ TME_M68K_INSN(tme_m68k_cmp2_chk2)
   /* get the values to check: */
   switch (size_name) {
   case TME_M68K_SIZE_8:
-    uvalue = ic->tme_m68k_ireg_uint8(ireg);
+    uvalue = ic->tme_m68k_ireg_uint8(ireg << 2);
     ulower = ic->tme_m68k_ireg_uint8(TME_M68K_IREG_MEMX8);
     uupper = ic->tme_m68k_ireg_uint8(TME_M68K_IREG_MEMY8);
-    value = ic->tme_m68k_ireg_int8(ireg);
-    lower = ic->tme_m68k_ireg_int8(TME_M68K_IREG_MEMX8);
-    upper = ic->tme_m68k_ireg_int8(TME_M68K_IREG_MEMY8);
     break;
   case TME_M68K_SIZE_16:
-    uvalue = ic->tme_m68k_ireg_uint16(ireg);
+    uvalue = ic->tme_m68k_ireg_uint16(ireg << 1);
     ulower = ic->tme_m68k_ireg_uint16(TME_M68K_IREG_MEMX16);
     uupper = ic->tme_m68k_ireg_uint16(TME_M68K_IREG_MEMY16);
-    value = ic->tme_m68k_ireg_int16(ireg);
-    lower = ic->tme_m68k_ireg_int16(TME_M68K_IREG_MEMX16);
-    upper = ic->tme_m68k_ireg_int16(TME_M68K_IREG_MEMY16);
     break;
   case TME_M68K_SIZE_32:
     uvalue = ic->tme_m68k_ireg_uint32(ireg);
     ulower = ic->tme_m68k_ireg_uint32(TME_M68K_IREG_MEMX32);
     uupper = ic->tme_m68k_ireg_uint32(TME_M68K_IREG_MEMY32);
-    value = ic->tme_m68k_ireg_int32(ireg);
-    lower = ic->tme_m68k_ireg_int32(TME_M68K_IREG_MEMX32);
-    upper = ic->tme_m68k_ireg_int32(TME_M68K_IREG_MEMY32);
     break;
   default: abort();
   }
@@ -557,12 +612,10 @@ TME_M68K_INSN(tme_m68k_cmp2_chk2)
     ic->tme_m68k_ireg_ccr |= TME_M68K_FLAG_Z;
   }
   else if ((ulower > uupper)
-	   /* signed comparison: */
-	   ? (value < lower || value > upper)
-	   /* unsigned comparison: */
+	   ? (uvalue < ulower && uvalue > uupper)
 	   : (uvalue < ulower || uvalue > uupper)) {
     ic->tme_m68k_ireg_ccr |= TME_M68K_FLAG_C;
-    if (TME_M68K_INSN_OPCODE & TME_BIT(11)) {
+    if (TME_M68K_INSN_SPECOP & TME_BIT(11)) {
       ic->tme_m68k_ireg_pc_last = ic->tme_m68k_ireg_pc;
       ic->tme_m68k_ireg_pc = ic->tme_m68k_ireg_pc_next;
       TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_INST(TME_M68K_VECTOR_CHK));

@@ -1,4 +1,4 @@
-/* $Id: serial-kb.c,v 1.5 2005/05/14 19:18:42 fredette Exp $ */
+/* $Id: serial-kb.c,v 1.7 2007/01/21 15:45:01 fredette Exp $ */
 
 /* serial/serial-kb.c - serial keyboard emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: serial-kb.c,v 1.5 2005/05/14 19:18:42 fredette Exp $");
+_TME_RCSID("$Id: serial-kb.c,v 1.7 2007/01/21 15:45:01 fredette Exp $");
 
 /* includes: */
 #include "serial-kb.h"
@@ -43,6 +43,7 @@ _TME_RCSID("$Id: serial-kb.c,v 1.5 2005/05/14 19:18:42 fredette Exp $");
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <errno.h>
 
 /* macros: */
 #define TME_SERIAL_KB_BUFFER_SIZE	(1024)
@@ -970,7 +971,7 @@ TME_ELEMENT_X_NEW_DECL(tme_serial_,kb,keyboard) {
       }
       for (p1 = line_buffer;
 	   ((c = *(p1++)) != '\0'
-	    && isspace(c)););
+	    && isspace((unsigned char) c)););
       if (c == '\0'
 	  || c == '#') {
 	continue;
@@ -1053,7 +1054,7 @@ TME_ELEMENT_X_NEW_DECL(tme_serial_,kb,keyboard) {
     }
     for (p1 = line_buffer;
 	 ((c = *(p1++)) != '\0'
-	  && isspace(c)););
+	  && isspace((unsigned char) c)););
     if (c == '\0'
 	|| c == '#') {
       continue;

@@ -1,3 +1,1165 @@
+Thu Sep 06 23:35:41 2007  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* Release 0.6 out.
+
+	* TODO: Updated. 
+
+	* ic/ncr53c9x.c: Fixed some comments. 
+	(_tme_ncr53c9x_scsi_cycle): When we transfer in from the SCSI bus, if
+	we need to detect the the transfer residual based on the data
+	transferred, try to update the transfer residual. 
+
+	* machine/sun4/sun44c-mmu.c (_tme_sun44c_buserr_common): A bus error
+	that is asynchronous for the CPU isn't reported as a hard fault to the
+	CPU, but if the initiator is another bus master, it is reported to
+	that master as a hard fault. 
+
+	* scsi/scsi-tape.c (tme_scsi_tape_cdb_xfer0): In the NetBSD PR
+	pkg/34536 hack, only clear the Illegal Length Indicator (ILI) flag. 
+	More importantly, this preserves the filemark flag, which is needed
+	for SunOS tape installs to work. 
+
+Sun Aug 26 14:02:04 2007  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* configure.in: Bumped version to 0.6. 
+	Now check for the alignment of long, when it's 64 bits.  Added support
+	for sun4 systems. 
+
+	* ic/ieee754/ieee754-precision.sh: Added some missing ${prefix}es to
+	the variable names in the precision-independent statements. 
+
+Sat Aug 25 23:12:31 2007  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* generic/fb.c (_tme_fb_xlat_colors_get_set): If the colors that the
+	destination framebuffer needs to allocate don't depend on the source
+	framebuffer, return a colorset signature that destination framebuffers
+	can use to avoid reallocating the same set of colors repeatedly.  When
+	the number of colors to allocate is clearly more than the destination
+	could ever allocate, and source pixels are mapped to intensities,
+	remove some of the less significant bits of the source intensities to
+	reduce the number of colors needed.  Now give a distinct pixel value
+	for each distinct color we ask for, especially when we're asking for a
+	lot of duplicate colors as the result of reducing the range of the
+	source intensities (see above). 
+
+	* host/gtk/gtk-display.c (_tme_gtk_display_menu_radio): Added. 
+
+	* host/gtk/gtk-screen.c (_tme_gtk_screen_mode_change): Now only
+	reallocate the GdkImage when the framebuffer size changes, and the
+	colors when the final mapping from source color to destination pixel
+	changes.  When allocating colors, now only allocate distinct colors. 
+	(_tme_gtk_screen_submenu_scaling): Added. 
+	(_tme_gtk_screen_new): Now use _tme_gtk_display_menu_radio() to create
+	the scaling submenu. 
+
+	* ic/i825x6.c: Added a union to fix an aliasing problem with
+	TME_I825X6_RX_BUFFER_NEXT().  From skrll@netbsd.org. 
+	(_tme_i825x6_rx_buffers_add): Now busy a TLB before checking if it's
+	valid and useful, and unbusy it for filling if it's not.  After
+	filling it, loop to busy and check it again.  When we're done with the
+	TLB entry, unbusy it. 
+	(_tme_i825x6_callout_ca): When the receive unit is being started,
+	always abort it first, unless it was already idle.  Before, we
+	wouldn't abort it if it was out of resources, which was wrong since
+	it's possible to run out of receive frame descriptors but not receive
+	buffers. 
+	(_tme_i825x6_callout_cu): Don't abort() for a DIAGNOSE command.  From
+	sigmfsk@aol.com in NetBSD PR pkg/35305. 
+	(_tme_i825x6_signal): Don't assume that xor-ing the level out of the
+	signal value leaves only the base signal; use TME_BUS_SIGNAL_WHICH()
+	instead. 
+	(_tme_i825x6_read): Keep track of the transmit packet's size in a new
+	variable, since the DMA read and write helper macros destroy rc.  From
+	sigmfsk@aol.com in NetBSD PR pkg/35305. 
+
+	* ic/z8530.c (_tme_z8530_channel_reset): On a hardware reset, clear
+	the IUS bits and reset RR2.  Now take a pointer to the structure for
+	the whole chip, since some registers are common to both channels.  All
+	callers changed. 
+	(_tme_z8530_channel_init): Now take a pointer to the structure for the
+	whole chip, since some registers are common to both channels.  All
+	callers changed. 
+	(_tme_z8530_rr0_update): Fixed a bug where we would use the RR15 value
+	where we meant to use the WR15 value. 
+	(_tme_z8530_rr2_update):
+	(_tme_z8530_int_pending): Added. 
+	(_tme_z8530_intack): Now use _tme_z8530_int_pending() to see if an
+	interrupt is pending, and call _tme_z8530_rr2_update() to update RR2
+	and get the vector to use.  Now check a socket flag to see if the IEI
+	pin is tied low. 
+	(_tme_z8530_callout): Now use _tme_z8530_int_pending() to see if an
+	interrupt is pending. 
+	(_tme_z8530_bus_cycle): When an interrupt is acknowledged, call
+	_tme_z8530_rr2_update() to update RR2. 
+
+	* ic/m68k/m6888x-auto.sh: No longer use the IEEE754 sub function to
+	implement fcmp, use a specific m6888x function instead. 
+
+	* ic/m68k/m6888x.c (tme_m68k_fpgen): Fixed a bug where a byte or word
+	source operand in a register would get sign-extended and stored back
+	into the register, destroying the other parts of the register. 
+	(_tme_m6888x_fcmp): Added. 
+	(tme_m68k_fmove_rm): We don't use TME_M68K_INSN_OP1(), so there's no
+	need to set _op1. 
+	(tme_m68k_fmovem): Fixed a serious bug where we wouldn't advance the
+	effective address after storing the last 32-bit word of a register's
+	value. 
+	(tme_m68k_fsave): Fixed a buffer overflow bug where we could write the
+	BIU flags outside of the frame structure. 
+
+	* ic/m68k/m68k-insns-auto.sh: The cmpm, addx, and subx instructions
+	access the source operand before the destination operand, and we had
+	it backwards.  Now generate the wrapper functions for a move of an
+	address register to a predecrement or postincrement EA with that same
+	address register. 
+	(tme_m68k_movem_${name}${size}): Now calculate the total size of the
+	transfer early, so we can correctly emulate the behavior of storing
+	the same address register used in a predecrement EA on the different
+	CPUs. 
+	(tme_m68k_moves${size}): Now when storing the same address register
+	used in a predecrement EA, store the original value.  The BCD math
+	functions can only fault when they access memory, and they must
+	advance an address register right after it's used, in case the same
+	address register is used for the other operand. 
+
+	* ic/m68k/m68k-insns.c (tme_m68k_tas): Removed the
+	TME_M68K_INSN_CANFAULT, since tme_m68k_rmw_start() does this if
+	needed. 
+	(tme_m68k_cmp2_chk2): Fixed several bugs.  From sigmfsk@aol.com in
+	NetBSD PR pkg/33969. 
+
+	* ic/m68k/m68k-iset-expand.pl: As a special exception, expand a move
+	instruction that moves an address register into a predecrement or
+	postincrement EA with the same address register, to use a move wrapper
+	function. 
+
+	* ic/m68k/m68k-iset.txt: Fixed a bug in decoding cas instructions -
+	their size field actually doesn't work like any other. 
+
+	* ic/m68k/m68k-misc.c (tme_m68k_go_slow): Only make the first and last
+	valid fast pointers from the TLB entry if it supports fast reading. 
+	(tme_m68k_rmw_start): Fixed a bug where we would mark an instruction
+	as possibly faulting, even when we wouldn't make any normal bus cycle
+	calls. 
+	Corrected a byteswapping macro. 
+	(tme_m68k_rmw_finish): Corrected a byteswapping macro. 
+
+	* ic/m68k/m68k-opmap-make.pl: Now recognize the
+	move-same-address-register-to-predecrement and -postincrement
+	functions wherever the move function is recognized. 
+
+	* libtme/threads-sjlj.c: In struct tme_sjlj_thread, when GTK is in use
+	track the current timeout handle, and have space for some fixed
+	timeout handles.  We no longer track a single timeout tag, since
+	removing a timeout that hasn't fired yet may not prevent it from
+	firing.  Now, for each file descriptor, track a different thread for
+	each file descriptor condition. 
+	(tme_sjlj_threads_init): Initialize the file descriptor condition to
+	threads mapping. 
+	(tme_sjlj_dispatch_timeout) [HAVE_GTK]: Now remove no longer used
+	timeouts when they occur naturally, and free their timeout handles. 
+	(tme_sjlj_dispatch_fd): Now dispatch different threads depending on
+	the file descriptor conditions that are present. 
+	(tme_sjlj_threads_run): Now always do a select, even if there are no
+	threads blocking on file descriptors.  Now make a GdkInputCondition
+	value for each file descriptor that is ready, for
+	tme_sjlj_dispatch_fd(). 
+	(tme_sjlj_thread_create) [HAVE_GTK]: Now initialize the timeout
+	handles. 
+	(tme_sjlj_yield): Now correctly track a different thread for each file
+	descriptor condition, since there are often different threads managing
+	the same file descriptor.  When GTK is in use, timeouts can actually
+	expire up to 1ms early, so account for this, and no longer try to
+	remove an old timeout now, since it may still fire anyways.  Instead,
+	allocate and use another timeout handle, which will be managed by
+	tme_sjlj_dispatch_timeout(). 
+
+	* machine/sun/sun-obie.c (_tme_sun_obie_bus_signal): Fixed a bug where
+	instead of managing the INTR bit in the CSR, we were just passing the
+	i82586's interrupt signal through to the mainbus.  This was breaking
+	SunOS.  Found by sigmfsk@aol.com in NetBSD PR pkg/35305.  Now also
+	pass a reset signal from obio up to the i82586. 
+	(_tme_sun_obie_connections_new): Now use _tme_sun_obie_bus_signal to
+	handle bus signals coming from obio. 
+
+	* scsi/emulexmt02.c (_tme_emulexmt02_cdb_mode_sense): Now use
+	TME_EMULEXMT02_BLOCK_SIZE instead of the hard-coded constant. 
+	(_tme_emulexmt02_cdb_mode_select): Avoid a gcc warning about a
+	comparison whose result is always known due to the limited range of a
+	type. 
+	(tme_scsi_tape_emulexmt02_init): Now provide the fixed block size to
+	the machine-independent code. 
+
+	* scsi/scsi-cdb.c (tme_scsi_device_mode_select_data): Added. 
+	(_tme_scsi_device_make_inquiry_string): Fixed a type to get better
+	type agreement.  From tsutsui@ceres.dti.ne.jp in NetBSD PR pkg/34113. 
+
+	* scsi/scsi-tape.c (tme_scsi_tape_cdb_xfer0): Don't pad out a block
+	with zeroes if the filemark indication is set. 
+	(_tme_scsi_tape_mode_select_data):
+	(tme_scsi_tape_cdb_mode_select): Avoid a gcc warning about a
+	comparison whose result is always known due to the limited range of a
+	type. 
+
+	* tme/generic/fb.h: Now define TME_FB_COLORSET_NONE. 
+
+Sat Aug 25 19:52:23 2007  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* host/gtk/gtk-display.h: Now store a colorset signature in struct
+	tme_gtk_screen.  Define struct tme_gtk_display_menu_item, and added a
+	prototype for _tme_gtk_display_menu_radio(). 
+
+Fri Aug 24 01:21:50 2007  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* acinclude.m4 (AC_CHECK_ALIGNOF): Some compilers will do a smaller
+	read than you expect, if they know that the value read will only be
+	used at a smaller size later.  A little math on the value read
+	discourages this. 
+	(AC_CHECK_SHIFTMAX): Don't create the center value with one
+	expression, which would do the shifting in type int.  Defeat any
+	constant optimizations on the shift count by using sscanf to
+	initialize it. 
+
+	* generic/float-auto.sh (tme_float_infinity_${_builtin_type}):
+	(tme_float_negative_zero_${_builtin_type}): Added. 
+	(tme_float_radix${radix}_mantissa_exponent_${_builtin_type}): If the
+	value is a zero, just return the same value.  Fixed a bug where we
+	would return a mantissa that was exactly the radix (instead of
+	reducing it again to 1). 
+
+	* host/posix/posix-serial.c (_tme_posix_serial_th_ctrl): If a TIOCMGET
+	ioctl fails, be sure to use a zero modem state instead of garbage. 
+
+	* ic/am7930.c (_tme_am7930_bus_cycle): Fixed a bug where we used
+	TME_BUS16_LOG2 but the device is only eight bits wide. 
+
+	* ic/ieee754/ieee754-misc-auto.sh (tme_ieee754_${precision}_value_to_builtin):
+	Use the new tme_float_infinity_${_builtin_type}() and
+	tme_float_negative_${_builtin_type}() functions to get built-in
+	infinities and negative zeroes. 
+	(tme_ieee754_${precision}_value_from_builtin): Detect a negative zero
+	using a bit-for-bit comparison to a positive zero, since the C
+	equality operator may treat all zeroes as equal.  Fixed a bug where
+	roundup in a builtin-to-integer cast would affect the conversion. 
+	Removed an extraneous assignment to factor in the shell script. 
+
+	* ic/sparc/sparc-misc.c (tme_sparc32_dump_memory): To avoid an
+	assertion failure with TLB lock debugging turned on, now save, set,
+	and restore the busy flag on the DTLB entry that the load function
+	will use (assuming that it will only use one). 
+
+	* machine/sun2/sun2-mainbus.c (tme_machine_sun2,zs): Override the
+	default z8530 socket flags - on a sun2, the IEI lines are tied low. 
+
+	* machine/sun3/SUN3-CARRERA: Removed the "delay 10000" option from
+	bpf1, to speed things up in general - however it is still needed when
+	netbooting NetBSD, to avoid a race condition in the kernel RARP client
+	(when the RARP response comes back before the tsleep() starts, the
+	wakeup() is lost). 
+
+	* machine/sun3/sun3-mainbus.c (machine/sun3/sun3-mainbus.c): Now
+	propagate a reset signal from the m68k out to the busses. 
+
+	* tme/threads.h: Now include <sys/time.h>. 
+
+	* tme/generic/float.h: Added prototypes for
+	tme_float_infinity_${_builtin_type}() and
+	tme_float_negative_zero_${_builtin_type}(). 
+
+	* tme/ic/z8530.h: Started a set of socket flags, and added the
+	tme_z8530_socket_flags to struct tme_z8530_socket. 
+
+	* tme/machine/sun.h: In TME_SUN_Z8530_SOCKET_INIT, supply a default
+	value for the z8530 socket flags. 
+
+Thu Mar 29 01:56:40 2007  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* generic/fb-xlat-auto.sh: Fixed bugs where we would use the wrong
+	masks with TME_FB_XLAT_MAP_LINEAR_SCALE() when we needed to scale
+	large intensities down into a lookup range,
+
+	* host/posix/posix-serial.c (_tme_posix_serial_th_reader): If we get
+	EOF, exit the thread. 
+
+	* ic/m68k/m68k-impl.h: Keep the m68k TLB array pointers in unions with
+	regular bus TLB pointers, to avoid any aliasing problems when
+	allocating them. 
+
+	* ic/m68k/m68k-misc.c (_tme_m68k_connection_make): When allocating the
+	m68k TLB arrays, pass pointers to the regular bus TLB pointers in
+	unions in struct tme_m68k, to avoid any aliasing problems. 
+
+	* ic/sparc/sparc-execute.c (_TME_SPARC_EXECUTE_NAME): Cast a constant
+	to an unsigned type to silence a gcc warning. 
+
+	* ic/sparc/sparc-impl.h: Keep the sparc TLB array pointers in unions
+	with regular bus TLB pointers, to avoid any aliasing problems when
+	allocating them. 
+
+	* ic/sparc/sparc-insns-auto.sh: In the jmpl instructions, cast a
+	constant to an unsigned type to silence a gcc warning. 
+
+	* ic/sparc/sparc-insns.c (tme_sparc32_rdpsr):
+	(tme_sparc32_wrpsr): Cast constants to an unsigned type to silence a
+	gcc warning. 
+
+	* ic/sparc/sparc-misc.c (_tme_sparc_connection_make): When allocating
+	the TLB arrays, pass pointers to the regular bus TLB pointers in
+	unions in struct tme_sparc, to avoid any aliasing problems. 
+	(tme_sparc32_trap): Cast a constant to an unsigned type to silence a
+	gcc warning. 
+	(tme_sparc32_dump_memory): Added. 
+
+	* machine/sun/sun-fb.c (TME_SUNFB_S4_REG): Added. 
+	(tme_bt458_omap_best): Fixed a bug where we would use the final loop
+	counter as the best colormap index. 
+	(_tme_sunfb_callout): Reworked to handled failed callouts better, and
+	added support for calling out framebuffer interrupts. 
+	(_tme_sunfb_callout_thread): The callout thread is now always present,
+	running when a condition is notified. 
+	(tme_sunfb_memory_update): Now notify the callout thread to call out
+	an interrupt if one is now pending. 
+	(tme_sunfb_bus_cycle_bt458): Now support 8-bit and 32-bit accesses. 
+	Schedule a mode change callout whenever the colormap or overlay map
+	changes.  Fixed bugs where we wouldn't read and write the bt458
+	register set correctly. 
+	(tme_sunfb_bus_cycle_s4): If a write covers the status register, clear
+	any pending interrupt.  Call _tme_sunfb_callout() to make any
+	callouts. 
+	(tme_sunfb_new): Initialize the callout thread condition, and create
+	the callout thread. 
+	(tme_sun_cgthree): Set the correct sunfb flags for a cgthree.  Fixed a
+	bug where we wouldn't initialize the bt458 colormap pointers to point
+	to the colormap. 
+
+	* machine/sun/sun-fb.h: Since the callout thread is always present,
+	removed the flag that marked when it was.  Added flags for specifying
+	which byte in a 32-bit access to an 8-bit register is used.  In struct
+	tme_sunfb now track whether or not the framebuffer interrupt is
+	asserted, added a condition for notifying the callout thread, and
+	added an alias for the first S4 basic register. 
+
+	* machine/sun/sun-keyboards.txt: Removed the acute keysym from the US
+	type 4 keyboard.  Its definition is the same as apostrophe, and it was
+	causing problems on hosts that actually have acute.  This is really a
+	bug in the keyboard emulation. 
+
+	* machine/sun4/SUN4-75: Many changes. 
+
+	* machine/sun4/sun44c-cache.c (_tme_sun44c_cache_new): Cast some
+	expressions in comparisons to an unsigned type, to silence a gcc
+	warning. 
+
+	* machine/sun4/sun44c-control.c (_tme_sun44c_control_cycle_handler):
+	Cast a promoted expression to an unsigned type in a ternary operator
+	expression to silence a gcc warning. 
+
+	* scsi/scsi-cdrom.c (tme_scsi_cdrom_cdb_read_toc):
+	(tme_scsi_cdrom_cdb_mode_sense): Cast some expressions to unsigned
+	types to silence a gcc warning. 
+
+Sun Mar 25 21:18:50 2007  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* dist/softfloat/softfloat/bits64/softfloat.c (float128_rem): Added a
+	cast to get better type agreement.  From tsutsui@ceres.dti.ne.jp in
+	NetBSD PR pkg/34113. 
+
+	* generic/bus-el.c (_tme_bus_intack): Now unlock the bus before
+	calling a device's interrupt acknowledge function, to avoid a
+	deadlock. 
+
+	* ic/am7990.c (_tme_am7990_receive): Added a cast to avoid a
+	signed/unsigned comparison. 
+
+Sat Mar 03 15:36:15 2007  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* host/gtk/gtk-mouse.c (_tme_gtk_mouse_mouse_event): Now discard
+	double- and triple-click button events, since normal button press and
+	release events are always generated also. 
+
+	* machine/sun/sun-cgtwo.c (_tme_suncg2_callout): Fixed a bug where we
+	tested the wrong variable for the mode change callout bit. 
+
+Wed Feb 21 01:52:28 2007  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* host/bsd/bsd-bpf.c (_tme_bsd_bpf_callout): Now check that the packet
+	being written has a reasonable size, and that the write succeeds. 
+	From sigmfsk@aol.com in NetBSD PR pkg/35305. 
+
+	* host/gtk/gtk-display.h: Changed the signedness of the
+	tme_gtk_screen_mouse_warp_x and tme_gtk_screen_mouse_warp_y members to
+	get better type agreement.  From tsutsui@ceres.dti.ne.jp in NetBSD PR
+	pkg/34113. 
+
+	* host/gtk/gtk-mouse.c: Changed some types to get better type
+	agreement.  From tsutsui@ceres.dti.ne.jp in NetBSD PR pkg/34113. 
+
+	* host/gtk/gtk-screen.c (_tme_gtk_gdkimage_scanline_pad): Removed the
+	if that tests for the eight-bit case.  This avoids a gcc4 warning
+	about a possible missing return value, even though the possibility of
+	that was zero. 
+
+	* ic/i825x6reg.h: The size mask in an i82586 TBD is 0x3fff (it's
+	0x7fff on a i82596).  From sigmfsk@aol.com in NetBSD PR pkg/35305. 
+
+	* ic/ncr53c9x.c (_tme_ncr53c9x_stimreg_msec): Fixed a gcc4 warning. 
+
+	* ic/ieee754/ieee754-ops-auto.sh: Now perform negation by multiplying
+	the source operand by -1, which correctly negates 0.0 into -0.0.  From
+	sigmfsk@aol.com in NetBSD PR pkg/34616. 
+
+	* ic/m68k/m68k-execute.c (_TME_M68K_EXECUTE_NAME): Simplified how
+	PC-relative EAs are calculated.  This should fix NetBSD PR pkg/34538. 
+
+	* ic/sparc/sparc-misc.c (tme_sparc_new): Increased the instruction
+	burst size to 800. 
+	(tme_sparc_do_reset): Now poison all idle type state to force the idle
+	type to retrain, since we may be booting a new kernel. 
+
+	* libtme/module.c (tme_module_open): Changed the signedness of
+	tokens_count to get better type agreement.  From
+	tsutsui@ceres.dti.ne.jp in NetBSD PR pkg/34113. 
+
+	* machine/sun/sun-si.c (_tme_sun_si_bus_cycle_regs): Fixed an
+	uninitialized variable bug that wasn't noticed by gcc3, because the
+	value was never used.  From tsutsui@ceres.dti.ne.jp in NetBSD PR
+	pkg/34113. 
+	(tme_sun_si): Changed a type to get better type agreement.  From
+	tsutsui@ceres.dti.ne.jp in NetBSD PR pkg/34113. 
+
+	* tme/memory.h (tme_memory_atomic_pointer_write): Fixed a bug where we
+	tried to use a ternary operator expression as an lvalue. 
+
+Fri Feb 16 02:50:23 2007  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* host/bsd/bsd-bpf.c (_tme_bsd_bpf_read): Fixed a bug where we would
+	drop packets or pass garbage packets because we weren't using
+	BPF_WORDALIGN() to determine the offset of the next packet.  Added
+	code to try to detect and strip off any CRC accidentally passed up
+	through BPF from a host network device driver. 
+
+	* ic/m68k/m68010.c (_tme_m68010_rte): A zero returned by
+	tme_m68k_sequence_fill() or tme_m68k_insn_buffer_fill() also means a
+	format error. 
+
+	* ic/m68k/m68020.c (_tme_m68020_rte): A zero returned by
+	tme_m68k_sequence_fill() or tme_m68k_insn_buffer_fill() also means a
+	format error. 
+
+	* ic/m68k/m68k-execute.c ic/m68k/m68k-impl.h
+	  ic/m68k/m68k-insns-auto.sh ic/m68k/m68k-insns.c
+	  ic/m68k/m68k-misc-auto.sh ic/m68k/m68k-misc.c:
+
+	  Although I hate doing this, many changes to convert the m68k
+	  emulation to the new TLB and memory discipline.  This has mainly
+	  affected fast instruction fetching and memory access.  Fast
+	  instruction fetches now happen directly into the instruction buffer,
+	  with some optimizations to lessen the penalty for that.  Fast
+	  fetches are now kept entirely out of the transfer accounting, and
+	  the functions that empty and fill the instruction buffer from an
+	  exception frame are also simpler now. 
+	  All memory access functions now busy and unbusy a TLB entry and use
+	  the generic memory access functions when doing fast transfers. 
+	  The tme_m68k_rmw_start() and tme_m68k_rmw_finish() are completely
+	  changed for the new TLB discipline.  All of the atomic instructions
+	  are also completely changed.  All callouts are now wrapped in
+	  tme_m68k_callout_unlock() and tme_m68k_callout_relock(), which will
+	  unbusy and rebusy any instruction TLB entry for the fast executor,
+	  and poison the fast executor if that TLB entry is now invalid. 
+
+Thu Feb 15 02:15:41 2007  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* generic/keyboard.c (_tme_keysym_state_get):
+	(tme_keyboard_buffer_in_macro):
+	(tme_keyboard_buffer_out_map):
+	(tme_keyboard_buffer_out_mode):
+	(_tme_keyboard_buffer_in2):
+	(_tme_keyboard_buffer_in0): Use tme_keyboard_hash_data_from_keyval()
+	to convert a tme_keyboard_keyval_t to a tme_hash_data_t. 
+
+	* host/gtk/gtk-keyboard.c (_tme_gtk_keyboard_x11_new):
+	(_tme_gtk_keyboard_key_event): Use
+	tme_keyboard_hash_data_from_keyval() and
+	tme_keyboard_hash_data_to_keyval() to convert between
+	tme_keyboard_keyval_t and tme_hash_data_t. 
+
+	* machine/sun/sun-bwtwo.c: Removed much code, which became the new
+	generic Sun framebuffer code.  The remaining bwtwo code now uses this
+	generic support.  Added support for the SBus bwtwo. 
+
+	* machine/sun/sun-cgtwo.c (_tme_suncg2_validate_bitmaps):
+	(_tme_suncg2_validate_pixmap): Don't attempt to translate using
+	unsigned longs on 64-bit hosts. 
+	(_tme_suncg2_mode_change): Don't try to make any sense of the case
+	where the pixel colors don't select any bitmap.  In this case, or when
+	multiple bitmaps seem to be selected, just display the pixmap. 
+
+	* machine/sun2/sun2-control.c (_TME_SUN2_REG_ACCESSED): Silence a
+	warning about comparing an unsigned quantity to be greater than or
+	equal to zero.  This would happen on 64-bit big-endian systems, due to
+	their particular struct tme_ic register layout. 
+
+	* machine/sun2/sun2-mmu.c (_tme_sun2_mmu_reset): Now busy and
+	unbusy-fill the reset TLBs, so they are marked valid. 
+
+	* machine/sun4/sun4-impl.h: Added a prototype for _tme_sun4_reset(). 
+
+	* machine/sun4/sun4-mainbus.c (_tme_sun4_reset): Added. 
+	(_tme_sun4_command): Now use _tme_sun4_reset() to do the reset. 
+	(tme_machine_sun4): Fixed the usage string. 
+
+	* machine/sun4/sun44c-control.c (_tme_sun44c_control_cycle_handler): A
+	write to the software reset bit in the enable register clears all
+	other bits in the register, and now call _tme_sun4_reset() to do the
+	reset. 
+
+	* scsi/scsi-bus.c (_tme_scsi_bus_cycle): Skip any SCSI connection that
+	isn't waiting on any events and has no actions to take. 
+
+	* tme/hash.h: Added macros for converting between tme_hash_data_t and
+	some integral types. 
+
+	* tme/generic/ethernet.h: Define some Ethernet packet types. 
+
+	* tme/generic/keyboard.h: Added macros to convert between a keyval and
+	a tme_hash_data_t. 
+
+	* tme/scsi/scsi-cdb.h: Define extended sense key, ASC, and ASCQ
+	values.  Define struct tme_scsi_device_mode_blocks and give a
+	prototype for tme_scsi_device_mode_select_data(). 
+
+Mon Feb 12 23:50:36 2007  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* generic/bus.c (tme_bus_tlb_map): Fixed a word-size bug, where the
+	address offset was kept as a tme_bus_addr_t.  Since this offset can be
+	negative, and it's used in pointer arithmetic, it has to be a signed
+	long. 
+
+	* generic/fb-xlat-auto.sh (TME_FB_XLAT_SHIFT_DST): Now detect when we
+	shifted a tme_uint32_t by 32 on an architecture where SHIFTMAX_INT32_T
+	is less than 32, and force the shifted result to zero. 
+
+	* ic/ncr5380.c (_tme_ncr5380_bus_tlb_fill): Fixed a bug where we
+	wouldn't notice a TLB that was invalid. 
+
+	* ic/ieee754/ieee754-misc-auto.sh (tme_ieee754_${precision}_value_builtin_set):
+	When rewriting x to be an infinity, don't set the float format until
+	the end, because we still need to test the original format x's sign. 
+	After converting a native result to the best native format for the
+	IEEE754 precision, don't forget to update x's float format. 
+	(tme_ieee754_${precision}_value_to_builtin): When the format has an
+	explicit integer bit, don't treat it as a fraction bit when the
+	exponent is the biased maximum. 
+
+	* ic/m68k/m68k-bus-auto.sh: Fixed a bug where tme_m68k_router_32 was
+	defined static. 
+
+	* ic/sparc/sparc-misc-auto.sh: Make sure that TME_SPARC_IREG_FPX is
+	aligned to four, since it is often used as a register pair, and the
+	ldd/std functions expect the first register of a pair (and later, some
+	quad load/store functions) to be aligned. 
+
+	* machine/sun/sun-si.c (_tme_sun_si_tlb_fill_regs): Fixed a bug where
+	we were filling TLBs that supported fast reading.  We can't support
+	fast reading, because we have to fault on byte accesses, to support
+	the SunOS sc/si probes. 
+
+Tue Jan 30 22:57:08 2007  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* ic/am7990.c (_tme_am7990_init): Now log the init.  Fixed a bug where
+	we wouldn't start reading the Ethernet again after exiting loopback
+	mode. 
+	(_tme_am7990_start): Now log the start. 
+	(_tme_am7990_receive): Append dummy CRC bytes to each received frame. 
+	Log receive MISS and BUFF errors. 
+	(_tme_am7990_transmit): Log transmit BUFF errors. 
+	(_tme_am7990_bus_cycle): Log writes to CSRs other than CSR0. 
+
+Sun Jan 21 15:45:01 2007  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* libtme/misc.c (tme_misc_tokenize):
+	(_tme_misc_number_parse): Don't use the ctype macros with a char,
+	since it will be sign-extended to an int. 
+
+	* libtme/module.c (tme_module_open): Don't use the ctype macros with a
+	char, since it will be sign-extended to an int. 
+
+	* serial/serial-kb.c (tme_serial_,kb,keyboard): Don't use the ctype
+	macros with a char, since it will be sign-extended to an int. 
+
+Fri Jan 19 01:01:07 2007  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* host/gtk/gtk-display.h: In struct tme_gtk_display, track the next
+	keysym to try in the unused keysym allocator. 
+
+	* host/gtk/gtk-keyboard.c (_tme_gtk_keyboard_lookup): Don't consider a
+	conversion of a string to a keysym successful unless the keysym
+	reverses to that same string. 
+	Fixed a bug in the code that tries to allocate an unused keysym for an
+	unknown string, where we would repeatedly allocate the first unused
+	keysym over and over again. 
+
+	* ic/sparc/sparc-impl.h: Increased the size of the ITLB hash. 
+
+	* ic/sparc/sparc-insns-auto.sh: Now emit code in the load and store
+	functions to track DTLB fills under _TME_SPARC_STATS. 
+
+	* machine/sun/sun-keyboards.txt: Added a map for the US type 4
+	keyboard. 
+
+	* scsi/cdrom-tme.c:
+	* scsi/scsi-cdrom.c:
+	* tme/scsi/scsi-cdrom.h: Added. 
+
+	* scsi/scsi-device.c (tme_scsi_device_check_condition): Added. 
+
+	* tme/scsi/scsi-device.h: Added a prototype for
+	tme_scsi_device_check_condition(). 
+
+Thu Jan 18 02:15:49 2007  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* tme/common.h: Added definitions of __tme_predict_true() and
+	__tme_predict_false() for gcc>=2.96. 
+
+Sun Jan 14 16:53:04 2007  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* generic/bus-el.c (tme_generic,bus): Fixed a printf string.  Some
+	changes to silence gcc -Wuninitialized. 
+
+	* ic/sparc/Makefile.am: Added sparc-fpu-auto.sh to EXTRA_DIST. 
+
+	* ic/sparc/sparc-execute.c (_TME_SPARC_EXECUTE_NAME): In NetBSD 3.x,
+	the idle loop wrpsrs use %l1 instead of %g1, and the annulled wrpsr
+	writes IPL_SCHED << 8, not PSR_PIL. 
+
+	* ic/sparc/sparc-fpu-auto.sh: Removed the parameter lists from some
+	macro #undefs. 
+
+	* ic/sparc/sparc-fpu.c (tme_sparc_fpu_new): Removed the parameter list
+	from a macro #undef. 
+
+	* ic/sparc/sparc-insns.c (tme_sparc32_wrpsr): Updated the
+	netbsd32-type-0 idle type comment. 
+
+	* ic/sparc/sparc-misc.c (tme_sparc_new): Increased the burst size. 
+
+	* libtme/threads-sjlj.c (tme_sjlj_yield) [HAVE_GTK]: Fixed a bug where
+	we could round the number of microseconds to a whole second and leave
+	it that way. 
+
+	* machine/Makefile.am: Added the sun4 directory to DIST_SUBDIRS. 
+
+	* machine/sun/sun-fb.c (tme_bt458_omap_best): Fixed a bug caught by
+	gcc -Wuninitialized. 
+
+	* scsi/Makefile.am: Added scsi-cdrom.c and cdrom-tme.c to
+	tme_scsi_la_SOURCES. 
+
+	* scsi/scsi-tape.c (_tme_scsi_tape_mode_select_data): Fixed a bug
+	caught by gcc -Wuninitialized. 
+
+	* tme/scsi/Makefile.am: Now install scsi-cdrom.h. 
+
+Mon Jan 08 00:59:04 2007  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* bus/Makefile.am: Added sbus to DIST_SUBDIRS. 
+
+	* bus/sbus/Makefile.am:
+	* bus/sbus/sun-fbs4.c:
+	* tme/ic/bt458.h: Added. 
+
+	* generic/scsi.c (tme_scsi_phase_resid): Added. 
+
+	* ic/Makefile.am: Added sparc to DIST_SUBDIRS. 
+	Now build tme_ic_ncr53c9x.la, tme_ic_mk48txx.la, tme_ic_nec765.la,
+	tme_ic_am7930.la, tme_ic_am7990.la, and tme_ic_lsi64854.la. 
+
+	* ic/ncr53c9x.c: Added tme_ncr53c9x_transfer_resid_detect_state to
+	struct tme_ncr53c9x, for detecting the SCSI transfer residual while
+	data is being transferred. 
+	(_tme_ncr53c9x_cs_monitor_phase): Now take a new argument that will
+	force the phase to be checked, even if there isn't any SCSI transfer
+	residual.  All callers changed. 
+	(_TME_NCR53C9X_CS_MONITOR_PHASE): Now check the phase immediately. 
+	(_TME_NCR53C9X_CS_TRANSFER): Now initialize the transfer residual
+	detect state to zero. 
+	(_tme_ncr53c9x_update): In TME_NCR53C9X_CMD_TRANSFER, fixed bugs for
+	the MESSAGE IN phase, and simplified the sequence for the MESSAGE OUT
+	phase.  Fixed many bugs for all of the target selection commands. 
+	(_tme_ncr53c9x_callout): When we're detecting the transfer residual
+	while data is being transferred, we can't transfer more than one byte
+	at a time from a TLB that only supports slow reading, and also call
+	tme_scsi_phase_resid() to do the detection. 
+	Don't hold ACK on a transfer unless it definitely includes the last
+	byte of the transfer. 
+	(_tme_ncr53c9x_scsi_cycle): Fixed a bug where we wouldn't note an
+	automatically asserted ACK or ATN in the active SCSI cycle. 
+	(_tme_ncr53c9x_bus_cycle): Fixed a bug where we wouldn't add to the
+	data FIFO at the head. 
+
+	* ic/nec765.c (_tme_nec765_bus_cycle): More correctly alias reads and
+	writes to register number two on an i82072 to the MSR and DRS,
+	respectively.  This allows both the NetBSD fdc and the SunOS fd
+	drivers to work.
+
+	* ic/sparc/sparc-execute.c: Now define tme_sparc_idle_type_pc
+	appropriately for the version. 
+	(_TME_SPARC_EXECUTE_NAME): When we begin a new instruction burst, if
+	the first instruction in the burst is the beginning of the idle loop,
+	go idle. 
+	Check an annulled instruction for the netbsd32-type-0 idle type. 
+	Check a branch for the sunos32-type-0 idle type.  Fixed a bug where
+	repeated annulled instructions could cause the instruction burst to
+	never finish. 
+
+	* ic/sparc/sparc-fpu-auto.sh: Avoid a gcc -Wuninitialized warning by
+	setting fpreg_rd_format even for an unimplemented operation. 
+
+	* ic/sparc/sparc-impl.h: Added support for idle types. 
+
+	* ic/sparc/sparc-insns-auto.sh: In the slow read and write functions,
+	fixed a bug found by gcc -Wuninitialized in the unusual case where
+	this cycle is part fast, part slow, where we would use use an
+	uninitialized resid. 
+
+	* ic/sparc/sparc-insns.c (tme_sparc32_rdasr): To avoid a gcc
+	-Wuninitialized warning, for an unimplemented rdasr set value to zero
+	even though we abort(). 
+	(tme_sparc32_rdpsr): Added support for the sunos32-type-0 idle type. 
+	(tme_sparc32_wrpsr): Added support for the sunos32-type-0 and
+	netbsd32-type-0 idle types. 
+
+	* ic/sparc/sparc-misc.c (_tme_sparc_command):
+	(tme_sparc_do_idle): tme_sparc_fetch_nearby): Added. 
+	(tme_sparc_new): Now set _tme_sparc_command to handle commands. 
+	Poison the initial idle type state. 
+
+	* machine/sun/sun-cgtwo.c: Use the new generic tme_sunfb_ functions
+	and macros instead of the older tme_sun_fb_p4_ functions. 
+
+	* machine/sun/sun-fb.c: Replaced the old tme_sun_fb_p4_ functions with
+	the new generic tme_sunfb_ functions, and added support for more
+	sizes. 
+	Added all of the new generic Sun framebuffer support, including some
+	out-of-place Bt458 support. 
+	(tme_sun_cgthree): Added. 
+
+	* machine/sun/sun-fb.h: Removed most of the P4-specific definitions. 
+	Added many definitions for a generic Sun framebuffer, including some
+	P4 and S4 specifics. 
+
+	* machine/sun4/sun4-mainbus.c (tme_machine_sun4,bwtwo):
+	(tme_machine_sun4,si):
+	(tme_machine_sun4,cgtwo): Removed. 
+
+	* scsi/scsi-bus.c (_tme_scsi_bus_cycle): Added an assert to the
+	bulk-copy code to check that the target is always in sequence step
+	one. 
+
+	* scsi/scsi-device.c (_tme_scsi_device_cycle): Now log the message in
+	a MESSAGE_OUT phase.  Now extended messages have their own dispatch
+	array. 
+	(tme_scsi_device_target_mc): Added. 
+	(tme_scsi_device_new): By default, a new device will reject
+	synchronous negotiation. 
+
+	* scsi/scsi-msg.c (tme_scsi_device_msg_target_reject): Added. 
+
+	* tme/generic/scsi.h: Added the prototype for tme_scsi_phase_resid(). 
+
+	* tme/ic/Makefile.am: Added bt458.h to tmeicinclude_HEADERS. 
+
+	* tme/machine/sun.h: Added a prototype for tme_sun_cgthree(). 
+
+	* tme/scsi/scsi-device.h: Now define TME_SCSI_DEVICE_DO_MSG_EXT(). 
+	Added a dispatch array for extended messages to struct
+	tme_scsi_device. 
+	Now declare tme_scsi_device_target_mc(). 
+
+	* tme/scsi/scsi-msg.h: Now define TME_SCSI_MSG_EXT_SDTR.  Now declare
+	tme_scsi_device_msg_target_reject(). 
+
+Sun Nov 26 16:37:55 2006  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* generic/bus.c (tme_bus_tlb_fill): Fixed bugs in the support for bus
+	connections with nonzero sourced-address masks. 
+
+	* ic/am7930.c:
+	* ic/am7990.c: Added. 
+
+	* ic/mk48txx.c (_tme_mk48txx_bus_cycle): Added support for a
+	platform's year zero. 
+
+	* ic/ieee754/ieee754-misc-auto.sh: Removed the simple
+	tme_ieee754_PRECISION_to_int32 functions in favor of the ops versions. 
+
+	* ic/ieee754/ieee754-ops-auto.sh: Now emit ops for from_int32 and
+	from_int64.  Now allow an op to override the type of its first source
+	operand.  Made the generation of the preprocessor condition more
+	general.  Added some more support for integral source operands.  Fixed
+	a bug in substituting in softfloat function names. 
+
+	* ic/sparc/sparc-fpu-auto.sh: Fixed the ops that convert between
+	integer and floating-point to use the regular IEEE754 ops. 
+
+	* machine/sun4/sun4-mainbus.c (tme_machine_sun4,clock): Now set the
+	sun4 year zero in the mk48txx socket. 
+
+	* scsi/scsi-bus.c (_tme_scsi_bus_callout): Now clear the actions and
+	events for a connection before they are called out, to prevent calling
+	them out again. 
+	Added support for the cycle marker bit. 
+	(_tme_scsi_bus_cycle): Added support for the cycle marker bit.  Added
+	support for TME_SCSI_ACTION_SELECT_WITH_ATN and
+	TME_SCSI_ACTION_DMA_INITIATOR_HOLD_ACK.  Moved the bulk DMA copy code
+	inside the slow initiator DMA code.  This allows the normal target and
+	initiator slow DMA code to always handle the boundaries of a transfer,
+	which (especially in the initiator hold ACK case) can be important. 
+
+	* scsi/scsi-tape.c: Added the tme generic SCSI-1 tape to the list. 
+	(tme_scsi_tape_cdb_xfer0): Added a big hack to quickly fix NetBSD PR
+	pkg/34536. 
+	(_tme_scsi_tape_mode_select_data): Added. 
+	(tme_scsi_tape_cdb_block_limits):
+	(tme_scsi_tape_cdb_mode_select): Implemented. 
+
+	* tme/common.h: Replaced the old TME_FIELD_MASK_EXTRACTS macros with a
+	single smarter version. 
+	Now TME_FIELD_MASK_DEPOSITU masks the value being deposited. 
+
+	* tme/memory.h [!TME_THREADS_COOPERATIVE]: Now define
+	TME_MEMORY_BUS_BOUNDARY to be sizeof(tme_uint8_t), to avoid some
+	compiler warnings when the previous value of zero was used in some
+	comparisons. 
+
+	* tme/generic/ethernet.h: Fixed a bug where the source address field
+	was named tme_ethernet_header_size. 
+
+	* tme/generic/scsi.h: Renumbered the SCSI actions to allow for future
+	expansion, and also to add TME_SCSI_ACTION_DMA_INITIATOR_HOLD_ACK,
+	TME_SCSI_ACTION_SELECT_WITH_ATN, and TME_SCSI_ACTION_CYCLE_MARKER. 
+
+	* tme/ic/mk48txx.h: Added tme_mk48txx_socket_year_zero to the socket
+	structure. 
+
+	* tme/scsi/scsi-device.h: Expanded tme_scsi_device_data to 256 bytes,
+	to hold a large MODE SELECT parameter list. 
+
+Thu Nov 16 02:54:40 2006  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* generic/bus-el.c (_tme_bus_connections_new): Added support for the
+	'slot', 'offset', 'controller', and 'dma-offset' arguments. 
+	(TME_ELEMENT_SUB_NEW_DECL(tme_generic,bus)): Added real argument
+	processing, and added support for the arguments that define bus slots. 
+
+	* generic/bus.c (tme_bus_tlb_fill): If this bus has a controller, and
+	the TLB fill request isn't from the controller, pass the TLB fill on
+	to the controller. 
+	(tme_bus_connection_make): Added support for making a connection to a
+	bus controller. 
+
+	* generic/ethernet.c (tme_ethernet_chunks_copy): Made the destination
+	chunks structures const. 
+	(tme_ethernet_crc32_el): Added. 
+
+	* ic/lsi64854.c ic/ncr53c9x.c ic/nec765.c machine/sun4/sun4-fdc.c
+	  scsi/tape-tme.c tme/ic/nec765.h:
+
+	  Added. 
+
+	* ic/ncr5380.c (_tme_ncr5380_signal): Now use TME_BUS_SIGNAL_WHICH()
+	to remove the flags from a bus signal. 
+
+	* ic/z8530.c (_tme_z8530_channel_reset): Now have
+	TME_Z8530_RR1_ALL_SENT in the reset value for RR1. 
+	(_tme_z8530_bus_cycle): Now clear TME_Z8530_RR1_ALL_SENT when transmit
+	data is written. 
+	(_tme_z8530_read): Now set TME_Z8530_RR1_ALL_SENT when all transmit
+	data has been written. 
+
+	* ic/ieee754/ieee754-misc-auto.sh: Now emit prototypes for the
+	functions that convert floats to 32-bit integers. 
+
+	* ic/ieee754/ieee754-misc.c (tme_ieee754_fpreg_format): Added. 
+
+	* ic/sparc/cy7c601.c (TME_ELEMENT_X_NEW_DECL(tme_ic_,sparc,cy7c601)):
+	The common CY7C601 has a PSR version of 1.  Use the default slow
+	instruction fetch function. 
+
+	* ic/sparc/mb86900.c (TME_ELEMENT_X_NEW_DECL(tme_ic_,sparc,mb86900)):
+	Use the default slow instruction fetch function. 
+
+	* ic/sparc/sparc-execute.c (_TME_SPARC_EXECUTE_NAME): Now save the ASI
+	mask for instructions in the CPU state. 
+	Now fetch all instructions with tme_memory_bus_read32(), which gives
+	all needed behavior (when threads are cooperative,
+	tme_memory_atomic_read32 means a function call).  Now log call
+	instructions, which makes reconstructing code flow possible. 
+
+	* ic/sparc/sparc-fpu.c (tme_sparc_fpu_new): Fixed a bug where the FPU
+	version wasn't being put into the FSR. 
+
+	* ic/sparc/sparc-impl.h: Now define TME_SPARC_SLOW_FLAG_INSN and
+	TME_SPARC_SLOW_FLAG_NO_FAULTS for the slow load and store functions. 
+	Now _tme_sparc_bus_fault/tme_sparc32_bus_fault get the flags passed to
+	the slow load/store function.  Added a prototype for
+	tme_sparc32_fetch_slow(). 
+
+	* ic/sparc/sparc-insns-auto.sh: For the instructions that have
+	add-style condition codes, changed the calculation of C to match the
+	V8 architecture manual.  In the memory access instructions, instead of
+	using a tme_memory_atomic_ function, use a tme_memory_bus_ function,
+	which is how it should always have been.  Log jmpl instructions that
+	act as call or return instructions, which makes reconstructing code
+	flow possible.  In the slow load/store functions, use the ASI mask for
+	instructions if the instruction flag is specified, and allow the
+	CPU-specific bus fault handler to cancel a fault. 
+
+	* ic/sparc/sparc-insns.c (tme_sparc32_rett): Fixed a bug where a user
+	PS wasn't restored into S correctly.  Fixed a bug where we wouldn't
+	redispatch after changing the PSR. 
+	(tme_sparc32_ticc): Fixed a bug where we thought the trap number was
+	in rd, instead of from rs1 + rs2. 
+
+	* ic/sparc/sparc-misc.c (tme_sparc32_fetch_slow): Added. 
+	(tme_sparc32_bus_fault): When a fault happens during an instruction
+	fetch, ignore the fault if we're supposed to, otherwise return an
+	instruction access exception instead of a data access exception. 
+
+	* libtme/module.c (_tme_modules_find): Fixed a bug where we wouldn't
+	check the LTDL_SHLIBPATH_VAR directory for modules. 
+
+	* libtme/threads-sjlj.c (tme_sjlj_cond_sleep_yield): Added. 
+
+	* machine/sun/sun-mmu.c: In struct tme_sun_mmu, added members for MMUs
+	with an address space hole. 
+	(tme_sun_mmu_new): If this MMU has an address space hole, adjust the
+	number of address bits and save a mask with the last significant
+	address bit set. 
+	(_tme_sun_mmu_lookup): If this MMU has an address space hole, and the
+	address to look up is in the hole, return the hole PTE. 
+	(tme_sun_mmu_pte_set):
+	(tme_sun_mmu_segmap_get):
+	(tme_sun_mmu_segmap_set): Handle addresses in an address space hole. 
+	(tme_sun_mmu_tlb_fill): Fixed a bug in the previous commit that would
+	not remember TLBs filled from invalid PTEs for later invalidation when
+	those PTEs are made valid.  However, don't remember TLBs filled in the
+	address hole. 
+
+	* machine/sun/sun-si.c (_tme_sun_si_tlb_fill): Now use
+	tme_bus_tlb_initialize() to make a TLB entry passed on the stack
+	invalid, since tme_bus_tlb_invalidate() assumes that the TLB's locks
+	have been constructed. 
+
+	* machine/sun4/Makefile.am: Added sun4-fdc.c to
+	tme_machine_sun4_la_SOURCES. 
+
+	* machine/sun4/sun4-mainbus.c (_tme_sun4_connections_new): Only fill
+	the TLB set allocator on a bus connection for an actual bus, not the
+	other devices. 
+
+	* machine/sun4/sun4-timer.c (_tme_sun4_timer_reset): Fixed a
+	TME_SUN4_IS_SUN4C to TME_SUN4_IS_SUN44C. 
+	(_tme_sun4_timer_cycle_control): Fixed a bug where we had the counter
+	values counting down, not up.  Fixed a TME_SUN4_IS_SUN4C to
+	TME_SUN4_IS_SUN44C.  Now log for all registers, and make the minimum
+	log level much higher to filter out these messages. 
+
+	* machine/sun4/sun44c-mmu.c (_tme_sun44c_buserr_log): On a sun4c, add
+	0xf0000000 to the physical address displayed. 
+	(_tme_sun44c_tlb_fill_mmu):
+	(_tme_sun44c_tlb_fill_pte): Before a TLB has been filled, it has no
+	fault handlers, and since the TLB might be on the stack its handler
+	count is garbage, so always thread the initiator's bus connection down
+	as the first fault handler private value. 
+
+	* scsi/Makefile.am: Added tape-tme.c to tme_scsi_la_SOURCES. 
+
+	* scsi/scsi-device.c (tme_scsi_device_target_phase): Bumped the log
+	level for the various data phases so it's easier to filter the
+	messages out. 
+	(_tme_scsi_device_cycle): Fixed a bug in handling the length byte of
+	an extended message. 
+
+	* serial/Makefile.am: Added serial-sink.c to tme_serial_kb_la_SOURCES. 
+
+	* tme/Makefile.am: Replaced atomics.h with memory.h in
+	pkginclude_HEADERS. 
+
+	* tme/connection.h: Now define TME_CONNECTION_BUS_SPARC. 
+
+	* tme/threads.h: Now define TME_THREADS_COOPERATIVE to TRUE.  Now
+	define tme_thread_suspend_others() and tme_thread_resume_others(). 
+	[!TME_NO_DEBUG_LOCKS]: When __FILE__ and __LINE__ aren't defined,
+	fixed a bug where we would pass in NULL for __LINE__, instead of zero. 
+	Added a prototype for tme_sjlj_cond_sleep_yield(), and the
+	tme_cond_sleep_yield() macro.  Removed the old atomic memory access
+	support. 
+
+	* tme/generic/bus.h: Now define
+	TME_BUS_CONNECTION_INT_FLAG_ADDRESSABLE and
+	TME_BUS_CONNECTION_INT_FLAG_CONTROLLER.  Now define struct
+	tme_bus_slot.  In struct tme_bus, keep a list of struct tme_bus_slot,
+	and track up to one bus connection that is the "controller" of the
+	bus. 
+
+	* tme/generic/ethernet.h: Added a const to the prototype for
+	tme_ethernet_chunks_copy(), and added a prototype for
+	tme_ethernet_crc32_el(). 
+
+	* tme/generic/ic.h: Quadrupled the value of TME_IC_REGS_SIZE, to
+	support the SPARC emulations and their large register sets.  In struct
+	tme_ic, fixed the definitions for the 64-bit register members, to
+	divide the TME_IC_REGS_SIZE by eight instead of sixteen. 
+
+	* tme/ic/Makefile.am: Added sparc.h, mk48txx.h, and nec765.h to
+	tmeicinclude_HEADERS. 
+
+	* tme/ic/ieee754.h: Now define macros describing an IEEE754 register
+	file.  Added a prototype for tme_ieee754_fpreg_format(). 
+
+	* tme/machine/sun.h: Now define TME_SUN_IDPROM_OFF_MACHTYPE, and
+	macros for some possible machine and architecture types.  In struct
+	tme_sun_mmu_info, added tme_sun_mmu_info_topindex_bits, for describing
+	either the number of top address bits for region, or for the address
+	hole. 
+
+	* tme/scsi/scsi-tape.h: In struct tme_scsi_tape, added members for
+	describing the minimum, maximum, and current block sizes. 
+
+	* tmesh/tmesh-cmds.c (_tmesh_command_alias): Added. 
+	(tmesh_eval): Now dispatch an 'alias' command. 
+
+	* tmesh/tmesh-impl.h: Now define TMESH_COMMAND_ALIAS. 
+
+	* tmesh/tmesh-input.y: Added support for scanning and parsing the new
+	'alias' command. 
+
+Sat Sep 30 13:48:38 2006  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* bus/multibus/3c400.c bus/multibus/sun-mie.c bus/multibus/sun-sc.c
+	  generic/bus-device-auto.sh generic/bus-device.c generic/bus-el.c
+	  generic/bus.c host/posix/posix-memory.c host/posix/posix-serial.c
+	  ic/am9513.c ic/i825x6.c ic/isil7170.c ic/mm58167.c ic/ncr5380.c
+	  ic/z8530.c libtme/Makefile.am libtme/memory-auto.sh
+	  machine/sun/sun-bwtwo.c machine/sun/sun-cgtwo.c
+	  machine/sun/sun-mmu.c machine/sun/sun-obie.c machine/sun/sun-si.c
+	  machine/sun2/sun2-impl.h machine/sun2/sun2-mmu.c
+	  machine/sun3/sun3-impl.h machine/sun3/sun3-mmu.c tme/connection.h
+	  tme/memory.h tme/tme.h tme/generic/bus-device.h tme/generic/bus.h
+	  tme/ic/m68k.h tme/machine/sun.h:
+
+	  Changed how atomic values are handled.  Removed the TME_ATOMIC_ set
+	  of macros, which may or may not use a rwlock to serialize access to
+	  a value, and added the tme_memory_atomic_ set of macros, which
+	  always requires an rwlock argument. 
+	  This tme_memory_atomic_ set of macros also takes a compile-time
+	  minimum alignment hint, covers a wide range of math operations, and
+	  is guaranteed to work atomically for any access, no matter what the
+	  actual alignment. 
+	  Added the tme_memory_bus_ set of macros, which work just like the
+	  tme_memory_atomic_ macros but only within a certain bus size - i.e.,
+	  if a 32-bit bus size is specified, and an access crosses one
+	  32-bit-aligned address boundary, the access will be split into two
+	  atomic accesses. 
+	  The tme_memory_atomic_ and tme_memory_bus_ macros should better
+	  enable emulation on a non-cooperative threading host someday.  Added
+	  the tme_memory_ set of macros, which don't access memory atomically
+	  but still take the same compile-time minimum-alignment hint and are
+	  guaranteed to work for any actual alignment.  This has caused
+	  significant fallout in all TLB handling, since the first and last
+	  address fields in a TLB were previously TME_ATOMICs, and TLBs were
+	  invalidated by atomically updating these first to be greater than
+	  last. 
+	  This method would not have worked in a non-cooperative threading
+	  host.  First, it was impossible to update both first and last
+	  address fields simultaneously, and second, it was impossible to know
+	  if anyone was using, or had committed to using, the TLB while you
+	  were invalidating it.  Without knowing that the TLB can't be used
+	  after invalidation, the invalidator can't continue and make other
+	  changes that would give incorrect behavior if the TLB *is* actually
+	  used later. 
+	  So, TLBs have a new discipline.  They have "busy" and "invalid"
+	  atomic flags.  Before a TLB entry is used, its busy flag is marked
+	  true, and its invalid flag is checked.  If the invalid flag is true,
+	  the TLB is unbusied and prepared for filling (see
+	  tme_bus_tlb_unbusy_fill() and tme_bus_tlb_invalidate() for how they
+	  synchronize and avoid interesting races), otherwise the TLB entry is
+	  valid and won't be invalidated until its busy flag is set to false. 
+	  To make this truly thread-safe, someday all slow bus cycle handlers
+	  will have to take a TLB entry somehow, so they can correctly busy
+	  the TLB entry before making the access. 
+
+	* generic/ethernet.c generic/keyboard.c generic/mouse.c
+	  libtme/element.c scsi/acb4000.c serial/serial-kb.c:
+
+	  Now explicitly include errno.h. 
+
+	* host/bsd/bsd-bpf.c host/posix/posix-tape.c serial/serial-kb.h
+	  serial/serial-ms.h tme/scsi/scsi-device.h:
+
+	  Now explicitly include tme/threads.h. 
+
+	* ic/mk48txx.c ic/sparc/Makefile.am ic/sparc/cy7c601.c
+	  ic/sparc/mb86900.c ic/sparc/sparc-bus-auto.sh
+	  ic/sparc/sparc-execute.c ic/sparc/sparc-fpu-auto.sh
+	  ic/sparc/sparc-fpu.c ic/sparc/sparc-impl.h
+	  ic/sparc/sparc-insns-auto.sh ic/sparc/sparc-insns.c
+	  ic/sparc/sparc-misc-auto.sh ic/sparc/sparc-misc.c
+	  machine/sun4/Makefile.am machine/sun4/SUN4-75
+	  machine/sun4/sun4-impl.h machine/sun4/sun4-mainbus.c
+	  machine/sun4/sun4-timer.c machine/sun4/sun44c-cache.c
+	  machine/sun4/sun44c-control.c machine/sun4/sun44c-memerr.c
+	  machine/sun4/sun44c-mmu.c serial/serial-sink.c tme/ic/mk48txx.h
+	  tme/ic/sparc.h:
+
+	  Added. 
+
+	* machine/sun3/sun3-mainbus.c (_tme_sun3_command): Fixed a bug where
+	we wouldn't reset the VME bus. 
+
+	* tme/atomics.h: Removed. 
+
+Sun Dec 04 22:53:37 2005  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* ic/ncr5380.c: Fixed a bug in the TME_NCR5380_REG_PUT macro. 
+	(_tme_ncr5380_reg_put): Now declared static. 
+	(_tme_ncr5380_callout): Fixed a comment.  Fixed a bug where we
+	wouldn't set the residual in the SCSI DMA structure. 
+
+	* ic/m68k/m68k-execute.c (_TME_M68K_EXECUTE_NAME): Fixed a bug where
+	we would call the slow executor inside a return() statement. 
+
+	* machine/sun/sun-cgtwo.c (_tme_suncg2_validate_bitmaps): Fixed a bug
+	where we were processing the pixmap into the bitmaps from
+	left-to-right, instead of from right-to-left like the individual pixel
+	bit translation requires. 
+
+	* machine/sun/sun-si.c (tme_sun_si): Now fail and display the usage if
+	no si type is given.  Fixed the usage string. 
+
+Sat Jun 11 13:47:23 2005  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* machine/sun/sun-mmu.c: Removed the invalid segment member of the MMU
+	structure, since the hardware doesn't have the notion of an invalid
+	segment. 
+	(tme_sun_mmu_new): Now initialize the segment map with the last PMEG
+	number. 
+	(tme_sun_mmu_pte_get):
+	(tme_sun_mmu_pte_set):
+	(tme_sun_mmu_segmap_set): Removed checks for the invalid segment. 
+
+	* machine/sun2/sun2-mmu.c (_tme_sun2_mmu_new): Now zero the MMU
+	information structure first, and don't provide the invalid segment
+	number. 
+
+	* machine/sun3/sun3-mmu.c (_tme_sun3_mmu_new): Now zero the MMU
+	information structure first, and don't provide the invalid segment
+	number. 
+
+	* tme/machine/sun.h: Removed tme_sun_mmu_info_seginv from struct
+	tme_sun_mmu_info. 
+
 Sun May 15 01:24:11 2005  Matthew Fredette  <fredette@alum.mit.edu>
 
 	* Release 0.4 out.

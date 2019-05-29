@@ -1,4 +1,4 @@
-/* $Id: scsi-msg.h,v 1.2 2005/02/18 02:18:43 fredette Exp $ */
+/* $Id: scsi-msg.h,v 1.3 2007/01/08 00:03:25 fredette Exp $ */
 
 /* tme/scsi/scsi-msg.h - header file describing SCSI messages: */
 
@@ -37,7 +37,7 @@
 #define _TME_SCSI_SCSI_MSG_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: scsi-msg.h,v 1.2 2005/02/18 02:18:43 fredette Exp $");
+_TME_RCSID("$Id: scsi-msg.h,v 1.3 2007/01/08 00:03:25 fredette Exp $");
 
 /* includes: */
 #include <tme/scsi/scsi-device.h>
@@ -58,6 +58,9 @@ _TME_RCSID("$Id: scsi-msg.h,v 1.2 2005/02/18 02:18:43 fredette Exp $");
 #define TME_SCSI_MSG_IDENTIFY			(0x80)
 #define  TME_SCSI_MSG_IDENTIFY_DISCONNECT	(0x40)
 #define  TME_SCSI_MSG_IDENTIFY_LUN_MASK		(0x07)
+
+/* extended messages: */
+#define TME_SCSI_MSG_EXT_SDTR			(0x01)
 
 /* this evaluates to nonzero iff this is a one-byte message: */
 #define TME_SCSI_MSG_IS_1(msg)			\
@@ -81,5 +84,6 @@ _TME_SCSI_DEVICE_MSG_P(tme_scsi_device_msg_message_reject);
 _TME_SCSI_DEVICE_MSG_P(tme_scsi_device_msg_nop);
 _TME_SCSI_DEVICE_MSG_P(tme_scsi_device_msg_parity_error);
 _TME_SCSI_DEVICE_MSG_P(tme_scsi_device_msg_identify);
+_TME_SCSI_DEVICE_MSG_P(tme_scsi_device_msg_target_reject);
 
 #endif /* !_TME_SCSI_SCSI_MSG_H */

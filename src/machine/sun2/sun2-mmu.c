@@ -1,4 +1,4 @@
-/* $Id: sun2-mmu.c,v 1.10 2005/02/17 12:37:25 fredette Exp $ */
+/* $Id: sun2-mmu.c,v 1.13 2007/02/15 01:34:34 fredette Exp $ */
 
 /* machine/sun2/sun2-mmu.c - implementation of Sun 2 MMU emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun2-mmu.c,v 1.10 2005/02/17 12:37:25 fredette Exp $");
+_TME_RCSID("$Id: sun2-mmu.c,v 1.13 2007/02/15 01:34:34 fredette Exp $");
 
 /* includes: */
 #include "sun2-impl.h"
@@ -292,8 +292,8 @@ _tme_sun2_m68k_tlb_fill(struct tme_m68k_bus_connection *conn_m68k, struct tme_m6
     tme_bus_tlb_initialize(tlb);
 
     /* we cover the entire address space: */
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first, 0);
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last, -1);
+    tlb->tme_bus_tlb_addr_first = 0;
+    tlb->tme_bus_tlb_addr_last = ((tme_bus_addr_t) 0) - 1;
 
     /* we allow reading and writing: */
     tlb->tme_bus_tlb_cycles_ok = TME_BUS_CYCLE_READ | TME_BUS_CYCLE_WRITE;
@@ -414,12 +414,8 @@ _tme_sun2_bus_tlb_fill(struct tme_bus_connection *conn_bus, struct tme_bus_tlb *
   /* create the mapping TLB entry.  we do this even if base == 0,
      because the TLB entry as currently filled may cover more address
      space than DVMA space on this machine is supposed to cover: */
-  TME_ATOMIC_WRITE(tme_bus_addr_t,
-		   tlb_bus.tme_bus_tlb_addr_first,
-		   0);
-  TME_ATOMIC_WRITE(tme_bus_addr_t,
-		   tlb_bus.tme_bus_tlb_addr_last,
-		   size - 1);
+  tlb_bus.tme_bus_tlb_addr_first = 0;
+  tlb_bus.tme_bus_tlb_addr_last = size - 1;
   tlb_bus.tme_bus_tlb_cycles_ok
     = (TME_BUS_CYCLE_READ
        | TME_BUS_CYCLE_WRITE);
@@ -737,7 +733,8 @@ _tme_sun2_mmu_context_user_set(struct tme_sun2 *sun2)
 int
 _tme_sun2_mmu_tlb_set_allocate(struct tme_bus_connection *conn_bus_asker,
 			       unsigned int count, unsigned int sizeof_one, 
-			       TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb *) _tlbs)
+			       struct tme_bus_tlb * tme_shared * _tlbs,
+			       tme_rwlock_t *_tlbs_rwlock)
 {
   struct tme_sun2 *sun2;
   int rc;
@@ -746,7 +743,7 @@ _tme_sun2_mmu_tlb_set_allocate(struct tme_bus_connection *conn_bus_asker,
   sun2 = (struct tme_sun2 *) conn_bus_asker->tme_bus_connection.tme_connection_element->tme_element_private;
 
   /* get the MMU to allocate the TLB set: */
-  rc = tme_sun_mmu_tlb_set_allocate(sun2->tme_sun2_mmu, count, sizeof_one, _tlbs);
+  rc = tme_sun_mmu_tlb_set_allocate(sun2->tme_sun2_mmu, count, sizeof_one, _tlbs, _tlbs_rwlock);
 
   /* if this is the TLB set for our CPU, remember where the context
      zero TLBs are, and try to reset the MMU now: */
@@ -756,7 +753,7 @@ _tme_sun2_mmu_tlb_set_allocate(struct tme_bus_connection *conn_bus_asker,
       && conn_bus_asker->tme_bus_connection.tme_connection_type == TME_CONNECTION_BUS_M68K
       && sun2->tme_sun2_reset_tlbs == NULL) {
     assert(sizeof_one == sizeof(struct tme_m68k_tlb));
-    sun2->tme_sun2_reset_tlbs = (struct tme_m68k_tlb *) TME_ATOMIC_READ(struct tme_bus_tlb *, *_tlbs);
+    sun2->tme_sun2_reset_tlbs = (struct tme_m68k_tlb *) tme_memory_atomic_pointer_read(struct tme_bus_tlb *, *_tlbs, _tlbs_rwlock);
     sun2->tme_sun2_reset_tlb_count = count;
     _tme_sun2_mmu_reset(sun2);
   }
@@ -831,6 +828,8 @@ _tme_sun2_mmu_reset(struct tme_sun2 *sun2)
   sun2->tme_sun2_reset_tlbs = NULL;
   /* XXX FIXME - this is not thread-safe: */
   tlb = &tlb_m68k->tme_m68k_tlb_bus_tlb;
+  tme_bus_tlb_busy(tlb);
+  tme_bus_tlb_unbusy_fill(tlb);
   
   /* fill the TLB entry: */
   (*sun2->tme_sun2_obmem->tme_bus_tlb_fill)
@@ -840,16 +839,16 @@ _tme_sun2_mmu_reset(struct tme_sun2 *sun2)
      TME_BUS_CYCLE_READ);
 
   /* map the TLB entry: */
-  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb_virtual.tme_bus_tlb_addr_first, 0);
-  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb_virtual.tme_bus_tlb_addr_last, 7);
+  tlb_virtual.tme_bus_tlb_addr_first = 0;
+  tlb_virtual.tme_bus_tlb_addr_last = 7;
   tlb_virtual.tme_bus_tlb_cycles_ok = TME_BUS_CYCLE_READ;
   tme_bus_tlb_map(tlb, TME_SUN2_PROM_BASE, &tlb_virtual, 0);
   
   /* this TLB entry must allow slow reads from exactly the reset
      range: */
   if (!(tlb->tme_bus_tlb_cycles_ok & TME_BUS_CYCLE_READ)
-      || TME_ATOMIC_READ(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first) != 0
-      || TME_ATOMIC_READ(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last) != 7) {
+      || tlb->tme_bus_tlb_addr_first != 0
+      || tlb->tme_bus_tlb_addr_last != 7) {
     abort();
   }
   
@@ -880,13 +879,13 @@ _tme_sun2_mmu_new(struct tme_sun2 *sun2)
 {
   struct tme_sun_mmu_info mmu_info;
 
+  memset(&mmu_info, 0, sizeof(mmu_info));
   mmu_info.tme_sun_mmu_info_element = sun2->tme_sun2_element;
   mmu_info.tme_sun_mmu_info_address_bits = 24;
   mmu_info.tme_sun_mmu_info_pgoffset_bits = TME_SUN2_PAGE_SIZE_LOG2;
   mmu_info.tme_sun_mmu_info_pteindex_bits = 4;
   mmu_info.tme_sun_mmu_info_contexts = 8;
   mmu_info.tme_sun_mmu_info_pmegs = 256;
-  mmu_info.tme_sun_mmu_info_seginv = 255;
   mmu_info.tme_sun_mmu_info_tlb_fill_private = sun2;
   mmu_info.tme_sun_mmu_info_tlb_fill = _tme_sun2_tlb_fill_mmu;
   mmu_info.tme_sun_mmu_info_proterr_private = sun2;

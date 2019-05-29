@@ -1,4 +1,4 @@
-/* $Id: sun-cgtwo.c,v 1.2 2005/05/09 02:01:02 fredette Exp $ */
+/* $Id: sun-cgtwo.c,v 1.7 2007/03/03 15:36:15 fredette Exp $ */
 
 /* machine/sun/sun-cgtwo.c - Sun cgtwo emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun-cgtwo.c,v 1.2 2005/05/09 02:01:02 fredette Exp $");
+_TME_RCSID("$Id: sun-cgtwo.c,v 1.7 2007/03/03 15:36:15 fredette Exp $");
 
 /* includes: */
 #include <tme/machine/sun.h>
@@ -255,8 +255,7 @@ _tme_suncg2_tlb_invalidate(struct tme_suncg2 *suncg2, struct tme_bus_tlb *tlb_va
   struct tme_bus_tlb *tlb;
 
   if (tlb_valid != NULL) {
-    tlb_valid = TME_ATOMIC_READ(struct tme_bus_tlb *, 
-				tlb_valid->tme_bus_tlb_backing_reservation);
+    tlb_valid = tlb_valid->tme_bus_tlb_global;
   }
 
   for (tlb_i = 0; tlb_i < TME_ARRAY_ELS(suncg2->tme_suncg2_tlbs); tlb_i++) {
@@ -275,8 +274,7 @@ _tme_suncg2_tlb_add(struct tme_suncg2 *suncg2, struct tme_bus_tlb *tlb_valid)
 {
   struct tme_bus_tlb *tlb;
 
-  tlb_valid = TME_ATOMIC_READ(struct tme_bus_tlb *, 
-			      tlb_valid->tme_bus_tlb_backing_reservation);
+  tlb_valid = tlb_valid->tme_bus_tlb_global;
 
   tlb = suncg2->tme_suncg2_tlbs[suncg2->tme_suncg2_tlb_head % TME_ARRAY_ELS(suncg2->tme_suncg2_tlbs)];
   if (tlb != NULL
@@ -291,13 +289,8 @@ _tme_suncg2_tlb_add(struct tme_suncg2 *suncg2, struct tme_bus_tlb *tlb_valid)
 static void
 _tme_suncg2_validate_bitmaps(struct tme_suncg2 *suncg2, struct tme_bus_tlb *tlb)
 {
-#if SIZEOF_LONG > 4
-  const unsigned long *pixmap_pointer;
-  unsigned long pixmap;
-#else  /* SIZEOF_LONG <= 4 */
   const tme_uint32_t *pixmap_pointer;
   tme_uint32_t pixmap;
-#endif /* SIZEOF_LONG <= 4 */
   tme_uint32_t pixmap_resid;
   tme_uint32_t bitmaps_lo;
   tme_uint32_t bitmaps_hi;
@@ -334,12 +327,12 @@ _tme_suncg2_validate_bitmaps(struct tme_suncg2 *suncg2, struct tme_bus_tlb *tlb)
     }
 
     /* start in the pixmap: */
-    pixmap_pointer = (tme_uint32_t *) (suncg2->tme_suncg2_raw_memory + TME_SUNCG2_REG_PIXMAP);
+    pixmap_pointer = (tme_uint32_t *) (suncg2->tme_suncg2_raw_memory + TME_SUNCG2_REG_PIXMAP + TME_SUNCG2_SIZ_PIXMAP);
     pixmap_resid = TME_SUNCG2_SIZ_PIXMAP;
     pixmap = 0;
   
     /* start in the bitmaps: */
-    bitmap_pointer = suncg2->tme_suncg2_raw_memory + TME_SUNCG2_REG_BITMAP(0);
+    bitmap_pointer = suncg2->tme_suncg2_raw_memory + TME_SUNCG2_REG_BITMAP(0) + TME_SUNCG2_SIZ_BITMAP;
     bitmaps_lo = 0;
     bitmaps_hi = 0;
 
@@ -348,7 +341,7 @@ _tme_suncg2_validate_bitmaps(struct tme_suncg2 *suncg2, struct tme_bus_tlb *tlb)
 
       /* if the pixmap data is empty, reload it: */
       if (__tme_predict_false((pixmap_resid % sizeof(pixmap)) == 0)) {
-	pixmap = *(pixmap_pointer++);
+	pixmap = *(--pixmap_pointer);
 	pixmap = tme_betoh_u32(pixmap);
       }
 
@@ -371,6 +364,7 @@ _tme_suncg2_validate_bitmaps(struct tme_suncg2 *suncg2, struct tme_bus_tlb *tlb)
       /* after every eight pixels, we have another eight bytes of bitmap
 	 data to write out: */
       if (__tme_predict_false((pixmap_resid % 8) == 0)) {
+	bitmap_pointer--;
 	bitmap_pointer[TME_SUNCG2_SIZ_BITMAP * 0] = TME_FIELD_MASK_EXTRACTU(bitmaps_lo, 0x000000ff);
 	bitmap_pointer[TME_SUNCG2_SIZ_BITMAP * 1] = TME_FIELD_MASK_EXTRACTU(bitmaps_lo, 0x0000ff00);
 	bitmap_pointer[TME_SUNCG2_SIZ_BITMAP * 2] = TME_FIELD_MASK_EXTRACTU(bitmaps_lo, 0x00ff0000);
@@ -381,7 +375,6 @@ _tme_suncg2_validate_bitmaps(struct tme_suncg2 *suncg2, struct tme_bus_tlb *tlb)
 	bitmap_pointer[TME_SUNCG2_SIZ_BITMAP * 6] = TME_FIELD_MASK_EXTRACTU(bitmaps_hi, 0x00ff0000);
 	bitmap_pointer[TME_SUNCG2_SIZ_BITMAP * 7] = TME_FIELD_MASK_EXTRACTU(bitmaps_hi, 0xff000000);
 	bitmaps_hi = 0;
-	bitmap_pointer++;
       }
 
       /* loop while we have pixmap bytes remaining: */
@@ -422,13 +415,8 @@ _tme_suncg2_validate_bitmaps(struct tme_suncg2 *suncg2, struct tme_bus_tlb *tlb)
 static void
 _tme_suncg2_validate_pixmap(struct tme_suncg2 *suncg2, struct tme_bus_tlb *tlb)
 {
-#if SIZEOF_LONG > 4
-  unsigned long *pixmap_pointer;
-  unsigned long pixmap;
-#else  /* SIZEOF_LONG <= 4 */
   tme_uint32_t *pixmap_pointer;
   tme_uint32_t pixmap;
-#endif /* SIZEOF_LONG <= 4 */
   tme_uint32_t pixmap_resid;
   tme_uint32_t bitmaps_lo;
   tme_uint32_t bitmaps_hi;
@@ -648,20 +636,11 @@ _tme_suncg2_mode_change(struct tme_suncg2 *suncg2)
     }
   }
 
-  /* if we completed the above loop, but our monochrome mask is zero,
-     the colors for all pixel values must be the same.  while strange,
-     we tolerate this, and take the least significant bit as the
-     monochrome mask: */
-  if (pixel_i == 255
-      && mono_mask == 0) {
-    assert (color0 == color1);
-    mono_mask = 1;
-  }
-
   /* if the monochrome mask is zero, we must display the pixmap, else
      we display the bitmap corresponding to the least significant set
      bit in the monochrome mask: */
-  if (mono_mask == 0) {
+  if (mono_mask == 0
+      || (mono_mask & (mono_mask - 1)) != 0) {
     bitmap_mode_plane = TME_SUNCG2_PLANE_MAX;
   }
   else {
@@ -800,7 +779,7 @@ _tme_suncg2_callout(struct tme_suncg2 *suncg2, int new_callouts)
       &= TME_SUNCG2_CALLOUTS_MASK;
 
     /* if we need a mode change: */
-    if (new_callouts & TME_SUNCG2_CALLOUT_MODE_CHANGE) {
+    if (callouts & TME_SUNCG2_CALLOUT_MODE_CHANGE) {
 
       /* call out the mode change: */
       rc = _tme_suncg2_mode_change(suncg2);
@@ -1429,12 +1408,8 @@ _tme_suncg2_tlb_fill(void *_suncg2, struct tme_bus_tlb *tlb,
     }
 
     /* the address range: */
-    TME_ATOMIC_WRITE(tme_bus_addr_t,
-		     tlb->tme_bus_tlb_addr_first, 
-		     address_first);
-    TME_ATOMIC_WRITE(tme_bus_addr_t,
-		     tlb->tme_bus_tlb_addr_last,
-		     address_last);
+    tlb->tme_bus_tlb_addr_first = address_first;
+    tlb->tme_bus_tlb_addr_last = address_last;
 
     /* this TLB entry allows fast reading and fast writing: */
     tlb->tme_bus_tlb_emulator_off_read = memory - address_first;
@@ -1499,12 +1474,8 @@ _tme_suncg2_tlb_fill(void *_suncg2, struct tme_bus_tlb *tlb,
     }
 
     /* the address range: */
-    TME_ATOMIC_WRITE(tme_bus_addr_t,
-		     tlb->tme_bus_tlb_addr_first, 
-		     address_first);
-    TME_ATOMIC_WRITE(tme_bus_addr_t,
-		     tlb->tme_bus_tlb_addr_last,
-		     address_last);
+    tlb->tme_bus_tlb_addr_first = address_first;
+    tlb->tme_bus_tlb_addr_last = address_last;
 
     /* this TLB entry allows fast reading and fast writing: */
     tlb->tme_bus_tlb_emulator_off_read = memory - address_first;
@@ -1527,13 +1498,8 @@ _tme_suncg2_tlb_fill(void *_suncg2, struct tme_bus_tlb *tlb,
     tlb->tme_bus_tlb_cycle = _tme_suncg2_bus_cycle_rop_data;
     
     /* this TLB entry covers this range: */
-    TME_ATOMIC_WRITE(tme_bus_addr_t, 
-		     tlb->tme_bus_tlb_addr_first,
-		     TME_SUNCG2_REG_ROP_DATA);
-    TME_ATOMIC_WRITE(tme_bus_addr_t, 
-		     tlb->tme_bus_tlb_addr_last, 
-		     (TME_SUNCG2_REG_ROPC_UNIT(0)
-		      - 1));
+    tlb->tme_bus_tlb_addr_first = TME_SUNCG2_REG_ROP_DATA;
+    tlb->tme_bus_tlb_addr_last = (TME_SUNCG2_REG_ROPC_UNIT(0) - 1);
 
     /* this TLB entry cannot allow fast reading or fast writing, since
        this is the rasterop data: */
@@ -1549,13 +1515,8 @@ _tme_suncg2_tlb_fill(void *_suncg2, struct tme_bus_tlb *tlb,
     tlb->tme_bus_tlb_cycle = _tme_suncg2_bus_cycle_regs;
 
     /* this TLB entry covers this range: */
-    TME_ATOMIC_WRITE(tme_bus_addr_t, 
-		     tlb->tme_bus_tlb_addr_first,
-		     TME_SUNCG2_REG_ROPC_UNIT(0));
-    TME_ATOMIC_WRITE(tme_bus_addr_t, 
-		     tlb->tme_bus_tlb_addr_last, 
-		     (TME_SUNCG2_REG_CMAP_R
-		      - 1));
+    tlb->tme_bus_tlb_addr_first = TME_SUNCG2_REG_ROPC_UNIT(0);
+    tlb->tme_bus_tlb_addr_last = (TME_SUNCG2_REG_CMAP_R - 1);
 
     /* this TLB entry cannot allow fast reading or fast writing, since
        these are registers: */
@@ -1572,12 +1533,8 @@ _tme_suncg2_tlb_fill(void *_suncg2, struct tme_bus_tlb *tlb,
     tlb->tme_bus_tlb_cycle = _tme_suncg2_bus_cycle_cmap;
 
     /* this TLB entry covers this range: */
-    TME_ATOMIC_WRITE(tme_bus_addr_t,
-		     tlb->tme_bus_tlb_addr_first, 
-		     TME_SUNCG2_REG_CMAP_R);
-    TME_ATOMIC_WRITE(tme_bus_addr_t,
-		     tlb->tme_bus_tlb_addr_last,
-		     TME_SUNCG2_SIZ_REGS - 1);
+    tlb->tme_bus_tlb_addr_first = TME_SUNCG2_REG_CMAP_R;
+    tlb->tme_bus_tlb_addr_last = TME_SUNCG2_SIZ_REGS - 1;
 
     /* this TLB entry allows fast reading: */
     tlb->tme_bus_tlb_emulator_off_read
@@ -1694,8 +1651,8 @@ _tme_suncg2_connections_new(struct tme_element *element,
     conn_fb->tme_fb_connection_update = _tme_suncg2_update;
 
     /* height and width: */
-    conn_fb->tme_fb_connection_width = tme_sun_fb_p4_size_width(suncg2->tme_suncg2_size);
-    conn_fb->tme_fb_connection_height = tme_sun_fb_p4_size_height(suncg2->tme_suncg2_size);
+    conn_fb->tme_fb_connection_width = tme_sunfb_size_width(suncg2->tme_suncg2_size);
+    conn_fb->tme_fb_connection_height = tme_sunfb_size_height(suncg2->tme_suncg2_size);
 
     /* we are color: */
     conn_fb->tme_fb_connection_class = TME_FB_XLAT_CLASS_COLOR;
@@ -1749,7 +1706,7 @@ tme_sun_cgtwo(struct tme_element *element, const char * const *args, char **_out
   /* check our arguments: */
   usage = 0;
   cg2_type = TME_SUNCG2_TYPE_NULL;
-  cg2_size = TME_SUN_P4_SIZE_1152_900;
+  cg2_size = TME_SUNFB_SIZE_1152_900;
   arg_i = 1;
   for (;;) {
 
@@ -1767,9 +1724,9 @@ tme_sun_cgtwo(struct tme_element *element, const char * const *args, char **_out
 
     /* the framebuffer size: */
     else if (TME_ARG_IS(args[arg_i + 0], "size")) {
-      cg2_size = tme_sun_fb_p4_size(args[arg_i + 1]);
-      if (cg2_size != TME_SUN_P4_SIZE_1152_900
-	  && cg2_size != TME_SUN_P4_SIZE_1024_1024) {
+      cg2_size = tme_sunfb_size(args[arg_i + 1]);
+      if (cg2_size != TME_SUNFB_SIZE_1152_900
+	  && cg2_size != TME_SUNFB_SIZE_1024_1024) {
 	usage = TRUE;
 	break;
       }
@@ -1823,7 +1780,7 @@ tme_sun_cgtwo(struct tme_element *element, const char * const *args, char **_out
   /* set our initial CSR: */
   suncg2->tme_suncg2_csr
     = (TME_SUNCG2_CSR_ENABLE_VIDEO
-       | (cg2_size == TME_SUN_P4_SIZE_1024_1024
+       | (cg2_size == TME_SUNFB_SIZE_1024_1024
 	  ? TME_SUNCG2_CSR_SIZE_1024_1024
 	  : TME_SUNCG2_CSR_SIZE_1152_900));
 
@@ -1834,8 +1791,8 @@ tme_sun_cgtwo(struct tme_element *element, const char * const *args, char **_out
 
   /* calculate the pixel count: */
   suncg2->tme_suncg2_pixel_count
-    = (tme_sun_fb_p4_size_width(cg2_size)
-       * tme_sun_fb_p4_size_height(cg2_size));
+    = (tme_sunfb_size_width(cg2_size)
+       * tme_sunfb_size_height(cg2_size));
 
   /* allocate the raw memory: */
   suncg2->tme_suncg2_raw_memory

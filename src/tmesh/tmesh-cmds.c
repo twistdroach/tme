@@ -1,4 +1,4 @@
-/* $Id: tmesh-cmds.c,v 1.5 2003/10/25 17:08:01 fredette Exp $ */
+/* $Id: tmesh-cmds.c,v 1.6 2006/11/15 23:12:30 fredette Exp $ */
 
 /* tmesh/tmesh-cmds.c - functions implementing the tmesh commands: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: tmesh-cmds.c,v 1.5 2003/10/25 17:08:01 fredette Exp $");
+_TME_RCSID("$Id: tmesh-cmds.c,v 1.6 2006/11/15 23:12:30 fredette Exp $");
 
 /* includes: */
 #include <tme/threads.h>
@@ -799,6 +799,59 @@ _tmesh_command_log(struct tmesh *tmesh, struct tmesh_parser_value *value, char *
   return (rc);
 }
 
+/* the "alias" command: */
+static int
+_tmesh_command_alias(struct tmesh *tmesh, struct tmesh_parser_value *value, char **_output)
+{
+  struct tmesh_fs_dirent *parent, *entry;
+  struct tmesh_fs_element *element;
+  char *oldname;
+  char *newname;
+  int rc;
+
+  /* look up the existing element: */
+  oldname = value->tmesh_parser_value_pathname1;
+  rc = _tmesh_fs_lookup(tmesh,
+			&oldname,
+			&parent, &entry,
+			_output,
+			TMESH_SEARCH_NORMAL);
+
+  /* if the lookup failed, return now: */
+  if (rc != TME_OK) {
+    return (rc);
+  }
+
+  /* if this pathname doesn't refer to an element, we can't alias it: */
+  if (entry->tmesh_fs_dirent_type != TMESH_FS_DIRENT_ELEMENT) {
+    return (ENOTSOCK);
+  }
+
+  /* get the element to alias: */
+  element = entry->tmesh_fs_dirent_value;
+
+  /* look up the new name: */
+  newname = value->tmesh_parser_value_pathname0;
+  rc = _tmesh_fs_lookup(tmesh,
+			&newname,
+			&parent, &entry,
+			_output,
+			TMESH_SEARCH_LAST_PART_OK);
+  if (rc != TME_OK) {
+    return (rc);
+  }
+
+  /* if the name exists: */
+  if (entry != NULL) {
+    return (EEXIST);
+  }
+
+  /* create the alias: */
+  entry = _tmesh_fs_link(parent, tme_strdup(newname), 
+			 TMESH_FS_DIRENT_ELEMENT, element);
+  return (TME_OK);
+}
+
 /* this evaluates one or more commands: */
 int
 tmesh_eval(void *_tmesh, char **_output, int *_yield)
@@ -838,6 +891,7 @@ tmesh_eval(void *_tmesh, char **_output, int *_yield)
     case TMESH_COMMAND_MV: command_func = _tmesh_command_mv; break;
     case TMESH_COMMAND_COMMAND: command_func = _tmesh_command_command; break;
     case TMESH_COMMAND_LOG: command_func = _tmesh_command_log; break;
+    case TMESH_COMMAND_ALIAS: command_func = _tmesh_command_alias; break;
     }
     
     /* call the function: */

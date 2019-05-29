@@ -8,6 +8,7 @@ tmescsidir = $(pkgincludedir)/scsi
 tmescsi_HEADERS = \
 	scsi-disk.h \
 	scsi-tape.h \
+	scsi-cdrom.h \
 	scsi-msg.h \
 	scsi-cdb.h \
 	scsi-device.h

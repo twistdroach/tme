@@ -1,4 +1,4 @@
-/* $Id: scsi-msg.c,v 1.2 2005/01/26 13:13:29 fredette Exp $ */
+/* $Id: scsi-msg.c,v 1.3 2007/01/07 23:59:31 fredette Exp $ */
 
 /* scsi/scsi-msg.c - implementation of generic SCSI device message support: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: scsi-msg.c,v 1.2 2005/01/26 13:13:29 fredette Exp $");
+_TME_RCSID("$Id: scsi-msg.c,v 1.3 2007/01/07 23:59:31 fredette Exp $");
 
 /* includes: */
 #include <tme/scsi/scsi-msg.h>
@@ -101,4 +101,19 @@ _TME_SCSI_DEVICE_MSG_DECL(tme_scsi_device_msg_identify)
   scsi_device->tme_scsi_device_addressed_lun
     = TME_FIELD_MASK_EXTRACTU(scsi_device->tme_scsi_device_msg[0],
 			      TME_SCSI_MSG_IDENTIFY_LUN_MASK);
+}
+
+/* this sends a MESSAGE REJECT message: */
+_TME_SCSI_DEVICE_MSG_DECL(tme_scsi_device_msg_target_reject)
+{
+
+  /* enter the MESSAGE IN phase and send a MESSAGE REJECT message: */
+  scsi_device->tme_scsi_device_msg[0] = TME_SCSI_MSG_MESSAGE_REJECT;
+  tme_scsi_device_target_phase(scsi_device,
+			       (TME_SCSI_SIGNAL_BSY
+				| TME_SCSI_PHASE_MESSAGE_IN));
+
+  /* the next phase we will enter will be either a MESSAGE OUT
+     or the COMMAND phase: */
+  scsi_device->tme_scsi_device_phase = tme_scsi_device_target_mc;
 }

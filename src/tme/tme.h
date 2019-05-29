@@ -1,4 +1,4 @@
-/* $Id: tme.h,v 1.2 2003/06/27 21:08:40 fredette Exp $ */
+/* $Id: tme.h,v 1.3 2006/09/30 12:43:39 fredette Exp $ */
 
 /* tme/tme.h - public header file for tme: */
 
@@ -37,10 +37,9 @@
 #define _TME_TME_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: tme.h,v 1.2 2003/06/27 21:08:40 fredette Exp $");
+_TME_RCSID("$Id: tme.h,v 1.3 2006/09/30 12:43:39 fredette Exp $");
 
 /* includes: */
-#include <tme/atomics.h>
 #include <tme/connection.h>
 #include <tme/element.h>
 #include <tme/module.h>

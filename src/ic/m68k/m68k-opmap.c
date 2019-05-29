@@ -777,6 +777,566 @@ _tme_m68k_opcode_root_init_10(tme_uint32_t *root, const tme_uint32_t *params)
 static void
 _tme_m68k_opcode_root_init_11(tme_uint32_t *root, const tme_uint32_t *params)
 {
+  root[0] = params[0] | params[18] | params[20] | params[21];
+  root[1] = params[5] | params[18] | params[20] | params[21];
+  root[2] = params[10] | params[18] | params[20] | params[21];
+  root[3] = params[14] | params[18] | params[20] | params[21];
+  root[4] = params[3] | params[18] | params[20] | params[21];
+  root[5] = params[8] | params[18] | params[20] | params[21];
+  root[6] = params[13] | params[18] | params[20] | params[21];
+  root[7] = params[2] | params[18] | params[20] | params[21];
+  root[8] = params[7] | params[18] | params[21];
+  root[9] = params[12] | params[18] | params[20] | params[21];
+  root[10] = params[1] | params[18] | params[20] | params[21];
+  root[11] = params[6] | params[18] | params[20] | params[21];
+  root[12] = params[11] | params[18] | params[20] | params[21];
+  root[13] = params[15] | params[18] | params[20] | params[21];
+  root[14] = params[4] | params[18] | params[20] | params[21];
+  root[15] = params[9] | params[18] | params[20] | params[21];
+  root[16] = params[16] | params[20] | params[21];
+  root[17] = params[16] | params[20] | params[21];
+  root[18] = params[16] | params[20] | params[21];
+  root[19] = params[16] | params[20] | params[21];
+  root[20] = params[16] | params[20] | params[21];
+  root[21] = params[16] | params[20] | params[21];
+  root[22] = params[16] | params[20] | params[21];
+  root[23] = params[16] | params[20] | params[21];
+  root[24] = params[16] | params[20] | params[21];
+  root[25] = params[16] | params[20] | params[21];
+  root[26] = params[16] | params[20] | params[21];
+  root[27] = params[16] | params[20] | params[21];
+  root[28] = params[16] | params[20] | params[21];
+  root[29] = params[16] | params[20] | params[21];
+  root[30] = params[16] | params[20] | params[21];
+  root[31] = params[16] | params[20] | params[21];
+  root[32] = params[16] | params[20] | params[21];
+  root[33] = params[16] | params[20] | params[21];
+  root[34] = params[16] | params[20] | params[21];
+  root[35] = params[16] | params[20] | params[21];
+  root[36] = params[16] | params[20] | params[21];
+  root[37] = params[16] | params[20] | params[21];
+  root[38] = params[16] | params[20] | params[21];
+  root[39] = params[16] | params[20] | params[21];
+  root[40] = params[16] | params[20] | params[21];
+  root[41] = params[16] | params[20] | params[21];
+  root[42] = params[16] | params[20] | params[21];
+  root[43] = params[16] | params[20] | params[21];
+  root[44] = params[16] | params[20] | params[21];
+  root[45] = params[16] | params[20] | params[21];
+  root[46] = params[16] | params[20] | params[21];
+  root[47] = params[16] | params[20] | params[21];
+  root[48] = params[16] | params[20] | params[21];
+  root[49] = params[16] | params[20] | params[21];
+  root[50] = params[16] | params[20] | params[21];
+  root[51] = params[16] | params[20] | params[21];
+  root[52] = params[16] | params[20] | params[21];
+  root[53] = params[16] | params[20] | params[21];
+  root[54] = params[16] | params[20] | params[21];
+  root[55] = params[16] | params[20] | params[21];
+  root[56] = params[16] | params[20] | params[21];
+  root[57] = params[16] | params[20] | params[21];
+  root[58] = params[16] | params[20] | params[21];
+  root[59] = params[16] | params[20] | params[21];
+  root[60] = params[17] | params[18] | params[20] | params[21];
+  root[61] = params[19];
+  root[62] = params[19];
+  root[63] = params[19];
+}
+
+/* root init 12: */
+static void
+_tme_m68k_opcode_root_init_12(tme_uint32_t *root, const tme_uint32_t *params)
+{
+  root[0] = params[0] | params[18] | params[20] | params[21];
+  root[1] = params[5] | params[18] | params[20] | params[21];
+  root[2] = params[10] | params[18] | params[20] | params[21];
+  root[3] = params[14] | params[18] | params[20] | params[21];
+  root[4] = params[3] | params[18] | params[20] | params[21];
+  root[5] = params[8] | params[18] | params[20] | params[21];
+  root[6] = params[13] | params[18] | params[20] | params[21];
+  root[7] = params[2] | params[18] | params[20] | params[21];
+  root[8] = params[7] | params[18] | params[20] | params[21];
+  root[9] = params[12] | params[18] | params[21];
+  root[10] = params[1] | params[18] | params[20] | params[21];
+  root[11] = params[6] | params[18] | params[20] | params[21];
+  root[12] = params[11] | params[18] | params[20] | params[21];
+  root[13] = params[15] | params[18] | params[20] | params[21];
+  root[14] = params[4] | params[18] | params[20] | params[21];
+  root[15] = params[9] | params[18] | params[20] | params[21];
+  root[16] = params[16] | params[20] | params[21];
+  root[17] = params[16] | params[20] | params[21];
+  root[18] = params[16] | params[20] | params[21];
+  root[19] = params[16] | params[20] | params[21];
+  root[20] = params[16] | params[20] | params[21];
+  root[21] = params[16] | params[20] | params[21];
+  root[22] = params[16] | params[20] | params[21];
+  root[23] = params[16] | params[20] | params[21];
+  root[24] = params[16] | params[20] | params[21];
+  root[25] = params[16] | params[20] | params[21];
+  root[26] = params[16] | params[20] | params[21];
+  root[27] = params[16] | params[20] | params[21];
+  root[28] = params[16] | params[20] | params[21];
+  root[29] = params[16] | params[20] | params[21];
+  root[30] = params[16] | params[20] | params[21];
+  root[31] = params[16] | params[20] | params[21];
+  root[32] = params[16] | params[20] | params[21];
+  root[33] = params[16] | params[20] | params[21];
+  root[34] = params[16] | params[20] | params[21];
+  root[35] = params[16] | params[20] | params[21];
+  root[36] = params[16] | params[20] | params[21];
+  root[37] = params[16] | params[20] | params[21];
+  root[38] = params[16] | params[20] | params[21];
+  root[39] = params[16] | params[20] | params[21];
+  root[40] = params[16] | params[20] | params[21];
+  root[41] = params[16] | params[20] | params[21];
+  root[42] = params[16] | params[20] | params[21];
+  root[43] = params[16] | params[20] | params[21];
+  root[44] = params[16] | params[20] | params[21];
+  root[45] = params[16] | params[20] | params[21];
+  root[46] = params[16] | params[20] | params[21];
+  root[47] = params[16] | params[20] | params[21];
+  root[48] = params[16] | params[20] | params[21];
+  root[49] = params[16] | params[20] | params[21];
+  root[50] = params[16] | params[20] | params[21];
+  root[51] = params[16] | params[20] | params[21];
+  root[52] = params[16] | params[20] | params[21];
+  root[53] = params[16] | params[20] | params[21];
+  root[54] = params[16] | params[20] | params[21];
+  root[55] = params[16] | params[20] | params[21];
+  root[56] = params[16] | params[20] | params[21];
+  root[57] = params[16] | params[20] | params[21];
+  root[58] = params[16] | params[20] | params[21];
+  root[59] = params[16] | params[20] | params[21];
+  root[60] = params[17] | params[18] | params[20] | params[21];
+  root[61] = params[19];
+  root[62] = params[19];
+  root[63] = params[19];
+}
+
+/* root init 13: */
+static void
+_tme_m68k_opcode_root_init_13(tme_uint32_t *root, const tme_uint32_t *params)
+{
+  root[0] = params[0] | params[18] | params[20] | params[21];
+  root[1] = params[5] | params[18] | params[20] | params[21];
+  root[2] = params[10] | params[18] | params[20] | params[21];
+  root[3] = params[14] | params[18] | params[20] | params[21];
+  root[4] = params[3] | params[18] | params[20] | params[21];
+  root[5] = params[8] | params[18] | params[20] | params[21];
+  root[6] = params[13] | params[18] | params[20] | params[21];
+  root[7] = params[2] | params[18] | params[20] | params[21];
+  root[8] = params[7] | params[18] | params[20] | params[21];
+  root[9] = params[12] | params[18] | params[20] | params[21];
+  root[10] = params[1] | params[18] | params[21];
+  root[11] = params[6] | params[18] | params[20] | params[21];
+  root[12] = params[11] | params[18] | params[20] | params[21];
+  root[13] = params[15] | params[18] | params[20] | params[21];
+  root[14] = params[4] | params[18] | params[20] | params[21];
+  root[15] = params[9] | params[18] | params[20] | params[21];
+  root[16] = params[16] | params[20] | params[21];
+  root[17] = params[16] | params[20] | params[21];
+  root[18] = params[16] | params[20] | params[21];
+  root[19] = params[16] | params[20] | params[21];
+  root[20] = params[16] | params[20] | params[21];
+  root[21] = params[16] | params[20] | params[21];
+  root[22] = params[16] | params[20] | params[21];
+  root[23] = params[16] | params[20] | params[21];
+  root[24] = params[16] | params[20] | params[21];
+  root[25] = params[16] | params[20] | params[21];
+  root[26] = params[16] | params[20] | params[21];
+  root[27] = params[16] | params[20] | params[21];
+  root[28] = params[16] | params[20] | params[21];
+  root[29] = params[16] | params[20] | params[21];
+  root[30] = params[16] | params[20] | params[21];
+  root[31] = params[16] | params[20] | params[21];
+  root[32] = params[16] | params[20] | params[21];
+  root[33] = params[16] | params[20] | params[21];
+  root[34] = params[16] | params[20] | params[21];
+  root[35] = params[16] | params[20] | params[21];
+  root[36] = params[16] | params[20] | params[21];
+  root[37] = params[16] | params[20] | params[21];
+  root[38] = params[16] | params[20] | params[21];
+  root[39] = params[16] | params[20] | params[21];
+  root[40] = params[16] | params[20] | params[21];
+  root[41] = params[16] | params[20] | params[21];
+  root[42] = params[16] | params[20] | params[21];
+  root[43] = params[16] | params[20] | params[21];
+  root[44] = params[16] | params[20] | params[21];
+  root[45] = params[16] | params[20] | params[21];
+  root[46] = params[16] | params[20] | params[21];
+  root[47] = params[16] | params[20] | params[21];
+  root[48] = params[16] | params[20] | params[21];
+  root[49] = params[16] | params[20] | params[21];
+  root[50] = params[16] | params[20] | params[21];
+  root[51] = params[16] | params[20] | params[21];
+  root[52] = params[16] | params[20] | params[21];
+  root[53] = params[16] | params[20] | params[21];
+  root[54] = params[16] | params[20] | params[21];
+  root[55] = params[16] | params[20] | params[21];
+  root[56] = params[16] | params[20] | params[21];
+  root[57] = params[16] | params[20] | params[21];
+  root[58] = params[16] | params[20] | params[21];
+  root[59] = params[16] | params[20] | params[21];
+  root[60] = params[17] | params[18] | params[20] | params[21];
+  root[61] = params[19];
+  root[62] = params[19];
+  root[63] = params[19];
+}
+
+/* root init 14: */
+static void
+_tme_m68k_opcode_root_init_14(tme_uint32_t *root, const tme_uint32_t *params)
+{
+  root[0] = params[0] | params[18] | params[20] | params[21];
+  root[1] = params[5] | params[18] | params[20] | params[21];
+  root[2] = params[10] | params[18] | params[20] | params[21];
+  root[3] = params[14] | params[18] | params[20] | params[21];
+  root[4] = params[3] | params[18] | params[20] | params[21];
+  root[5] = params[8] | params[18] | params[20] | params[21];
+  root[6] = params[13] | params[18] | params[20] | params[21];
+  root[7] = params[2] | params[18] | params[20] | params[21];
+  root[8] = params[7] | params[18] | params[20] | params[21];
+  root[9] = params[12] | params[18] | params[20] | params[21];
+  root[10] = params[1] | params[18] | params[20] | params[21];
+  root[11] = params[6] | params[18] | params[21];
+  root[12] = params[11] | params[18] | params[20] | params[21];
+  root[13] = params[15] | params[18] | params[20] | params[21];
+  root[14] = params[4] | params[18] | params[20] | params[21];
+  root[15] = params[9] | params[18] | params[20] | params[21];
+  root[16] = params[16] | params[20] | params[21];
+  root[17] = params[16] | params[20] | params[21];
+  root[18] = params[16] | params[20] | params[21];
+  root[19] = params[16] | params[20] | params[21];
+  root[20] = params[16] | params[20] | params[21];
+  root[21] = params[16] | params[20] | params[21];
+  root[22] = params[16] | params[20] | params[21];
+  root[23] = params[16] | params[20] | params[21];
+  root[24] = params[16] | params[20] | params[21];
+  root[25] = params[16] | params[20] | params[21];
+  root[26] = params[16] | params[20] | params[21];
+  root[27] = params[16] | params[20] | params[21];
+  root[28] = params[16] | params[20] | params[21];
+  root[29] = params[16] | params[20] | params[21];
+  root[30] = params[16] | params[20] | params[21];
+  root[31] = params[16] | params[20] | params[21];
+  root[32] = params[16] | params[20] | params[21];
+  root[33] = params[16] | params[20] | params[21];
+  root[34] = params[16] | params[20] | params[21];
+  root[35] = params[16] | params[20] | params[21];
+  root[36] = params[16] | params[20] | params[21];
+  root[37] = params[16] | params[20] | params[21];
+  root[38] = params[16] | params[20] | params[21];
+  root[39] = params[16] | params[20] | params[21];
+  root[40] = params[16] | params[20] | params[21];
+  root[41] = params[16] | params[20] | params[21];
+  root[42] = params[16] | params[20] | params[21];
+  root[43] = params[16] | params[20] | params[21];
+  root[44] = params[16] | params[20] | params[21];
+  root[45] = params[16] | params[20] | params[21];
+  root[46] = params[16] | params[20] | params[21];
+  root[47] = params[16] | params[20] | params[21];
+  root[48] = params[16] | params[20] | params[21];
+  root[49] = params[16] | params[20] | params[21];
+  root[50] = params[16] | params[20] | params[21];
+  root[51] = params[16] | params[20] | params[21];
+  root[52] = params[16] | params[20] | params[21];
+  root[53] = params[16] | params[20] | params[21];
+  root[54] = params[16] | params[20] | params[21];
+  root[55] = params[16] | params[20] | params[21];
+  root[56] = params[16] | params[20] | params[21];
+  root[57] = params[16] | params[20] | params[21];
+  root[58] = params[16] | params[20] | params[21];
+  root[59] = params[16] | params[20] | params[21];
+  root[60] = params[17] | params[18] | params[20] | params[21];
+  root[61] = params[19];
+  root[62] = params[19];
+  root[63] = params[19];
+}
+
+/* root init 15: */
+static void
+_tme_m68k_opcode_root_init_15(tme_uint32_t *root, const tme_uint32_t *params)
+{
+  root[0] = params[0] | params[18] | params[20] | params[21];
+  root[1] = params[5] | params[18] | params[20] | params[21];
+  root[2] = params[10] | params[18] | params[20] | params[21];
+  root[3] = params[14] | params[18] | params[20] | params[21];
+  root[4] = params[3] | params[18] | params[20] | params[21];
+  root[5] = params[8] | params[18] | params[20] | params[21];
+  root[6] = params[13] | params[18] | params[20] | params[21];
+  root[7] = params[2] | params[18] | params[20] | params[21];
+  root[8] = params[7] | params[18] | params[20] | params[21];
+  root[9] = params[12] | params[18] | params[20] | params[21];
+  root[10] = params[1] | params[18] | params[20] | params[21];
+  root[11] = params[6] | params[18] | params[20] | params[21];
+  root[12] = params[11] | params[18] | params[21];
+  root[13] = params[15] | params[18] | params[20] | params[21];
+  root[14] = params[4] | params[18] | params[20] | params[21];
+  root[15] = params[9] | params[18] | params[20] | params[21];
+  root[16] = params[16] | params[20] | params[21];
+  root[17] = params[16] | params[20] | params[21];
+  root[18] = params[16] | params[20] | params[21];
+  root[19] = params[16] | params[20] | params[21];
+  root[20] = params[16] | params[20] | params[21];
+  root[21] = params[16] | params[20] | params[21];
+  root[22] = params[16] | params[20] | params[21];
+  root[23] = params[16] | params[20] | params[21];
+  root[24] = params[16] | params[20] | params[21];
+  root[25] = params[16] | params[20] | params[21];
+  root[26] = params[16] | params[20] | params[21];
+  root[27] = params[16] | params[20] | params[21];
+  root[28] = params[16] | params[20] | params[21];
+  root[29] = params[16] | params[20] | params[21];
+  root[30] = params[16] | params[20] | params[21];
+  root[31] = params[16] | params[20] | params[21];
+  root[32] = params[16] | params[20] | params[21];
+  root[33] = params[16] | params[20] | params[21];
+  root[34] = params[16] | params[20] | params[21];
+  root[35] = params[16] | params[20] | params[21];
+  root[36] = params[16] | params[20] | params[21];
+  root[37] = params[16] | params[20] | params[21];
+  root[38] = params[16] | params[20] | params[21];
+  root[39] = params[16] | params[20] | params[21];
+  root[40] = params[16] | params[20] | params[21];
+  root[41] = params[16] | params[20] | params[21];
+  root[42] = params[16] | params[20] | params[21];
+  root[43] = params[16] | params[20] | params[21];
+  root[44] = params[16] | params[20] | params[21];
+  root[45] = params[16] | params[20] | params[21];
+  root[46] = params[16] | params[20] | params[21];
+  root[47] = params[16] | params[20] | params[21];
+  root[48] = params[16] | params[20] | params[21];
+  root[49] = params[16] | params[20] | params[21];
+  root[50] = params[16] | params[20] | params[21];
+  root[51] = params[16] | params[20] | params[21];
+  root[52] = params[16] | params[20] | params[21];
+  root[53] = params[16] | params[20] | params[21];
+  root[54] = params[16] | params[20] | params[21];
+  root[55] = params[16] | params[20] | params[21];
+  root[56] = params[16] | params[20] | params[21];
+  root[57] = params[16] | params[20] | params[21];
+  root[58] = params[16] | params[20] | params[21];
+  root[59] = params[16] | params[20] | params[21];
+  root[60] = params[17] | params[18] | params[20] | params[21];
+  root[61] = params[19];
+  root[62] = params[19];
+  root[63] = params[19];
+}
+
+/* root init 16: */
+static void
+_tme_m68k_opcode_root_init_16(tme_uint32_t *root, const tme_uint32_t *params)
+{
+  root[0] = params[0] | params[18] | params[20] | params[21];
+  root[1] = params[5] | params[18] | params[20] | params[21];
+  root[2] = params[10] | params[18] | params[20] | params[21];
+  root[3] = params[14] | params[18] | params[20] | params[21];
+  root[4] = params[3] | params[18] | params[20] | params[21];
+  root[5] = params[8] | params[18] | params[20] | params[21];
+  root[6] = params[13] | params[18] | params[20] | params[21];
+  root[7] = params[2] | params[18] | params[20] | params[21];
+  root[8] = params[7] | params[18] | params[20] | params[21];
+  root[9] = params[12] | params[18] | params[20] | params[21];
+  root[10] = params[1] | params[18] | params[20] | params[21];
+  root[11] = params[6] | params[18] | params[20] | params[21];
+  root[12] = params[11] | params[18] | params[20] | params[21];
+  root[13] = params[15] | params[18] | params[21];
+  root[14] = params[4] | params[18] | params[20] | params[21];
+  root[15] = params[9] | params[18] | params[20] | params[21];
+  root[16] = params[16] | params[20] | params[21];
+  root[17] = params[16] | params[20] | params[21];
+  root[18] = params[16] | params[20] | params[21];
+  root[19] = params[16] | params[20] | params[21];
+  root[20] = params[16] | params[20] | params[21];
+  root[21] = params[16] | params[20] | params[21];
+  root[22] = params[16] | params[20] | params[21];
+  root[23] = params[16] | params[20] | params[21];
+  root[24] = params[16] | params[20] | params[21];
+  root[25] = params[16] | params[20] | params[21];
+  root[26] = params[16] | params[20] | params[21];
+  root[27] = params[16] | params[20] | params[21];
+  root[28] = params[16] | params[20] | params[21];
+  root[29] = params[16] | params[20] | params[21];
+  root[30] = params[16] | params[20] | params[21];
+  root[31] = params[16] | params[20] | params[21];
+  root[32] = params[16] | params[20] | params[21];
+  root[33] = params[16] | params[20] | params[21];
+  root[34] = params[16] | params[20] | params[21];
+  root[35] = params[16] | params[20] | params[21];
+  root[36] = params[16] | params[20] | params[21];
+  root[37] = params[16] | params[20] | params[21];
+  root[38] = params[16] | params[20] | params[21];
+  root[39] = params[16] | params[20] | params[21];
+  root[40] = params[16] | params[20] | params[21];
+  root[41] = params[16] | params[20] | params[21];
+  root[42] = params[16] | params[20] | params[21];
+  root[43] = params[16] | params[20] | params[21];
+  root[44] = params[16] | params[20] | params[21];
+  root[45] = params[16] | params[20] | params[21];
+  root[46] = params[16] | params[20] | params[21];
+  root[47] = params[16] | params[20] | params[21];
+  root[48] = params[16] | params[20] | params[21];
+  root[49] = params[16] | params[20] | params[21];
+  root[50] = params[16] | params[20] | params[21];
+  root[51] = params[16] | params[20] | params[21];
+  root[52] = params[16] | params[20] | params[21];
+  root[53] = params[16] | params[20] | params[21];
+  root[54] = params[16] | params[20] | params[21];
+  root[55] = params[16] | params[20] | params[21];
+  root[56] = params[16] | params[20] | params[21];
+  root[57] = params[16] | params[20] | params[21];
+  root[58] = params[16] | params[20] | params[21];
+  root[59] = params[16] | params[20] | params[21];
+  root[60] = params[17] | params[18] | params[20] | params[21];
+  root[61] = params[19];
+  root[62] = params[19];
+  root[63] = params[19];
+}
+
+/* root init 17: */
+static void
+_tme_m68k_opcode_root_init_17(tme_uint32_t *root, const tme_uint32_t *params)
+{
+  root[0] = params[0] | params[18] | params[20] | params[21];
+  root[1] = params[5] | params[18] | params[20] | params[21];
+  root[2] = params[10] | params[18] | params[20] | params[21];
+  root[3] = params[14] | params[18] | params[20] | params[21];
+  root[4] = params[3] | params[18] | params[20] | params[21];
+  root[5] = params[8] | params[18] | params[20] | params[21];
+  root[6] = params[13] | params[18] | params[20] | params[21];
+  root[7] = params[2] | params[18] | params[20] | params[21];
+  root[8] = params[7] | params[18] | params[20] | params[21];
+  root[9] = params[12] | params[18] | params[20] | params[21];
+  root[10] = params[1] | params[18] | params[20] | params[21];
+  root[11] = params[6] | params[18] | params[20] | params[21];
+  root[12] = params[11] | params[18] | params[20] | params[21];
+  root[13] = params[15] | params[18] | params[20] | params[21];
+  root[14] = params[4] | params[18] | params[21];
+  root[15] = params[9] | params[18] | params[20] | params[21];
+  root[16] = params[16] | params[20] | params[21];
+  root[17] = params[16] | params[20] | params[21];
+  root[18] = params[16] | params[20] | params[21];
+  root[19] = params[16] | params[20] | params[21];
+  root[20] = params[16] | params[20] | params[21];
+  root[21] = params[16] | params[20] | params[21];
+  root[22] = params[16] | params[20] | params[21];
+  root[23] = params[16] | params[20] | params[21];
+  root[24] = params[16] | params[20] | params[21];
+  root[25] = params[16] | params[20] | params[21];
+  root[26] = params[16] | params[20] | params[21];
+  root[27] = params[16] | params[20] | params[21];
+  root[28] = params[16] | params[20] | params[21];
+  root[29] = params[16] | params[20] | params[21];
+  root[30] = params[16] | params[20] | params[21];
+  root[31] = params[16] | params[20] | params[21];
+  root[32] = params[16] | params[20] | params[21];
+  root[33] = params[16] | params[20] | params[21];
+  root[34] = params[16] | params[20] | params[21];
+  root[35] = params[16] | params[20] | params[21];
+  root[36] = params[16] | params[20] | params[21];
+  root[37] = params[16] | params[20] | params[21];
+  root[38] = params[16] | params[20] | params[21];
+  root[39] = params[16] | params[20] | params[21];
+  root[40] = params[16] | params[20] | params[21];
+  root[41] = params[16] | params[20] | params[21];
+  root[42] = params[16] | params[20] | params[21];
+  root[43] = params[16] | params[20] | params[21];
+  root[44] = params[16] | params[20] | params[21];
+  root[45] = params[16] | params[20] | params[21];
+  root[46] = params[16] | params[20] | params[21];
+  root[47] = params[16] | params[20] | params[21];
+  root[48] = params[16] | params[20] | params[21];
+  root[49] = params[16] | params[20] | params[21];
+  root[50] = params[16] | params[20] | params[21];
+  root[51] = params[16] | params[20] | params[21];
+  root[52] = params[16] | params[20] | params[21];
+  root[53] = params[16] | params[20] | params[21];
+  root[54] = params[16] | params[20] | params[21];
+  root[55] = params[16] | params[20] | params[21];
+  root[56] = params[16] | params[20] | params[21];
+  root[57] = params[16] | params[20] | params[21];
+  root[58] = params[16] | params[20] | params[21];
+  root[59] = params[16] | params[20] | params[21];
+  root[60] = params[17] | params[18] | params[20] | params[21];
+  root[61] = params[19];
+  root[62] = params[19];
+  root[63] = params[19];
+}
+
+/* root init 18: */
+static void
+_tme_m68k_opcode_root_init_18(tme_uint32_t *root, const tme_uint32_t *params)
+{
+  root[0] = params[0] | params[18] | params[20] | params[21];
+  root[1] = params[5] | params[18] | params[20] | params[21];
+  root[2] = params[10] | params[18] | params[20] | params[21];
+  root[3] = params[14] | params[18] | params[20] | params[21];
+  root[4] = params[3] | params[18] | params[20] | params[21];
+  root[5] = params[8] | params[18] | params[20] | params[21];
+  root[6] = params[13] | params[18] | params[20] | params[21];
+  root[7] = params[2] | params[18] | params[20] | params[21];
+  root[8] = params[7] | params[18] | params[20] | params[21];
+  root[9] = params[12] | params[18] | params[20] | params[21];
+  root[10] = params[1] | params[18] | params[20] | params[21];
+  root[11] = params[6] | params[18] | params[20] | params[21];
+  root[12] = params[11] | params[18] | params[20] | params[21];
+  root[13] = params[15] | params[18] | params[20] | params[21];
+  root[14] = params[4] | params[18] | params[20] | params[21];
+  root[15] = params[9] | params[18] | params[21];
+  root[16] = params[16] | params[20] | params[21];
+  root[17] = params[16] | params[20] | params[21];
+  root[18] = params[16] | params[20] | params[21];
+  root[19] = params[16] | params[20] | params[21];
+  root[20] = params[16] | params[20] | params[21];
+  root[21] = params[16] | params[20] | params[21];
+  root[22] = params[16] | params[20] | params[21];
+  root[23] = params[16] | params[20] | params[21];
+  root[24] = params[16] | params[20] | params[21];
+  root[25] = params[16] | params[20] | params[21];
+  root[26] = params[16] | params[20] | params[21];
+  root[27] = params[16] | params[20] | params[21];
+  root[28] = params[16] | params[20] | params[21];
+  root[29] = params[16] | params[20] | params[21];
+  root[30] = params[16] | params[20] | params[21];
+  root[31] = params[16] | params[20] | params[21];
+  root[32] = params[16] | params[20] | params[21];
+  root[33] = params[16] | params[20] | params[21];
+  root[34] = params[16] | params[20] | params[21];
+  root[35] = params[16] | params[20] | params[21];
+  root[36] = params[16] | params[20] | params[21];
+  root[37] = params[16] | params[20] | params[21];
+  root[38] = params[16] | params[20] | params[21];
+  root[39] = params[16] | params[20] | params[21];
+  root[40] = params[16] | params[20] | params[21];
+  root[41] = params[16] | params[20] | params[21];
+  root[42] = params[16] | params[20] | params[21];
+  root[43] = params[16] | params[20] | params[21];
+  root[44] = params[16] | params[20] | params[21];
+  root[45] = params[16] | params[20] | params[21];
+  root[46] = params[16] | params[20] | params[21];
+  root[47] = params[16] | params[20] | params[21];
+  root[48] = params[16] | params[20] | params[21];
+  root[49] = params[16] | params[20] | params[21];
+  root[50] = params[16] | params[20] | params[21];
+  root[51] = params[16] | params[20] | params[21];
+  root[52] = params[16] | params[20] | params[21];
+  root[53] = params[16] | params[20] | params[21];
+  root[54] = params[16] | params[20] | params[21];
+  root[55] = params[16] | params[20] | params[21];
+  root[56] = params[16] | params[20] | params[21];
+  root[57] = params[16] | params[20] | params[21];
+  root[58] = params[16] | params[20] | params[21];
+  root[59] = params[16] | params[20] | params[21];
+  root[60] = params[17] | params[18] | params[20] | params[21];
+  root[61] = params[19];
+  root[62] = params[19];
+  root[63] = params[19];
+}
+
+/* root init 19: */
+static void
+_tme_m68k_opcode_root_init_19(tme_uint32_t *root, const tme_uint32_t *params)
+{
   root[0] = params[1];
   root[1] = params[1];
   root[2] = params[1];
@@ -843,9 +1403,9 @@ _tme_m68k_opcode_root_init_11(tme_uint32_t *root, const tme_uint32_t *params)
   root[63] = params[1];
 }
 
-/* root init 12: */
+/* root init 20: */
 static void
-_tme_m68k_opcode_root_init_12(tme_uint32_t *root, const tme_uint32_t *params)
+_tme_m68k_opcode_root_init_20(tme_uint32_t *root, const tme_uint32_t *params)
 {
   root[0] = params[0] | params[4];
   root[1] = params[3] | params[4];
@@ -913,9 +1473,9 @@ _tme_m68k_opcode_root_init_12(tme_uint32_t *root, const tme_uint32_t *params)
   root[63] = params[10];
 }
 
-/* root init 13: */
+/* root init 21: */
 static void
-_tme_m68k_opcode_root_init_13(tme_uint32_t *root, const tme_uint32_t *params)
+_tme_m68k_opcode_root_init_21(tme_uint32_t *root, const tme_uint32_t *params)
 {
   root[0] = params[0] | params[4];
   root[1] = params[3] | params[4];
@@ -983,9 +1543,9 @@ _tme_m68k_opcode_root_init_13(tme_uint32_t *root, const tme_uint32_t *params)
   root[63] = params[9];
 }
 
-/* root init 14: */
+/* root init 22: */
 static void
-_tme_m68k_opcode_root_init_14(tme_uint32_t *root, const tme_uint32_t *params)
+_tme_m68k_opcode_root_init_22(tme_uint32_t *root, const tme_uint32_t *params)
 {
   root[0] = params[0] | params[4];
   root[1] = params[3] | params[4];
@@ -1053,9 +1613,9 @@ _tme_m68k_opcode_root_init_14(tme_uint32_t *root, const tme_uint32_t *params)
   root[63] = params[9];
 }
 
-/* root init 15: */
+/* root init 23: */
 static void
-_tme_m68k_opcode_root_init_15(tme_uint32_t *root, const tme_uint32_t *params)
+_tme_m68k_opcode_root_init_23(tme_uint32_t *root, const tme_uint32_t *params)
 {
   root[0] = params[1];
   root[1] = params[1];
@@ -1123,9 +1683,9 @@ _tme_m68k_opcode_root_init_15(tme_uint32_t *root, const tme_uint32_t *params)
   root[63] = params[1];
 }
 
-/* root init 16: */
+/* root init 24: */
 static void
-_tme_m68k_opcode_root_init_16(tme_uint32_t *root, const tme_uint32_t *params)
+_tme_m68k_opcode_root_init_24(tme_uint32_t *root, const tme_uint32_t *params)
 {
   root[0] = params[9];
   root[1] = params[9];
@@ -1193,9 +1753,9 @@ _tme_m68k_opcode_root_init_16(tme_uint32_t *root, const tme_uint32_t *params)
   root[63] = params[21];
 }
 
-/* root init 17: */
+/* root init 25: */
 static void
-_tme_m68k_opcode_root_init_17(tme_uint32_t *root, const tme_uint32_t *params)
+_tme_m68k_opcode_root_init_25(tme_uint32_t *root, const tme_uint32_t *params)
 {
   root[0] = params[0] | params[19];
   root[1] = params[5] | params[19];
@@ -1263,9 +1823,9 @@ _tme_m68k_opcode_root_init_17(tme_uint32_t *root, const tme_uint32_t *params)
   root[63] = params[17];
 }
 
-/* root init 18: */
+/* root init 26: */
 static void
-_tme_m68k_opcode_root_init_18(tme_uint32_t *root, const tme_uint32_t *params)
+_tme_m68k_opcode_root_init_26(tme_uint32_t *root, const tme_uint32_t *params)
 {
   root[0] = params[0] | params[19] | params[20];
   root[1] = params[5] | params[19] | params[20];
@@ -1333,9 +1893,9 @@ _tme_m68k_opcode_root_init_18(tme_uint32_t *root, const tme_uint32_t *params)
   root[63] = params[17];
 }
 
-/* root init 19: */
+/* root init 27: */
 static void
-_tme_m68k_opcode_root_init_19(tme_uint32_t *root, const tme_uint32_t *params)
+_tme_m68k_opcode_root_init_27(tme_uint32_t *root, const tme_uint32_t *params)
 {
   root[0] = params[0];
   root[1] = params[1];
@@ -1403,9 +1963,9 @@ _tme_m68k_opcode_root_init_19(tme_uint32_t *root, const tme_uint32_t *params)
   root[63] = params[1];
 }
 
-/* root init 20: */
+/* root init 28: */
 static void
-_tme_m68k_opcode_root_init_20(tme_uint32_t *root, const tme_uint32_t *params)
+_tme_m68k_opcode_root_init_28(tme_uint32_t *root, const tme_uint32_t *params)
 {
   root[0] = params[0];
   root[1] = params[0];
@@ -1473,9 +2033,9 @@ _tme_m68k_opcode_root_init_20(tme_uint32_t *root, const tme_uint32_t *params)
   root[63] = params[1];
 }
 
-/* root init 21: */
+/* root init 29: */
 static void
-_tme_m68k_opcode_root_init_21(tme_uint32_t *root, const tme_uint32_t *params)
+_tme_m68k_opcode_root_init_29(tme_uint32_t *root, const tme_uint32_t *params)
 {
   root[0] = params[0];
   root[1] = params[0];
@@ -1543,9 +2103,9 @@ _tme_m68k_opcode_root_init_21(tme_uint32_t *root, const tme_uint32_t *params)
   root[63] = params[0];
 }
 
-/* root init 22: */
+/* root init 30: */
 static void
-_tme_m68k_opcode_root_init_22(tme_uint32_t *root, const tme_uint32_t *params)
+_tme_m68k_opcode_root_init_30(tme_uint32_t *root, const tme_uint32_t *params)
 {
   root[0] = params[0] | params[11];
   root[1] = params[3] | params[11];
@@ -1613,9 +2173,9 @@ _tme_m68k_opcode_root_init_22(tme_uint32_t *root, const tme_uint32_t *params)
   root[63] = params[9];
 }
 
-/* root init 23: */
+/* root init 31: */
 static void
-_tme_m68k_opcode_root_init_23(tme_uint32_t *root, const tme_uint32_t *params)
+_tme_m68k_opcode_root_init_31(tme_uint32_t *root, const tme_uint32_t *params)
 {
   root[0] = params[0] | params[7] | params[16];
   root[1] = params[5] | params[7] | params[16];
@@ -1683,9 +2243,9 @@ _tme_m68k_opcode_root_init_23(tme_uint32_t *root, const tme_uint32_t *params)
   root[63] = params[19];
 }
 
-/* root init 24: */
+/* root init 32: */
 static void
-_tme_m68k_opcode_root_init_24(tme_uint32_t *root, const tme_uint32_t *params)
+_tme_m68k_opcode_root_init_32(tme_uint32_t *root, const tme_uint32_t *params)
 {
   root[0] = params[9];
   root[1] = params[9];
@@ -1753,9 +2313,9 @@ _tme_m68k_opcode_root_init_24(tme_uint32_t *root, const tme_uint32_t *params)
   root[63] = params[9];
 }
 
-/* root init 25: */
+/* root init 33: */
 static void
-_tme_m68k_opcode_root_init_25(tme_uint32_t *root, const tme_uint32_t *params)
+_tme_m68k_opcode_root_init_33(tme_uint32_t *root, const tme_uint32_t *params)
 {
   root[0] = params[0] | params[4] | params[6];
   root[1] = params[0] | params[6] | params[8];
@@ -1842,12 +2402,12 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   const tme_uint16_t root_group9[] = {389, 390, 391};
   const tme_uint16_t root_group8[] = {385, 386, 387, 393, 394, 395, 397, 398, 399, 401, 402, 403, 405, 406, 407, 409, 410, 411, 413, 414, 415, 417, 418, 419, 421, 422, 423, 425, 426, 427, 429, 430, 431, 433, 434, 435, 437, 438, 439, 441, 442, 443, 445, 446, 447};
   const tme_uint16_t root_group7[] = {384, 392, 396, 400, 404, 408, 412, 416, 420, 424, 428, 432, 436, 440, 444};
-  const tme_uint16_t root_group6[] = {323, 327, 331, 335, 339, 343, 347, 351, 355, 359, 363, 367, 371, 375, 379, 383};
-  const tme_uint16_t root_group5[] = {931, 935, 939, 943, 947, 951, 955, 959, 960, 961, 962, 963, 964, 965, 966, 967, 968, 969, 970, 971, 972, 973, 974, 975, 976, 977, 978, 979, 980, 981, 982, 983, 984, 985, 986, 987, 988, 989, 990, 991, 992, 993, 994, 995, 996, 997, 998, 999, 1000, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010, 1011, 1012, 1013, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022, 1023};
-  const tme_uint16_t root_group4[] = {640, 641, 642, 643, 644, 645, 646, 647, 648, 649, 650, 651, 652, 653, 654, 655, 656, 657, 658, 659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 675, 676, 677, 678, 679, 680, 681, 682, 683, 684, 685, 686, 687, 688, 689, 690, 691, 692, 693, 694, 695, 696, 697, 698, 699, 700, 701, 702, 703};
-  const tme_uint16_t root_group3[] = {3, 11, 19, 27, 43, 51, 56, 57, 58, 59, 65, 73, 81, 87, 89, 95, 97, 103, 105, 111, 113, 119, 121, 127, 151, 159, 167, 175, 183, 191, 215, 223, 231, 239, 247, 255, 261, 267, 269, 277, 285, 293, 301, 304, 305, 309, 312, 317, 452, 453, 454, 455, 460, 461, 462, 463, 468, 469, 470, 471, 476, 477, 478, 479, 484, 485, 486, 487, 492, 493, 494, 495, 500, 501, 502, 503, 508, 509, 510, 511};
-  const tme_uint16_t root_group2[] = {130, 131, 132, 133, 134, 135, 138, 139, 140, 141, 142, 143, 146, 147, 148, 149, 150, 154, 155, 156, 157, 158, 162, 163, 164, 165, 166, 170, 171, 172, 173, 174, 178, 179, 180, 181, 182, 186, 187, 188, 189, 190};
-  const tme_uint16_t root_group1[] = {194, 195, 196, 197, 198, 199, 202, 203, 204, 205, 206, 207, 210, 211, 212, 213, 214, 218, 219, 220, 221, 222, 226, 227, 228, 229, 230, 234, 235, 236, 237, 238, 242, 243, 244, 245, 246, 250, 251, 252, 253, 254};
+  const tme_uint16_t root_group6[] = {931, 935, 939, 943, 947, 951, 955, 959, 960, 961, 962, 963, 964, 965, 966, 967, 968, 969, 970, 971, 972, 973, 974, 975, 976, 977, 978, 979, 980, 981, 982, 983, 984, 985, 986, 987, 988, 989, 990, 991, 992, 993, 994, 995, 996, 997, 998, 999, 1000, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010, 1011, 1012, 1013, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022, 1023};
+  const tme_uint16_t root_group5[] = {640, 641, 642, 643, 644, 645, 646, 647, 648, 649, 650, 651, 652, 653, 654, 655, 656, 657, 658, 659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 675, 676, 677, 678, 679, 680, 681, 682, 683, 684, 685, 686, 687, 688, 689, 690, 691, 692, 693, 694, 695, 696, 697, 698, 699, 700, 701, 702, 703};
+  const tme_uint16_t root_group4[] = {3, 11, 19, 27, 43, 51, 56, 57, 58, 59, 65, 73, 81, 87, 89, 95, 97, 103, 105, 111, 113, 119, 121, 127, 151, 159, 167, 175, 183, 191, 215, 223, 231, 239, 247, 255, 261, 267, 269, 277, 285, 293, 301, 304, 305, 309, 312, 317, 452, 453, 454, 455, 460, 461, 462, 463, 468, 469, 470, 471, 476, 477, 478, 479, 484, 485, 486, 487, 492, 493, 494, 495, 500, 501, 502, 503, 508, 509, 510, 511};
+  const tme_uint16_t root_group3[] = {323, 327, 331, 335, 339, 343, 347, 351, 355, 359, 363, 367, 371, 375, 379, 383};
+  const tme_uint16_t root_group2[] = {130, 133, 134, 135, 138, 141, 142, 143, 146, 149, 150, 154, 157, 158, 162, 165, 166, 170, 173, 174, 178, 181, 182, 186, 189, 190};
+  const tme_uint16_t root_group1[] = {194, 197, 198, 199, 202, 205, 206, 207, 210, 213, 214, 218, 221, 222, 226, 229, 230, 234, 237, 238, 242, 245, 246, 250, 253, 254};
   const tme_uint16_t root_group0[] = {66, 67, 68, 69, 70, 71, 74, 75, 76, 77, 78, 79, 82, 83, 84, 85, 86, 90, 91, 92, 93, 94, 98, 99, 100, 101, 102, 106, 107, 108, 109, 110, 114, 115, 116, 117, 118, 122, 123, 124, 125, 126};
   tme_uint16_t root_i;
   const tme_uint32_t param120 = TME_M68K_OPCODE_OP0(tme_m68k_ireg_uint16(TME_M68K_IREG_A5 << 1));
@@ -2282,27 +2842,27 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 24: */
   _tme_m68k_opcode_root_init_1(opcodes + (24 * 64), params);
 
-  params[10] = TME_M68K_OPCODE_INSN(42);
+  params[10] = TME_M68K_OPCODE_INSN(46);
 
   /* root 256: */
   _tme_m68k_opcode_root_init_1(opcodes + (256 * 64), params);
 
-  params[10] = TME_M68K_OPCODE_INSN(49);
+  params[10] = TME_M68K_OPCODE_INSN(53);
 
   /* root 264: */
   _tme_m68k_opcode_root_init_1(opcodes + (264 * 64), params);
 
-  params[10] = TME_M68K_OPCODE_INSN(52);
+  params[10] = TME_M68K_OPCODE_INSN(56);
 
   /* root 272: */
   _tme_m68k_opcode_root_init_1(opcodes + (272 * 64), params);
 
-  params[10] = TME_M68K_OPCODE_INSN(56);
+  params[10] = TME_M68K_OPCODE_INSN(60);
 
   /* root 280: */
   _tme_m68k_opcode_root_init_1(opcodes + (280 * 64), params);
 
-  params[10] = TME_M68K_OPCODE_INSN(60);
+  params[10] = TME_M68K_OPCODE_INSN(64);
 
   /* root 288: */
   _tme_m68k_opcode_root_init_1(opcodes + (288 * 64), params);
@@ -2313,63 +2873,63 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 48: */
   _tme_m68k_opcode_root_init_1(opcodes + (48 * 64), params);
 
-  params[10] = TME_M68K_OPCODE_INSN(67);
+  params[10] = TME_M68K_OPCODE_INSN(71);
 
   /* root 296: */
   _tme_m68k_opcode_root_init_1(opcodes + (296 * 64), params);
 
-  params[7] = TME_M68K_OPCODE_INSN(104);
+  params[7] = TME_M68K_OPCODE_INSN(108);
   params[8] = param7;
   params[9] = TME_M68K_OPCODE_INSN(1);
   params[10] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | param9;
   params[11] = TME_M68K_OPCODE_INSN(29) | param39;
 
   /* root 708: */
-  _tme_m68k_opcode_root_init_22(opcodes + (708 * 64), params);
+  _tme_m68k_opcode_root_init_30(opcodes + (708 * 64), params);
 
   params[11] = TME_M68K_OPCODE_INSN(29) | param40;
 
   /* root 716: */
-  _tme_m68k_opcode_root_init_22(opcodes + (716 * 64), params);
+  _tme_m68k_opcode_root_init_30(opcodes + (716 * 64), params);
 
   params[11] = TME_M68K_OPCODE_INSN(29) | param41;
 
   /* root 724: */
-  _tme_m68k_opcode_root_init_22(opcodes + (724 * 64), params);
+  _tme_m68k_opcode_root_init_30(opcodes + (724 * 64), params);
 
   params[11] = TME_M68K_OPCODE_INSN(29) | param42;
 
   /* root 732: */
-  _tme_m68k_opcode_root_init_22(opcodes + (732 * 64), params);
+  _tme_m68k_opcode_root_init_30(opcodes + (732 * 64), params);
 
   params[11] = TME_M68K_OPCODE_INSN(29) | param43;
 
   /* root 740: */
-  _tme_m68k_opcode_root_init_22(opcodes + (740 * 64), params);
+  _tme_m68k_opcode_root_init_30(opcodes + (740 * 64), params);
 
   params[11] = TME_M68K_OPCODE_INSN(29) | param44;
 
   /* root 748: */
-  _tme_m68k_opcode_root_init_22(opcodes + (748 * 64), params);
+  _tme_m68k_opcode_root_init_30(opcodes + (748 * 64), params);
 
   params[11] = TME_M68K_OPCODE_INSN(29) | param45;
 
   /* root 756: */
-  _tme_m68k_opcode_root_init_22(opcodes + (756 * 64), params);
+  _tme_m68k_opcode_root_init_30(opcodes + (756 * 64), params);
 
   params[11] = TME_M68K_OPCODE_INSN(29) | param46;
 
   /* root 764: */
-  _tme_m68k_opcode_root_init_22(opcodes + (764 * 64), params);
+  _tme_m68k_opcode_root_init_30(opcodes + (764 * 64), params);
 
-  params[4] = TME_M68K_OPCODE_INSN(70);
+  params[4] = TME_M68K_OPCODE_INSN(74);
   params[5] = param4;
   params[6] = param5;
   params[7] = param6;
-  params[10] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(71) | param87;
+  params[10] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(75) | param87;
 
   /* root 299: */
-  _tme_m68k_opcode_root_init_14(opcodes + (299 * 64), params);
+  _tme_m68k_opcode_root_init_22(opcodes + (299 * 64), params);
 
   params[0] = param10;
   params[1] = param11;
@@ -2499,212 +3059,212 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   params[7] = param17;
   params[8] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | param19;
   params[9] = TME_M68K_OPCODE_IMM_16 | param76;
-  params[11] = TME_M68K_OPCODE_INSN(47) | param77;
+  params[11] = TME_M68K_OPCODE_INSN(51) | param77;
 
   /* root 262: */
   _tme_m68k_opcode_root_init_7(opcodes + (262 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(47) | param80;
+  params[11] = TME_M68K_OPCODE_INSN(51) | param80;
 
   /* root 270: */
   _tme_m68k_opcode_root_init_7(opcodes + (270 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(55);
+  params[11] = TME_M68K_OPCODE_INSN(59);
 
   /* root 275: */
   _tme_m68k_opcode_root_init_7(opcodes + (275 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(47) | param81;
+  params[11] = TME_M68K_OPCODE_INSN(51) | param81;
 
   /* root 278: */
   _tme_m68k_opcode_root_init_7(opcodes + (278 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(59);
+  params[11] = TME_M68K_OPCODE_INSN(63);
 
   /* root 283: */
   _tme_m68k_opcode_root_init_7(opcodes + (283 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(47) | param82;
+  params[11] = TME_M68K_OPCODE_INSN(51) | param82;
 
   /* root 286: */
   _tme_m68k_opcode_root_init_7(opcodes + (286 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(47) | param83;
+  params[11] = TME_M68K_OPCODE_INSN(51) | param83;
 
   /* root 294: */
   _tme_m68k_opcode_root_init_7(opcodes + (294 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(47) | param84;
+  params[11] = TME_M68K_OPCODE_INSN(51) | param84;
 
   /* root 302: */
   _tme_m68k_opcode_root_init_7(opcodes + (302 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(47) | param85;
+  params[11] = TME_M68K_OPCODE_INSN(51) | param85;
 
   /* root 310: */
   _tme_m68k_opcode_root_init_7(opcodes + (310 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(47) | param86;
+  params[11] = TME_M68K_OPCODE_INSN(51) | param86;
 
   /* root 318: */
   _tme_m68k_opcode_root_init_7(opcodes + (318 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(96) | param112;
+  params[11] = TME_M68K_OPCODE_INSN(100) | param112;
 
   /* root 515: */
   _tme_m68k_opcode_root_init_7(opcodes + (515 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(98) | param112;
+  params[11] = TME_M68K_OPCODE_INSN(102) | param112;
 
   /* root 519: */
   _tme_m68k_opcode_root_init_7(opcodes + (519 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(96) | param91;
+  params[11] = TME_M68K_OPCODE_INSN(100) | param91;
 
   /* root 523: */
   _tme_m68k_opcode_root_init_7(opcodes + (523 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(98) | param91;
+  params[11] = TME_M68K_OPCODE_INSN(102) | param91;
 
   /* root 527: */
   _tme_m68k_opcode_root_init_7(opcodes + (527 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(96) | param94;
+  params[11] = TME_M68K_OPCODE_INSN(100) | param94;
 
   /* root 531: */
   _tme_m68k_opcode_root_init_7(opcodes + (531 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(98) | param94;
+  params[11] = TME_M68K_OPCODE_INSN(102) | param94;
 
   /* root 535: */
   _tme_m68k_opcode_root_init_7(opcodes + (535 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(96) | param97;
+  params[11] = TME_M68K_OPCODE_INSN(100) | param97;
 
   /* root 539: */
   _tme_m68k_opcode_root_init_7(opcodes + (539 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(98) | param97;
+  params[11] = TME_M68K_OPCODE_INSN(102) | param97;
 
   /* root 543: */
   _tme_m68k_opcode_root_init_7(opcodes + (543 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(96) | param100;
+  params[11] = TME_M68K_OPCODE_INSN(100) | param100;
 
   /* root 547: */
   _tme_m68k_opcode_root_init_7(opcodes + (547 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(98) | param100;
+  params[11] = TME_M68K_OPCODE_INSN(102) | param100;
 
   /* root 551: */
   _tme_m68k_opcode_root_init_7(opcodes + (551 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(96) | param103;
+  params[11] = TME_M68K_OPCODE_INSN(100) | param103;
 
   /* root 555: */
   _tme_m68k_opcode_root_init_7(opcodes + (555 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(98) | param103;
+  params[11] = TME_M68K_OPCODE_INSN(102) | param103;
 
   /* root 559: */
   _tme_m68k_opcode_root_init_7(opcodes + (559 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(96) | param106;
+  params[11] = TME_M68K_OPCODE_INSN(100) | param106;
 
   /* root 563: */
   _tme_m68k_opcode_root_init_7(opcodes + (563 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(98) | param106;
+  params[11] = TME_M68K_OPCODE_INSN(102) | param106;
 
   /* root 567: */
   _tme_m68k_opcode_root_init_7(opcodes + (567 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(96) | param109;
+  params[11] = TME_M68K_OPCODE_INSN(100) | param109;
 
   /* root 571: */
   _tme_m68k_opcode_root_init_7(opcodes + (571 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(98) | param109;
+  params[11] = TME_M68K_OPCODE_INSN(102) | param109;
 
   /* root 575: */
   _tme_m68k_opcode_root_init_7(opcodes + (575 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(107) | param112;
+  params[11] = TME_M68K_OPCODE_INSN(111) | param112;
 
   /* root 771: */
   _tme_m68k_opcode_root_init_7(opcodes + (771 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(110) | param112;
+  params[11] = TME_M68K_OPCODE_INSN(114) | param112;
 
   /* root 775: */
   _tme_m68k_opcode_root_init_7(opcodes + (775 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(107) | param91;
+  params[11] = TME_M68K_OPCODE_INSN(111) | param91;
 
   /* root 779: */
   _tme_m68k_opcode_root_init_7(opcodes + (779 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(110) | param91;
+  params[11] = TME_M68K_OPCODE_INSN(114) | param91;
 
   /* root 783: */
   _tme_m68k_opcode_root_init_7(opcodes + (783 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(107) | param94;
+  params[11] = TME_M68K_OPCODE_INSN(111) | param94;
 
   /* root 787: */
   _tme_m68k_opcode_root_init_7(opcodes + (787 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(110) | param94;
+  params[11] = TME_M68K_OPCODE_INSN(114) | param94;
 
   /* root 791: */
   _tme_m68k_opcode_root_init_7(opcodes + (791 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(107) | param97;
+  params[11] = TME_M68K_OPCODE_INSN(111) | param97;
 
   /* root 795: */
   _tme_m68k_opcode_root_init_7(opcodes + (795 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(110) | param97;
+  params[11] = TME_M68K_OPCODE_INSN(114) | param97;
 
   /* root 799: */
   _tme_m68k_opcode_root_init_7(opcodes + (799 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(107) | param100;
+  params[11] = TME_M68K_OPCODE_INSN(111) | param100;
 
   /* root 803: */
   _tme_m68k_opcode_root_init_7(opcodes + (803 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(110) | param100;
+  params[11] = TME_M68K_OPCODE_INSN(114) | param100;
 
   /* root 807: */
   _tme_m68k_opcode_root_init_7(opcodes + (807 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(107) | param103;
+  params[11] = TME_M68K_OPCODE_INSN(111) | param103;
 
   /* root 811: */
   _tme_m68k_opcode_root_init_7(opcodes + (811 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(110) | param103;
+  params[11] = TME_M68K_OPCODE_INSN(114) | param103;
 
   /* root 815: */
   _tme_m68k_opcode_root_init_7(opcodes + (815 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(107) | param106;
+  params[11] = TME_M68K_OPCODE_INSN(111) | param106;
 
   /* root 819: */
   _tme_m68k_opcode_root_init_7(opcodes + (819 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(110) | param106;
+  params[11] = TME_M68K_OPCODE_INSN(114) | param106;
 
   /* root 823: */
   _tme_m68k_opcode_root_init_7(opcodes + (823 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(107) | param109;
+  params[11] = TME_M68K_OPCODE_INSN(111) | param109;
 
   /* root 827: */
   _tme_m68k_opcode_root_init_7(opcodes + (827 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(110) | param109;
+  params[11] = TME_M68K_OPCODE_INSN(114) | param109;
 
   /* root 831: */
   _tme_m68k_opcode_root_init_7(opcodes + (831 * 64), params);
@@ -2721,27 +3281,27 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 25: */
   _tme_m68k_opcode_root_init_1(opcodes + (25 * 64), params);
 
-  params[10] = TME_M68K_OPCODE_INSN(43);
+  params[10] = TME_M68K_OPCODE_INSN(47);
 
   /* root 257: */
   _tme_m68k_opcode_root_init_1(opcodes + (257 * 64), params);
 
-  params[10] = TME_M68K_OPCODE_INSN(45);
+  params[10] = TME_M68K_OPCODE_INSN(49);
 
   /* root 259: */
   _tme_m68k_opcode_root_init_1(opcodes + (259 * 64), params);
 
-  params[10] = TME_M68K_OPCODE_INSN(50);
+  params[10] = TME_M68K_OPCODE_INSN(54);
 
   /* root 265: */
   _tme_m68k_opcode_root_init_1(opcodes + (265 * 64), params);
 
-  params[10] = TME_M68K_OPCODE_INSN(53);
+  params[10] = TME_M68K_OPCODE_INSN(57);
 
   /* root 273: */
   _tme_m68k_opcode_root_init_1(opcodes + (273 * 64), params);
 
-  params[10] = TME_M68K_OPCODE_INSN(57);
+  params[10] = TME_M68K_OPCODE_INSN(61);
 
   /* root 281: */
   _tme_m68k_opcode_root_init_1(opcodes + (281 * 64), params);
@@ -2752,63 +3312,63 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 49: */
   _tme_m68k_opcode_root_init_1(opcodes + (49 * 64), params);
 
-  params[10] = TME_M68K_OPCODE_INSN(68);
+  params[10] = TME_M68K_OPCODE_INSN(72);
 
   /* root 297: */
   _tme_m68k_opcode_root_init_1(opcodes + (297 * 64), params);
 
-  params[7] = TME_M68K_OPCODE_INSN(105);
+  params[7] = TME_M68K_OPCODE_INSN(109);
   params[8] = param17;
   params[9] = TME_M68K_OPCODE_INSN(1);
   params[10] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | param19;
   params[11] = TME_M68K_OPCODE_INSN(31) | param77;
 
   /* root 709: */
-  _tme_m68k_opcode_root_init_22(opcodes + (709 * 64), params);
+  _tme_m68k_opcode_root_init_30(opcodes + (709 * 64), params);
 
   params[11] = TME_M68K_OPCODE_INSN(31) | param80;
 
   /* root 717: */
-  _tme_m68k_opcode_root_init_22(opcodes + (717 * 64), params);
+  _tme_m68k_opcode_root_init_30(opcodes + (717 * 64), params);
 
   params[11] = TME_M68K_OPCODE_INSN(31) | param81;
 
   /* root 725: */
-  _tme_m68k_opcode_root_init_22(opcodes + (725 * 64), params);
+  _tme_m68k_opcode_root_init_30(opcodes + (725 * 64), params);
 
   params[11] = TME_M68K_OPCODE_INSN(31) | param82;
 
   /* root 733: */
-  _tme_m68k_opcode_root_init_22(opcodes + (733 * 64), params);
+  _tme_m68k_opcode_root_init_30(opcodes + (733 * 64), params);
 
   params[11] = TME_M68K_OPCODE_INSN(31) | param83;
 
   /* root 741: */
-  _tme_m68k_opcode_root_init_22(opcodes + (741 * 64), params);
+  _tme_m68k_opcode_root_init_30(opcodes + (741 * 64), params);
 
   params[11] = TME_M68K_OPCODE_INSN(31) | param84;
 
   /* root 749: */
-  _tme_m68k_opcode_root_init_22(opcodes + (749 * 64), params);
+  _tme_m68k_opcode_root_init_30(opcodes + (749 * 64), params);
 
   params[11] = TME_M68K_OPCODE_INSN(31) | param85;
 
   /* root 757: */
-  _tme_m68k_opcode_root_init_22(opcodes + (757 * 64), params);
+  _tme_m68k_opcode_root_init_30(opcodes + (757 * 64), params);
 
   params[11] = TME_M68K_OPCODE_INSN(31) | param86;
 
   /* root 765: */
-  _tme_m68k_opcode_root_init_22(opcodes + (765 * 64), params);
+  _tme_m68k_opcode_root_init_30(opcodes + (765 * 64), params);
 
-  params[4] = TME_M68K_OPCODE_INSN(63);
+  params[4] = TME_M68K_OPCODE_INSN(67);
   params[5] = param14;
   params[6] = param15;
   params[7] = param16;
-  params[10] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(64) | param87 | TME_M68K_OPCODE_SPECOP;
+  params[10] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(68) | param87 | TME_M68K_OPCODE_SPECOP;
 
   /* root 290: */
-  _tme_m68k_opcode_root_init_13(opcodes + (290 * 64), params);
+  _tme_m68k_opcode_root_init_21(opcodes + (290 * 64), params);
 
   params[0] = param20;
   params[1] = param21;
@@ -2845,22 +3405,22 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 42: */
   _tme_m68k_opcode_root_init_1(opcodes + (42 * 64), params);
 
-  params[10] = TME_M68K_OPCODE_INSN(44);
+  params[10] = TME_M68K_OPCODE_INSN(48);
 
   /* root 258: */
   _tme_m68k_opcode_root_init_1(opcodes + (258 * 64), params);
 
-  params[10] = TME_M68K_OPCODE_INSN(51);
+  params[10] = TME_M68K_OPCODE_INSN(55);
 
   /* root 266: */
   _tme_m68k_opcode_root_init_1(opcodes + (266 * 64), params);
 
-  params[10] = TME_M68K_OPCODE_INSN(54);
+  params[10] = TME_M68K_OPCODE_INSN(58);
 
   /* root 274: */
   _tme_m68k_opcode_root_init_1(opcodes + (274 * 64), params);
 
-  params[10] = TME_M68K_OPCODE_INSN(58);
+  params[10] = TME_M68K_OPCODE_INSN(62);
 
   /* root 282: */
   _tme_m68k_opcode_root_init_1(opcodes + (282 * 64), params);
@@ -2871,7 +3431,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 50: */
   _tme_m68k_opcode_root_init_1(opcodes + (50 * 64), params);
 
-  params[10] = TME_M68K_OPCODE_INSN(69);
+  params[10] = TME_M68K_OPCODE_INSN(73);
 
   /* root 298: */
   _tme_m68k_opcode_root_init_1(opcodes + (298 * 64), params);
@@ -2879,89 +3439,89 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   params[8] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | param28;
   params[9] = TME_M68K_OPCODE_IMM_32 | param49;
   params[10] = TME_M68K_OPCODE_INSN(1);
-  params[11] = TME_M68K_OPCODE_INSN(46) | param50;
+  params[11] = TME_M68K_OPCODE_INSN(50) | param50;
 
   /* root 260: */
   _tme_m68k_opcode_root_init_7(opcodes + (260 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(46) | param54;
+  params[11] = TME_M68K_OPCODE_INSN(50) | param54;
 
   /* root 268: */
   _tme_m68k_opcode_root_init_7(opcodes + (268 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(46) | param56;
+  params[11] = TME_M68K_OPCODE_INSN(50) | param56;
 
   /* root 276: */
   _tme_m68k_opcode_root_init_7(opcodes + (276 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(46) | param58;
+  params[11] = TME_M68K_OPCODE_INSN(50) | param58;
 
   /* root 284: */
   _tme_m68k_opcode_root_init_7(opcodes + (284 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(46) | param60;
+  params[11] = TME_M68K_OPCODE_INSN(50) | param60;
 
   /* root 292: */
   _tme_m68k_opcode_root_init_7(opcodes + (292 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(46) | param62;
+  params[11] = TME_M68K_OPCODE_INSN(50) | param62;
 
   /* root 300: */
   _tme_m68k_opcode_root_init_7(opcodes + (300 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(46) | param64;
+  params[11] = TME_M68K_OPCODE_INSN(50) | param64;
 
   /* root 308: */
   _tme_m68k_opcode_root_init_7(opcodes + (308 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(46) | param66;
+  params[11] = TME_M68K_OPCODE_INSN(50) | param66;
 
   /* root 316: */
   _tme_m68k_opcode_root_init_7(opcodes + (316 * 64), params);
 
-  params[7] = TME_M68K_OPCODE_INSN(106);
+  params[7] = TME_M68K_OPCODE_INSN(110);
   params[8] = param27;
   params[9] = TME_M68K_OPCODE_INSN(1);
   params[10] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | param28;
   params[11] = TME_M68K_OPCODE_INSN(33) | param50;
 
   /* root 710: */
-  _tme_m68k_opcode_root_init_22(opcodes + (710 * 64), params);
+  _tme_m68k_opcode_root_init_30(opcodes + (710 * 64), params);
 
   params[11] = TME_M68K_OPCODE_INSN(33) | param54;
 
   /* root 718: */
-  _tme_m68k_opcode_root_init_22(opcodes + (718 * 64), params);
+  _tme_m68k_opcode_root_init_30(opcodes + (718 * 64), params);
 
   params[11] = TME_M68K_OPCODE_INSN(33) | param56;
 
   /* root 726: */
-  _tme_m68k_opcode_root_init_22(opcodes + (726 * 64), params);
+  _tme_m68k_opcode_root_init_30(opcodes + (726 * 64), params);
 
   params[11] = TME_M68K_OPCODE_INSN(33) | param58;
 
   /* root 734: */
-  _tme_m68k_opcode_root_init_22(opcodes + (734 * 64), params);
+  _tme_m68k_opcode_root_init_30(opcodes + (734 * 64), params);
 
   params[11] = TME_M68K_OPCODE_INSN(33) | param60;
 
   /* root 742: */
-  _tme_m68k_opcode_root_init_22(opcodes + (742 * 64), params);
+  _tme_m68k_opcode_root_init_30(opcodes + (742 * 64), params);
 
   params[11] = TME_M68K_OPCODE_INSN(33) | param62;
 
   /* root 750: */
-  _tme_m68k_opcode_root_init_22(opcodes + (750 * 64), params);
+  _tme_m68k_opcode_root_init_30(opcodes + (750 * 64), params);
 
   params[11] = TME_M68K_OPCODE_INSN(33) | param64;
 
   /* root 758: */
-  _tme_m68k_opcode_root_init_22(opcodes + (758 * 64), params);
+  _tme_m68k_opcode_root_init_30(opcodes + (758 * 64), params);
 
   params[11] = TME_M68K_OPCODE_INSN(33) | param66;
 
   /* root 766: */
-  _tme_m68k_opcode_root_init_22(opcodes + (766 * 64), params);
+  _tme_m68k_opcode_root_init_30(opcodes + (766 * 64), params);
 
   params[4] = TME_M68K_OPCODE_INSN(6);
   params[5] = param24;
@@ -2997,11 +3557,11 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 35: */
   _tme_m68k_opcode_root_init_6(opcodes + (35 * 64), params);
 
-  params[4] = TME_M68K_OPCODE_INSN(65);
-  params[10] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(66) | param87 | TME_M68K_OPCODE_SPECOP;
+  params[4] = TME_M68K_OPCODE_INSN(69);
+  params[10] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(70) | param87 | TME_M68K_OPCODE_SPECOP;
 
   /* root 291: */
-  _tme_m68k_opcode_root_init_13(opcodes + (291 * 64), params);
+  _tme_m68k_opcode_root_init_21(opcodes + (291 * 64), params);
 
   params[0] = param30;
   params[1] = param31;
@@ -3010,63 +3570,63 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   params[4] = param34;
   params[5] = param35;
   params[6] = param36;
-  params[7] = TME_M68K_OPCODE_INSN(109);
+  params[7] = TME_M68K_OPCODE_INSN(113);
   params[8] = param37;
   params[10] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(22) | param28;
   params[11] = param50;
 
   /* root 774: */
-  _tme_m68k_opcode_root_init_24(opcodes + (774 * 64), params);
+  _tme_m68k_opcode_root_init_32(opcodes + (774 * 64), params);
 
   params[11] = param54;
 
   /* root 782: */
-  _tme_m68k_opcode_root_init_24(opcodes + (782 * 64), params);
+  _tme_m68k_opcode_root_init_32(opcodes + (782 * 64), params);
 
   params[11] = param56;
 
   /* root 790: */
-  _tme_m68k_opcode_root_init_24(opcodes + (790 * 64), params);
+  _tme_m68k_opcode_root_init_32(opcodes + (790 * 64), params);
 
   params[11] = param58;
 
   /* root 798: */
-  _tme_m68k_opcode_root_init_24(opcodes + (798 * 64), params);
+  _tme_m68k_opcode_root_init_32(opcodes + (798 * 64), params);
 
   params[11] = param60;
 
   /* root 806: */
-  _tme_m68k_opcode_root_init_24(opcodes + (806 * 64), params);
+  _tme_m68k_opcode_root_init_32(opcodes + (806 * 64), params);
 
   params[11] = param62;
 
   /* root 814: */
-  _tme_m68k_opcode_root_init_24(opcodes + (814 * 64), params);
+  _tme_m68k_opcode_root_init_32(opcodes + (814 * 64), params);
 
   params[11] = param64;
 
   /* root 822: */
-  _tme_m68k_opcode_root_init_24(opcodes + (822 * 64), params);
+  _tme_m68k_opcode_root_init_32(opcodes + (822 * 64), params);
 
   params[11] = param66;
 
   /* root 830: */
-  _tme_m68k_opcode_root_init_24(opcodes + (830 * 64), params);
+  _tme_m68k_opcode_root_init_32(opcodes + (830 * 64), params);
 
   params[0] = param20;
   params[1] = param21;
   params[2] = param22;
   params[3] = param23;
-  params[4] = TME_M68K_OPCODE_INSN(61);
+  params[4] = TME_M68K_OPCODE_INSN(65);
   params[5] = param24;
   params[6] = param25;
   params[7] = param26;
   params[8] = param27;
-  params[9] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(62) | param87;
+  params[9] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(66) | param87;
   params[10] = TME_M68K_OPCODE_INSN(1);
 
   /* root 289: */
-  _tme_m68k_opcode_root_init_12(opcodes + (289 * 64), params);
+  _tme_m68k_opcode_root_init_20(opcodes + (289 * 64), params);
 
   params[0] = param50;
   params[1] = param66;
@@ -3352,63 +3912,63 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
 
   params[7] = param50;
   params[15] = param51;
-  params[16] = TME_M68K_OPCODE_INSN(109);
+  params[16] = TME_M68K_OPCODE_INSN(113);
   params[17] = param27;
   params[18] = param37;
   params[19] = TME_M68K_OPCODE_INSN(1);
   params[20] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(20) | param77 | param19;
 
   /* root 773: */
-  _tme_m68k_opcode_root_init_23(opcodes + (773 * 64), params);
+  _tme_m68k_opcode_root_init_31(opcodes + (773 * 64), params);
 
   params[7] = param54;
   params[15] = param55;
   params[20] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(20) | param80 | param19;
 
   /* root 781: */
-  _tme_m68k_opcode_root_init_23(opcodes + (781 * 64), params);
+  _tme_m68k_opcode_root_init_31(opcodes + (781 * 64), params);
 
   params[7] = param56;
   params[15] = param57;
   params[20] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(20) | param81 | param19;
 
   /* root 789: */
-  _tme_m68k_opcode_root_init_23(opcodes + (789 * 64), params);
+  _tme_m68k_opcode_root_init_31(opcodes + (789 * 64), params);
 
   params[7] = param58;
   params[15] = param59;
   params[20] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(20) | param82 | param19;
 
   /* root 797: */
-  _tme_m68k_opcode_root_init_23(opcodes + (797 * 64), params);
+  _tme_m68k_opcode_root_init_31(opcodes + (797 * 64), params);
 
   params[7] = param60;
   params[15] = param61;
   params[20] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(20) | param83 | param19;
 
   /* root 805: */
-  _tme_m68k_opcode_root_init_23(opcodes + (805 * 64), params);
+  _tme_m68k_opcode_root_init_31(opcodes + (805 * 64), params);
 
   params[7] = param62;
   params[15] = param63;
   params[20] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(20) | param84 | param19;
 
   /* root 813: */
-  _tme_m68k_opcode_root_init_23(opcodes + (813 * 64), params);
+  _tme_m68k_opcode_root_init_31(opcodes + (813 * 64), params);
 
   params[7] = param64;
   params[15] = param65;
   params[20] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(20) | param85 | param19;
 
   /* root 821: */
-  _tme_m68k_opcode_root_init_23(opcodes + (821 * 64), params);
+  _tme_m68k_opcode_root_init_31(opcodes + (821 * 64), params);
 
   params[7] = param66;
   params[15] = param67;
   params[20] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(20) | param86 | param19;
 
   /* root 829: */
-  _tme_m68k_opcode_root_init_23(opcodes + (829 * 64), params);
+  _tme_m68k_opcode_root_init_31(opcodes + (829 * 64), params);
 
   params[7] = param33;
   params[8] = param24;
@@ -3520,82 +4080,82 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   params[15] = param75;
   params[16] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | param19;
   params[17] = TME_M68K_OPCODE_IMM_16 | param76;
-  params[19] = TME_M68K_OPCODE_INSN(40) | param77;
+  params[19] = TME_M68K_OPCODE_INSN(42) | param77;
 
   /* root 192: */
   _tme_m68k_opcode_root_init_9(opcodes + (192 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(41) | param51;
+  params[19] = TME_M68K_OPCODE_INSN(43) | param51;
 
   /* root 193: */
   _tme_m68k_opcode_root_init_9(opcodes + (193 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(40) | param80;
+  params[19] = TME_M68K_OPCODE_INSN(42) | param80;
 
   /* root 200: */
   _tme_m68k_opcode_root_init_9(opcodes + (200 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(41) | param55;
+  params[19] = TME_M68K_OPCODE_INSN(43) | param55;
 
   /* root 201: */
   _tme_m68k_opcode_root_init_9(opcodes + (201 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(40) | param81;
+  params[19] = TME_M68K_OPCODE_INSN(42) | param81;
 
   /* root 208: */
   _tme_m68k_opcode_root_init_9(opcodes + (208 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(41) | param57;
+  params[19] = TME_M68K_OPCODE_INSN(43) | param57;
 
   /* root 209: */
   _tme_m68k_opcode_root_init_9(opcodes + (209 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(40) | param82;
+  params[19] = TME_M68K_OPCODE_INSN(42) | param82;
 
   /* root 216: */
   _tme_m68k_opcode_root_init_9(opcodes + (216 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(41) | param59;
+  params[19] = TME_M68K_OPCODE_INSN(43) | param59;
 
   /* root 217: */
   _tme_m68k_opcode_root_init_9(opcodes + (217 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(40) | param83;
+  params[19] = TME_M68K_OPCODE_INSN(42) | param83;
 
   /* root 224: */
   _tme_m68k_opcode_root_init_9(opcodes + (224 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(41) | param61;
+  params[19] = TME_M68K_OPCODE_INSN(43) | param61;
 
   /* root 225: */
   _tme_m68k_opcode_root_init_9(opcodes + (225 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(40) | param84;
+  params[19] = TME_M68K_OPCODE_INSN(42) | param84;
 
   /* root 232: */
   _tme_m68k_opcode_root_init_9(opcodes + (232 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(41) | param63;
+  params[19] = TME_M68K_OPCODE_INSN(43) | param63;
 
   /* root 233: */
   _tme_m68k_opcode_root_init_9(opcodes + (233 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(40) | param85;
+  params[19] = TME_M68K_OPCODE_INSN(42) | param85;
 
   /* root 240: */
   _tme_m68k_opcode_root_init_9(opcodes + (240 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(41) | param65;
+  params[19] = TME_M68K_OPCODE_INSN(43) | param65;
 
   /* root 241: */
   _tme_m68k_opcode_root_init_9(opcodes + (241 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(40) | param86;
+  params[19] = TME_M68K_OPCODE_INSN(42) | param86;
 
   /* root 248: */
   _tme_m68k_opcode_root_init_9(opcodes + (248 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(41) | param67;
+  params[19] = TME_M68K_OPCODE_INSN(43) | param67;
 
   /* root 249: */
   _tme_m68k_opcode_root_init_9(opcodes + (249 * 64), params);
@@ -3623,7 +4183,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 577: */
   _tme_m68k_opcode_root_init_9(opcodes + (577 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(99) | param33;
+  params[19] = TME_M68K_OPCODE_INSN(103) | param33;
 
   /* root 579: */
   _tme_m68k_opcode_root_init_9(opcodes + (579 * 64), params);
@@ -3633,7 +4193,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 585: */
   _tme_m68k_opcode_root_init_9(opcodes + (585 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(99) | param36;
+  params[19] = TME_M68K_OPCODE_INSN(103) | param36;
 
   /* root 587: */
   _tme_m68k_opcode_root_init_9(opcodes + (587 * 64), params);
@@ -3643,7 +4203,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 593: */
   _tme_m68k_opcode_root_init_9(opcodes + (593 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(99) | param30;
+  params[19] = TME_M68K_OPCODE_INSN(103) | param30;
 
   /* root 595: */
   _tme_m68k_opcode_root_init_9(opcodes + (595 * 64), params);
@@ -3653,7 +4213,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 601: */
   _tme_m68k_opcode_root_init_9(opcodes + (601 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(99) | param32;
+  params[19] = TME_M68K_OPCODE_INSN(103) | param32;
 
   /* root 603: */
   _tme_m68k_opcode_root_init_9(opcodes + (603 * 64), params);
@@ -3663,7 +4223,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 609: */
   _tme_m68k_opcode_root_init_9(opcodes + (609 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(99) | param35;
+  params[19] = TME_M68K_OPCODE_INSN(103) | param35;
 
   /* root 611: */
   _tme_m68k_opcode_root_init_9(opcodes + (611 * 64), params);
@@ -3673,7 +4233,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 617: */
   _tme_m68k_opcode_root_init_9(opcodes + (617 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(99) | param37;
+  params[19] = TME_M68K_OPCODE_INSN(103) | param37;
 
   /* root 619: */
   _tme_m68k_opcode_root_init_9(opcodes + (619 * 64), params);
@@ -3683,7 +4243,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 625: */
   _tme_m68k_opcode_root_init_9(opcodes + (625 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(99) | param31;
+  params[19] = TME_M68K_OPCODE_INSN(103) | param31;
 
   /* root 627: */
   _tme_m68k_opcode_root_init_9(opcodes + (627 * 64), params);
@@ -3693,7 +4253,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 633: */
   _tme_m68k_opcode_root_init_9(opcodes + (633 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(99) | param34;
+  params[19] = TME_M68K_OPCODE_INSN(103) | param34;
 
   /* root 635: */
   _tme_m68k_opcode_root_init_9(opcodes + (635 * 64), params);
@@ -3703,7 +4263,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 705: */
   _tme_m68k_opcode_root_init_9(opcodes + (705 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(103) | param33;
+  params[19] = TME_M68K_OPCODE_INSN(107) | param33;
 
   /* root 707: */
   _tme_m68k_opcode_root_init_9(opcodes + (707 * 64), params);
@@ -3713,7 +4273,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 713: */
   _tme_m68k_opcode_root_init_9(opcodes + (713 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(103) | param36;
+  params[19] = TME_M68K_OPCODE_INSN(107) | param36;
 
   /* root 715: */
   _tme_m68k_opcode_root_init_9(opcodes + (715 * 64), params);
@@ -3723,7 +4283,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 721: */
   _tme_m68k_opcode_root_init_9(opcodes + (721 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(103) | param30;
+  params[19] = TME_M68K_OPCODE_INSN(107) | param30;
 
   /* root 723: */
   _tme_m68k_opcode_root_init_9(opcodes + (723 * 64), params);
@@ -3733,7 +4293,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 729: */
   _tme_m68k_opcode_root_init_9(opcodes + (729 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(103) | param32;
+  params[19] = TME_M68K_OPCODE_INSN(107) | param32;
 
   /* root 731: */
   _tme_m68k_opcode_root_init_9(opcodes + (731 * 64), params);
@@ -3743,7 +4303,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 737: */
   _tme_m68k_opcode_root_init_9(opcodes + (737 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(103) | param35;
+  params[19] = TME_M68K_OPCODE_INSN(107) | param35;
 
   /* root 739: */
   _tme_m68k_opcode_root_init_9(opcodes + (739 * 64), params);
@@ -3753,7 +4313,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 745: */
   _tme_m68k_opcode_root_init_9(opcodes + (745 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(103) | param37;
+  params[19] = TME_M68K_OPCODE_INSN(107) | param37;
 
   /* root 747: */
   _tme_m68k_opcode_root_init_9(opcodes + (747 * 64), params);
@@ -3763,7 +4323,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 753: */
   _tme_m68k_opcode_root_init_9(opcodes + (753 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(103) | param31;
+  params[19] = TME_M68K_OPCODE_INSN(107) | param31;
 
   /* root 755: */
   _tme_m68k_opcode_root_init_9(opcodes + (755 * 64), params);
@@ -3773,7 +4333,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 761: */
   _tme_m68k_opcode_root_init_9(opcodes + (761 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(103) | param34;
+  params[19] = TME_M68K_OPCODE_INSN(107) | param34;
 
   /* root 763: */
   _tme_m68k_opcode_root_init_9(opcodes + (763 * 64), params);
@@ -3783,7 +4343,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 833: */
   _tme_m68k_opcode_root_init_9(opcodes + (833 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(111) | param33;
+  params[19] = TME_M68K_OPCODE_INSN(115) | param33;
 
   /* root 835: */
   _tme_m68k_opcode_root_init_9(opcodes + (835 * 64), params);
@@ -3793,7 +4353,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 841: */
   _tme_m68k_opcode_root_init_9(opcodes + (841 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(111) | param36;
+  params[19] = TME_M68K_OPCODE_INSN(115) | param36;
 
   /* root 843: */
   _tme_m68k_opcode_root_init_9(opcodes + (843 * 64), params);
@@ -3803,7 +4363,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 849: */
   _tme_m68k_opcode_root_init_9(opcodes + (849 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(111) | param30;
+  params[19] = TME_M68K_OPCODE_INSN(115) | param30;
 
   /* root 851: */
   _tme_m68k_opcode_root_init_9(opcodes + (851 * 64), params);
@@ -3813,7 +4373,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 857: */
   _tme_m68k_opcode_root_init_9(opcodes + (857 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(111) | param32;
+  params[19] = TME_M68K_OPCODE_INSN(115) | param32;
 
   /* root 859: */
   _tme_m68k_opcode_root_init_9(opcodes + (859 * 64), params);
@@ -3823,7 +4383,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 865: */
   _tme_m68k_opcode_root_init_9(opcodes + (865 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(111) | param35;
+  params[19] = TME_M68K_OPCODE_INSN(115) | param35;
 
   /* root 867: */
   _tme_m68k_opcode_root_init_9(opcodes + (867 * 64), params);
@@ -3833,7 +4393,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 873: */
   _tme_m68k_opcode_root_init_9(opcodes + (873 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(111) | param37;
+  params[19] = TME_M68K_OPCODE_INSN(115) | param37;
 
   /* root 875: */
   _tme_m68k_opcode_root_init_9(opcodes + (875 * 64), params);
@@ -3843,7 +4403,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 881: */
   _tme_m68k_opcode_root_init_9(opcodes + (881 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(111) | param31;
+  params[19] = TME_M68K_OPCODE_INSN(115) | param31;
 
   /* root 883: */
   _tme_m68k_opcode_root_init_9(opcodes + (883 * 64), params);
@@ -3853,7 +4413,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 889: */
   _tme_m68k_opcode_root_init_9(opcodes + (889 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(111) | param34;
+  params[19] = TME_M68K_OPCODE_INSN(115) | param34;
 
   /* root 891: */
   _tme_m68k_opcode_root_init_9(opcodes + (891 * 64), params);
@@ -3881,7 +4441,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 578: */
   _tme_m68k_opcode_root_init_9(opcodes + (578 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(90) | param33;
+  params[19] = TME_M68K_OPCODE_INSN(94) | param33;
 
   /* root 583: */
   _tme_m68k_opcode_root_init_9(opcodes + (583 * 64), params);
@@ -3891,7 +4451,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 586: */
   _tme_m68k_opcode_root_init_9(opcodes + (586 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(90) | param36;
+  params[19] = TME_M68K_OPCODE_INSN(94) | param36;
 
   /* root 591: */
   _tme_m68k_opcode_root_init_9(opcodes + (591 * 64), params);
@@ -3901,7 +4461,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 594: */
   _tme_m68k_opcode_root_init_9(opcodes + (594 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(90) | param30;
+  params[19] = TME_M68K_OPCODE_INSN(94) | param30;
 
   /* root 599: */
   _tme_m68k_opcode_root_init_9(opcodes + (599 * 64), params);
@@ -3911,7 +4471,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 602: */
   _tme_m68k_opcode_root_init_9(opcodes + (602 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(90) | param32;
+  params[19] = TME_M68K_OPCODE_INSN(94) | param32;
 
   /* root 607: */
   _tme_m68k_opcode_root_init_9(opcodes + (607 * 64), params);
@@ -3921,7 +4481,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 610: */
   _tme_m68k_opcode_root_init_9(opcodes + (610 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(90) | param35;
+  params[19] = TME_M68K_OPCODE_INSN(94) | param35;
 
   /* root 615: */
   _tme_m68k_opcode_root_init_9(opcodes + (615 * 64), params);
@@ -3931,7 +4491,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 618: */
   _tme_m68k_opcode_root_init_9(opcodes + (618 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(90) | param37;
+  params[19] = TME_M68K_OPCODE_INSN(94) | param37;
 
   /* root 623: */
   _tme_m68k_opcode_root_init_9(opcodes + (623 * 64), params);
@@ -3941,7 +4501,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 626: */
   _tme_m68k_opcode_root_init_9(opcodes + (626 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(90) | param31;
+  params[19] = TME_M68K_OPCODE_INSN(94) | param31;
 
   /* root 631: */
   _tme_m68k_opcode_root_init_9(opcodes + (631 * 64), params);
@@ -3951,7 +4511,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 634: */
   _tme_m68k_opcode_root_init_9(opcodes + (634 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(90) | param34;
+  params[19] = TME_M68K_OPCODE_INSN(94) | param34;
 
   /* root 639: */
   _tme_m68k_opcode_root_init_9(opcodes + (639 * 64), params);
@@ -4041,7 +4601,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 834: */
   _tme_m68k_opcode_root_init_9(opcodes + (834 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(87) | param33;
+  params[19] = TME_M68K_OPCODE_INSN(91) | param33;
 
   /* root 839: */
   _tme_m68k_opcode_root_init_9(opcodes + (839 * 64), params);
@@ -4051,7 +4611,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 842: */
   _tme_m68k_opcode_root_init_9(opcodes + (842 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(87) | param36;
+  params[19] = TME_M68K_OPCODE_INSN(91) | param36;
 
   /* root 847: */
   _tme_m68k_opcode_root_init_9(opcodes + (847 * 64), params);
@@ -4061,7 +4621,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 850: */
   _tme_m68k_opcode_root_init_9(opcodes + (850 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(87) | param30;
+  params[19] = TME_M68K_OPCODE_INSN(91) | param30;
 
   /* root 855: */
   _tme_m68k_opcode_root_init_9(opcodes + (855 * 64), params);
@@ -4071,7 +4631,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 858: */
   _tme_m68k_opcode_root_init_9(opcodes + (858 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(87) | param32;
+  params[19] = TME_M68K_OPCODE_INSN(91) | param32;
 
   /* root 863: */
   _tme_m68k_opcode_root_init_9(opcodes + (863 * 64), params);
@@ -4081,7 +4641,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 866: */
   _tme_m68k_opcode_root_init_9(opcodes + (866 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(87) | param35;
+  params[19] = TME_M68K_OPCODE_INSN(91) | param35;
 
   /* root 871: */
   _tme_m68k_opcode_root_init_9(opcodes + (871 * 64), params);
@@ -4091,7 +4651,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 874: */
   _tme_m68k_opcode_root_init_9(opcodes + (874 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(87) | param37;
+  params[19] = TME_M68K_OPCODE_INSN(91) | param37;
 
   /* root 879: */
   _tme_m68k_opcode_root_init_9(opcodes + (879 * 64), params);
@@ -4101,7 +4661,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 882: */
   _tme_m68k_opcode_root_init_9(opcodes + (882 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(87) | param31;
+  params[19] = TME_M68K_OPCODE_INSN(91) | param31;
 
   /* root 887: */
   _tme_m68k_opcode_root_init_9(opcodes + (887 * 64), params);
@@ -4111,7 +4671,7 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   /* root 890: */
   _tme_m68k_opcode_root_init_9(opcodes + (890 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(87) | param34;
+  params[19] = TME_M68K_OPCODE_INSN(91) | param34;
 
   /* root 895: */
   _tme_m68k_opcode_root_init_9(opcodes + (895 * 64), params);
@@ -4136,12 +4696,101 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   params[17] = TME_M68K_OPCODE_IMM_16 | param76;
   params[18] = TME_M68K_OPCODE_EA_WRITE | param79;
   params[19] = TME_M68K_OPCODE_INSN(1);
-  params[20] = TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_Y | TME_M68K_OPCODE_INSN(40);
+  params[20] = TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_Y | TME_M68K_OPCODE_INSN(42);
 
-  /* roots 194, 195, 196, 197, 198, 199, 202, 203, 204, 205, 206, 207, 210, 211, 212, 213, 214, 218, 219, 220, 221, 222, 226, 227, 228, 229, 230, 234, 235, 236, 237, 238, 242, 243, 244, 245, 246, 250, 251, 252, 253, 254: */
-  for (root_i = 0; root_i < 42; root_i++) {
+  /* roots 194, 197, 198, 199, 202, 205, 206, 207, 210, 213, 214, 218, 221, 222, 226, 229, 230, 234, 237, 238, 242, 245, 246, 250, 253, 254: */
+  for (root_i = 0; root_i < 26; root_i++) {
     _tme_m68k_opcode_root_init_10(opcodes + (root_group1[root_i] * 64), params);
   }
+
+  params[7] = TME_M68K_OPCODE_INSN(44) | param71;
+  params[20] = TME_M68K_OPCODE_INSN(42);
+  params[21] = TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_Y;
+
+  /* root 195: */
+  _tme_m68k_opcode_root_init_11(opcodes + (195 * 64), params);
+
+  params[7] = TME_M68K_OPCODE_INSN(45) | param71;
+
+  /* root 196: */
+  _tme_m68k_opcode_root_init_11(opcodes + (196 * 64), params);
+
+  params[7] = param71;
+  params[12] = TME_M68K_OPCODE_INSN(44) | param74;
+
+  /* root 203: */
+  _tme_m68k_opcode_root_init_12(opcodes + (203 * 64), params);
+
+  params[12] = TME_M68K_OPCODE_INSN(45) | param74;
+
+  /* root 204: */
+  _tme_m68k_opcode_root_init_12(opcodes + (204 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_INSN(44) | param68;
+  params[12] = param74;
+
+  /* root 211: */
+  _tme_m68k_opcode_root_init_13(opcodes + (211 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_INSN(45) | param68;
+
+  /* root 212: */
+  _tme_m68k_opcode_root_init_13(opcodes + (212 * 64), params);
+
+  params[1] = param68;
+  params[6] = TME_M68K_OPCODE_INSN(44) | param70;
+
+  /* root 219: */
+  _tme_m68k_opcode_root_init_14(opcodes + (219 * 64), params);
+
+  params[6] = TME_M68K_OPCODE_INSN(45) | param70;
+
+  /* root 220: */
+  _tme_m68k_opcode_root_init_14(opcodes + (220 * 64), params);
+
+  params[6] = param70;
+  params[11] = TME_M68K_OPCODE_INSN(44) | param73;
+
+  /* root 227: */
+  _tme_m68k_opcode_root_init_15(opcodes + (227 * 64), params);
+
+  params[11] = TME_M68K_OPCODE_INSN(45) | param73;
+
+  /* root 228: */
+  _tme_m68k_opcode_root_init_15(opcodes + (228 * 64), params);
+
+  params[11] = param73;
+  params[15] = TME_M68K_OPCODE_INSN(44) | param75;
+
+  /* root 235: */
+  _tme_m68k_opcode_root_init_16(opcodes + (235 * 64), params);
+
+  params[15] = TME_M68K_OPCODE_INSN(45) | param75;
+
+  /* root 236: */
+  _tme_m68k_opcode_root_init_16(opcodes + (236 * 64), params);
+
+  params[4] = TME_M68K_OPCODE_INSN(44) | param69;
+  params[15] = param75;
+
+  /* root 243: */
+  _tme_m68k_opcode_root_init_17(opcodes + (243 * 64), params);
+
+  params[4] = TME_M68K_OPCODE_INSN(45) | param69;
+
+  /* root 244: */
+  _tme_m68k_opcode_root_init_17(opcodes + (244 * 64), params);
+
+  params[4] = param69;
+  params[9] = TME_M68K_OPCODE_INSN(44) | param72;
+
+  /* root 251: */
+  _tme_m68k_opcode_root_init_18(opcodes + (251 * 64), params);
+
+  params[9] = TME_M68K_OPCODE_INSN(45) | param72;
+
+  /* root 252: */
+  _tme_m68k_opcode_root_init_18(opcodes + (252 * 64), params);
 
   params[0] = param20;
   params[1] = param30;
@@ -4164,12 +4813,79 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   params[18] = TME_M68K_OPCODE_EA_WRITE | param53;
   params[20] = TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_Y | TME_M68K_OPCODE_INSN(38);
 
-  /* roots 130, 131, 132, 133, 134, 135, 138, 139, 140, 141, 142, 143, 146, 147, 148, 149, 150, 154, 155, 156, 157, 158, 162, 163, 164, 165, 166, 170, 171, 172, 173, 174, 178, 179, 180, 181, 182, 186, 187, 188, 189, 190: */
-  for (root_i = 0; root_i < 42; root_i++) {
+  /* roots 130, 133, 134, 135, 138, 141, 142, 143, 146, 149, 150, 154, 157, 158, 162, 165, 166, 170, 173, 174, 178, 181, 182, 186, 189, 190: */
+  for (root_i = 0; root_i < 26; root_i++) {
     _tme_m68k_opcode_root_init_10(opcodes + (root_group2[root_i] * 64), params);
   }
 
-  params[14] = TME_M68K_OPCODE_INSN(87);
+  params[7] = TME_M68K_OPCODE_INSN(40) | param33;
+  params[20] = TME_M68K_OPCODE_INSN(38);
+  params[21] = TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_Y;
+
+  /* root 131: */
+  _tme_m68k_opcode_root_init_11(opcodes + (131 * 64), params);
+
+  params[7] = TME_M68K_OPCODE_INSN(41) | param33;
+
+  /* root 132: */
+  _tme_m68k_opcode_root_init_11(opcodes + (132 * 64), params);
+
+  params[7] = param33;
+  params[12] = TME_M68K_OPCODE_INSN(40) | param36;
+
+  /* root 139: */
+  _tme_m68k_opcode_root_init_12(opcodes + (139 * 64), params);
+
+  params[12] = TME_M68K_OPCODE_INSN(41) | param36;
+
+  /* root 140: */
+  _tme_m68k_opcode_root_init_12(opcodes + (140 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_INSN(40) | param30;
+  params[12] = param36;
+
+  /* root 147: */
+  _tme_m68k_opcode_root_init_13(opcodes + (147 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_INSN(41) | param30;
+
+  /* root 148: */
+  _tme_m68k_opcode_root_init_13(opcodes + (148 * 64), params);
+
+  params[1] = param30;
+  params[6] = TME_M68K_OPCODE_INSN(40) | param32;
+
+  /* root 155: */
+  _tme_m68k_opcode_root_init_14(opcodes + (155 * 64), params);
+
+  params[6] = TME_M68K_OPCODE_INSN(41) | param32;
+
+  /* root 156: */
+  _tme_m68k_opcode_root_init_14(opcodes + (156 * 64), params);
+
+  params[6] = param32;
+  params[11] = TME_M68K_OPCODE_INSN(40) | param35;
+
+  /* root 163: */
+  _tme_m68k_opcode_root_init_15(opcodes + (163 * 64), params);
+
+  params[11] = TME_M68K_OPCODE_INSN(41) | param35;
+
+  /* root 164: */
+  _tme_m68k_opcode_root_init_15(opcodes + (164 * 64), params);
+
+  params[11] = param35;
+  params[15] = TME_M68K_OPCODE_INSN(40) | param37;
+
+  /* root 171: */
+  _tme_m68k_opcode_root_init_16(opcodes + (171 * 64), params);
+
+  params[15] = TME_M68K_OPCODE_INSN(41) | param37;
+
+  /* root 172: */
+  _tme_m68k_opcode_root_init_16(opcodes + (172 * 64), params);
+
+  params[14] = TME_M68K_OPCODE_INSN(91);
   params[15] = param27;
   params[16] = param37;
   params[17] = TME_M68K_OPCODE_INSN(1);
@@ -4178,329 +4894,189 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   params[20] = param88;
 
   /* root 322: */
-  _tme_m68k_opcode_root_init_18(opcodes + (322 * 64), params);
+  _tme_m68k_opcode_root_init_26(opcodes + (322 * 64), params);
 
   params[20] = param91;
 
   /* root 330: */
-  _tme_m68k_opcode_root_init_18(opcodes + (330 * 64), params);
+  _tme_m68k_opcode_root_init_26(opcodes + (330 * 64), params);
 
   params[20] = param94;
 
   /* root 338: */
-  _tme_m68k_opcode_root_init_18(opcodes + (338 * 64), params);
+  _tme_m68k_opcode_root_init_26(opcodes + (338 * 64), params);
 
   params[20] = param97;
 
   /* root 346: */
-  _tme_m68k_opcode_root_init_18(opcodes + (346 * 64), params);
+  _tme_m68k_opcode_root_init_26(opcodes + (346 * 64), params);
 
   params[20] = param100;
 
   /* root 354: */
-  _tme_m68k_opcode_root_init_18(opcodes + (354 * 64), params);
+  _tme_m68k_opcode_root_init_26(opcodes + (354 * 64), params);
 
   params[20] = param103;
 
   /* root 362: */
-  _tme_m68k_opcode_root_init_18(opcodes + (362 * 64), params);
+  _tme_m68k_opcode_root_init_26(opcodes + (362 * 64), params);
 
   params[20] = param106;
 
   /* root 370: */
-  _tme_m68k_opcode_root_init_18(opcodes + (370 * 64), params);
+  _tme_m68k_opcode_root_init_26(opcodes + (370 * 64), params);
 
   params[20] = param109;
 
   /* root 378: */
-  _tme_m68k_opcode_root_init_18(opcodes + (378 * 64), params);
+  _tme_m68k_opcode_root_init_26(opcodes + (378 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(90);
+  params[14] = TME_M68K_OPCODE_INSN(94);
   params[19] = TME_M68K_OPCODE_INSN(25);
   params[20] = param88;
 
   /* root 326: */
-  _tme_m68k_opcode_root_init_18(opcodes + (326 * 64), params);
+  _tme_m68k_opcode_root_init_26(opcodes + (326 * 64), params);
 
   params[20] = param91;
 
   /* root 334: */
-  _tme_m68k_opcode_root_init_18(opcodes + (334 * 64), params);
+  _tme_m68k_opcode_root_init_26(opcodes + (334 * 64), params);
 
   params[20] = param94;
 
   /* root 342: */
-  _tme_m68k_opcode_root_init_18(opcodes + (342 * 64), params);
+  _tme_m68k_opcode_root_init_26(opcodes + (342 * 64), params);
 
   params[20] = param97;
 
   /* root 350: */
-  _tme_m68k_opcode_root_init_18(opcodes + (350 * 64), params);
+  _tme_m68k_opcode_root_init_26(opcodes + (350 * 64), params);
 
   params[20] = param100;
 
   /* root 358: */
-  _tme_m68k_opcode_root_init_18(opcodes + (358 * 64), params);
+  _tme_m68k_opcode_root_init_26(opcodes + (358 * 64), params);
 
   params[20] = param103;
 
   /* root 366: */
-  _tme_m68k_opcode_root_init_18(opcodes + (366 * 64), params);
+  _tme_m68k_opcode_root_init_26(opcodes + (366 * 64), params);
 
   params[20] = param106;
 
   /* root 374: */
-  _tme_m68k_opcode_root_init_18(opcodes + (374 * 64), params);
+  _tme_m68k_opcode_root_init_26(opcodes + (374 * 64), params);
 
   params[20] = param109;
 
   /* root 382: */
-  _tme_m68k_opcode_root_init_18(opcodes + (382 * 64), params);
-
-  params[0] = TME_M68K_OPCODE_INSN(1);
-
-  /* roots 3, 11, 19, 27, 43, 51, 56, 57, 58, 59, 65, 73, 81, 87, 89, 95, 97, 103, 105, 111, 113, 119, 121, 127, 151, 159, 167, 175, 183, 191, 215, 223, 231, 239, 247, 255, 261, 267, 269, 277, 285, 293, 301, 304, 305, 309, 312, 317, 452, 453, 454, 455, 460, 461, 462, 463, 468, 469, 470, 471, 476, 477, 478, 479, 484, 485, 486, 487, 492, 493, 494, 495, 500, 501, 502, 503, 508, 509, 510, 511: */
-  for (root_i = 0; root_i < 80; root_i++) {
-    _tme_m68k_opcode_root_init_2(opcodes + (root_group3[root_i] * 64), params);
-  }
-
-  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(3) | param77 | param19;
-
-  /* root 517: */
-  _tme_m68k_opcode_root_init_21(opcodes + (517 * 64), params);
-
-  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(5) | param50 | param28;
-
-  /* root 518: */
-  _tme_m68k_opcode_root_init_21(opcodes + (518 * 64), params);
-
-  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(3) | param80 | param19;
-
-  /* root 525: */
-  _tme_m68k_opcode_root_init_21(opcodes + (525 * 64), params);
-
-  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(5) | param54 | param28;
-
-  /* root 526: */
-  _tme_m68k_opcode_root_init_21(opcodes + (526 * 64), params);
-
-  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(3) | param81 | param19;
-
-  /* root 533: */
-  _tme_m68k_opcode_root_init_21(opcodes + (533 * 64), params);
-
-  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(5) | param56 | param28;
-
-  /* root 534: */
-  _tme_m68k_opcode_root_init_21(opcodes + (534 * 64), params);
-
-  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(3) | param82 | param19;
-
-  /* root 541: */
-  _tme_m68k_opcode_root_init_21(opcodes + (541 * 64), params);
-
-  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(5) | param58 | param28;
-
-  /* root 542: */
-  _tme_m68k_opcode_root_init_21(opcodes + (542 * 64), params);
-
-  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(3) | param83 | param19;
-
-  /* root 549: */
-  _tme_m68k_opcode_root_init_21(opcodes + (549 * 64), params);
-
-  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(5) | param60 | param28;
-
-  /* root 550: */
-  _tme_m68k_opcode_root_init_21(opcodes + (550 * 64), params);
-
-  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(3) | param84 | param19;
-
-  /* root 557: */
-  _tme_m68k_opcode_root_init_21(opcodes + (557 * 64), params);
-
-  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(5) | param62 | param28;
-
-  /* root 558: */
-  _tme_m68k_opcode_root_init_21(opcodes + (558 * 64), params);
-
-  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(3) | param85 | param19;
-
-  /* root 565: */
-  _tme_m68k_opcode_root_init_21(opcodes + (565 * 64), params);
-
-  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(5) | param64 | param28;
-
-  /* root 566: */
-  _tme_m68k_opcode_root_init_21(opcodes + (566 * 64), params);
-
-  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(3) | param86 | param19;
-
-  /* root 573: */
-  _tme_m68k_opcode_root_init_21(opcodes + (573 * 64), params);
-
-  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(5) | param66 | param28;
-
-  /* root 574: */
-  _tme_m68k_opcode_root_init_21(opcodes + (574 * 64), params);
-
-
-  /* roots 640, 641, 642, 643, 644, 645, 646, 647, 648, 649, 650, 651, 652, 653, 654, 655, 656, 657, 658, 659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 675, 676, 677, 678, 679, 680, 681, 682, 683, 684, 685, 686, 687, 688, 689, 690, 691, 692, 693, 694, 695, 696, 697, 698, 699, 700, 701, 702, 703: */
-  for (root_i = 0; root_i < 64; root_i++) {
-    _tme_m68k_opcode_root_init_2(opcodes + (root_group4[root_i] * 64), params);
-  }
-
-  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(119) | param92 | param19;
-
-  /* root 899: */
-  _tme_m68k_opcode_root_init_21(opcodes + (899 * 64), params);
-
-  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(131) | param92 | param19;
-
-  /* root 903: */
-  _tme_m68k_opcode_root_init_21(opcodes + (903 * 64), params);
-
-  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(120) | param92 | param19;
-
-  /* root 907: */
-  _tme_m68k_opcode_root_init_21(opcodes + (907 * 64), params);
-
-  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(132) | param92 | param19;
-
-  /* root 911: */
-  _tme_m68k_opcode_root_init_21(opcodes + (911 * 64), params);
-
-  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(121) | param92 | param19;
-
-  /* root 915: */
-  _tme_m68k_opcode_root_init_21(opcodes + (915 * 64), params);
-
-  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(133) | param92 | param19;
-
-  /* root 919: */
-  _tme_m68k_opcode_root_init_21(opcodes + (919 * 64), params);
-
-  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(122) | param92 | param19;
-
-  /* root 923: */
-  _tme_m68k_opcode_root_init_21(opcodes + (923 * 64), params);
-
-  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(134) | param92 | param19;
-
-  /* root 927: */
-  _tme_m68k_opcode_root_init_21(opcodes + (927 * 64), params);
-
-
-  /* roots 931, 935, 939, 943, 947, 951, 955, 959, 960, 961, 962, 963, 964, 965, 966, 967, 968, 969, 970, 971, 972, 973, 974, 975, 976, 977, 978, 979, 980, 981, 982, 983, 984, 985, 986, 987, 988, 989, 990, 991, 992, 993, 994, 995, 996, 997, 998, 999, 1000, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010, 1011, 1012, 1013, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022, 1023: */
-  for (root_i = 0; root_i < 72; root_i++) {
-    _tme_m68k_opcode_root_init_2(opcodes + (root_group5[root_i] * 64), params);
-  }
+  _tme_m68k_opcode_root_init_26(opcodes + (382 * 64), params);
 
   params[0] = param0;
-  params[1] = param30;
   params[2] = param1;
   params[3] = param2;
   params[5] = param3;
   params[8] = param4;
   params[10] = param5;
   params[13] = param6;
-  params[14] = TME_M68K_OPCODE_INSN(87) | param88;
+  params[14] = TME_M68K_OPCODE_INSN(91) | param88;
   params[15] = param7;
   params[18] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | param9;
   params[19] = TME_M68K_OPCODE_INSN(26) | param89;
 
   /* root 320: */
-  _tme_m68k_opcode_root_init_17(opcodes + (320 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (320 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(90) | param88;
+  params[14] = TME_M68K_OPCODE_INSN(94) | param88;
   params[19] = TME_M68K_OPCODE_INSN(23) | param89;
 
   /* root 324: */
-  _tme_m68k_opcode_root_init_17(opcodes + (324 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (324 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(87) | param91;
+  params[14] = TME_M68K_OPCODE_INSN(91) | param91;
   params[19] = TME_M68K_OPCODE_INSN(26) | param92;
 
   /* root 328: */
-  _tme_m68k_opcode_root_init_17(opcodes + (328 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (328 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(90) | param91;
+  params[14] = TME_M68K_OPCODE_INSN(94) | param91;
   params[19] = TME_M68K_OPCODE_INSN(23) | param92;
 
   /* root 332: */
-  _tme_m68k_opcode_root_init_17(opcodes + (332 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (332 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(87) | param94;
+  params[14] = TME_M68K_OPCODE_INSN(91) | param94;
   params[19] = TME_M68K_OPCODE_INSN(26) | param95;
 
   /* root 336: */
-  _tme_m68k_opcode_root_init_17(opcodes + (336 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (336 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(90) | param94;
+  params[14] = TME_M68K_OPCODE_INSN(94) | param94;
   params[19] = TME_M68K_OPCODE_INSN(23) | param95;
 
   /* root 340: */
-  _tme_m68k_opcode_root_init_17(opcodes + (340 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (340 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(87) | param97;
+  params[14] = TME_M68K_OPCODE_INSN(91) | param97;
   params[19] = TME_M68K_OPCODE_INSN(26) | param98;
 
   /* root 344: */
-  _tme_m68k_opcode_root_init_17(opcodes + (344 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (344 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(90) | param97;
+  params[14] = TME_M68K_OPCODE_INSN(94) | param97;
   params[19] = TME_M68K_OPCODE_INSN(23) | param98;
 
   /* root 348: */
-  _tme_m68k_opcode_root_init_17(opcodes + (348 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (348 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(87) | param100;
+  params[14] = TME_M68K_OPCODE_INSN(91) | param100;
   params[19] = TME_M68K_OPCODE_INSN(26) | param101;
 
   /* root 352: */
-  _tme_m68k_opcode_root_init_17(opcodes + (352 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (352 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(90) | param100;
+  params[14] = TME_M68K_OPCODE_INSN(94) | param100;
   params[19] = TME_M68K_OPCODE_INSN(23) | param101;
 
   /* root 356: */
-  _tme_m68k_opcode_root_init_17(opcodes + (356 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (356 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(87) | param103;
+  params[14] = TME_M68K_OPCODE_INSN(91) | param103;
   params[19] = TME_M68K_OPCODE_INSN(26) | param104;
 
   /* root 360: */
-  _tme_m68k_opcode_root_init_17(opcodes + (360 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (360 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(90) | param103;
+  params[14] = TME_M68K_OPCODE_INSN(94) | param103;
   params[19] = TME_M68K_OPCODE_INSN(23) | param104;
 
   /* root 364: */
-  _tme_m68k_opcode_root_init_17(opcodes + (364 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (364 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(87) | param106;
+  params[14] = TME_M68K_OPCODE_INSN(91) | param106;
   params[19] = TME_M68K_OPCODE_INSN(26) | param107;
 
   /* root 368: */
-  _tme_m68k_opcode_root_init_17(opcodes + (368 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (368 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(90) | param106;
+  params[14] = TME_M68K_OPCODE_INSN(94) | param106;
   params[19] = TME_M68K_OPCODE_INSN(23) | param107;
 
   /* root 372: */
-  _tme_m68k_opcode_root_init_17(opcodes + (372 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (372 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(87) | param109;
+  params[14] = TME_M68K_OPCODE_INSN(91) | param109;
   params[19] = TME_M68K_OPCODE_INSN(26) | param110;
 
   /* root 376: */
-  _tme_m68k_opcode_root_init_17(opcodes + (376 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (376 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(90) | param109;
+  params[14] = TME_M68K_OPCODE_INSN(94) | param109;
   params[19] = TME_M68K_OPCODE_INSN(23) | param110;
 
   /* root 380: */
-  _tme_m68k_opcode_root_init_17(opcodes + (380 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (380 * 64), params);
 
   params[1] = param81;
   params[4] = param85;
@@ -4509,13 +5085,13 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   params[9] = param86;
   params[11] = param83;
   params[12] = param80;
-  params[14] = TME_M68K_OPCODE_IMM_16 | TME_M68K_OPCODE_INSN(89) | param76;
+  params[14] = TME_M68K_OPCODE_IMM_16 | TME_M68K_OPCODE_INSN(93) | param76;
   params[16] = param84;
-  params[19] = TME_M68K_OPCODE_INSN(88);
+  params[19] = TME_M68K_OPCODE_INSN(92);
 
   /* roots 323, 327, 331, 335, 339, 343, 347, 351, 355, 359, 363, 367, 371, 375, 379, 383: */
   for (root_i = 0; root_i < 16; root_i++) {
-    _tme_m68k_opcode_root_init_17(opcodes + (root_group6[root_i] * 64), params);
+    _tme_m68k_opcode_root_init_25(opcodes + (root_group3[root_i] * 64), params);
   }
 
   params[0] = param10;
@@ -4532,604 +5108,778 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   params[11] = param35;
   params[12] = param36;
   params[13] = param16;
-  params[14] = TME_M68K_OPCODE_INSN(87) | param88;
+  params[14] = TME_M68K_OPCODE_INSN(91) | param88;
   params[15] = param17;
   params[16] = param37;
   params[18] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | param19;
   params[19] = TME_M68K_OPCODE_INSN(27) | param90;
 
   /* root 321: */
-  _tme_m68k_opcode_root_init_17(opcodes + (321 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (321 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(90) | param88;
+  params[14] = TME_M68K_OPCODE_INSN(94) | param88;
   params[19] = TME_M68K_OPCODE_INSN(24) | param90;
 
   /* root 325: */
-  _tme_m68k_opcode_root_init_17(opcodes + (325 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (325 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(87) | param91;
+  params[14] = TME_M68K_OPCODE_INSN(91) | param91;
   params[19] = TME_M68K_OPCODE_INSN(27) | param93;
 
   /* root 329: */
-  _tme_m68k_opcode_root_init_17(opcodes + (329 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (329 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(90) | param91;
+  params[14] = TME_M68K_OPCODE_INSN(94) | param91;
   params[19] = TME_M68K_OPCODE_INSN(24) | param93;
 
   /* root 333: */
-  _tme_m68k_opcode_root_init_17(opcodes + (333 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (333 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(87) | param94;
+  params[14] = TME_M68K_OPCODE_INSN(91) | param94;
   params[19] = TME_M68K_OPCODE_INSN(27) | param96;
 
   /* root 337: */
-  _tme_m68k_opcode_root_init_17(opcodes + (337 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (337 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(90) | param94;
+  params[14] = TME_M68K_OPCODE_INSN(94) | param94;
   params[19] = TME_M68K_OPCODE_INSN(24) | param96;
 
   /* root 341: */
-  _tme_m68k_opcode_root_init_17(opcodes + (341 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (341 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(87) | param97;
+  params[14] = TME_M68K_OPCODE_INSN(91) | param97;
   params[19] = TME_M68K_OPCODE_INSN(27) | param99;
 
   /* root 345: */
-  _tme_m68k_opcode_root_init_17(opcodes + (345 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (345 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(90) | param97;
+  params[14] = TME_M68K_OPCODE_INSN(94) | param97;
   params[19] = TME_M68K_OPCODE_INSN(24) | param99;
 
   /* root 349: */
-  _tme_m68k_opcode_root_init_17(opcodes + (349 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (349 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(87) | param100;
+  params[14] = TME_M68K_OPCODE_INSN(91) | param100;
   params[19] = TME_M68K_OPCODE_INSN(27) | param102;
 
   /* root 353: */
-  _tme_m68k_opcode_root_init_17(opcodes + (353 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (353 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(90) | param100;
+  params[14] = TME_M68K_OPCODE_INSN(94) | param100;
   params[19] = TME_M68K_OPCODE_INSN(24) | param102;
 
   /* root 357: */
-  _tme_m68k_opcode_root_init_17(opcodes + (357 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (357 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(87) | param103;
+  params[14] = TME_M68K_OPCODE_INSN(91) | param103;
   params[19] = TME_M68K_OPCODE_INSN(27) | param105;
 
   /* root 361: */
-  _tme_m68k_opcode_root_init_17(opcodes + (361 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (361 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(90) | param103;
+  params[14] = TME_M68K_OPCODE_INSN(94) | param103;
   params[19] = TME_M68K_OPCODE_INSN(24) | param105;
 
   /* root 365: */
-  _tme_m68k_opcode_root_init_17(opcodes + (365 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (365 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(87) | param106;
+  params[14] = TME_M68K_OPCODE_INSN(91) | param106;
   params[19] = TME_M68K_OPCODE_INSN(27) | param108;
 
   /* root 369: */
-  _tme_m68k_opcode_root_init_17(opcodes + (369 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (369 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(90) | param106;
+  params[14] = TME_M68K_OPCODE_INSN(94) | param106;
   params[19] = TME_M68K_OPCODE_INSN(24) | param108;
 
   /* root 373: */
-  _tme_m68k_opcode_root_init_17(opcodes + (373 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (373 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(87) | param109;
+  params[14] = TME_M68K_OPCODE_INSN(91) | param109;
   params[19] = TME_M68K_OPCODE_INSN(27) | param111;
 
   /* root 377: */
-  _tme_m68k_opcode_root_init_17(opcodes + (377 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (377 * 64), params);
 
-  params[14] = TME_M68K_OPCODE_INSN(90) | param109;
+  params[14] = TME_M68K_OPCODE_INSN(94) | param109;
   params[19] = TME_M68K_OPCODE_INSN(24) | param111;
 
   /* root 381: */
-  _tme_m68k_opcode_root_init_17(opcodes + (381 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (381 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(48) | param51 | param87;
+  params[0] = param20;
+  params[2] = param21;
+  params[3] = param22;
+  params[4] = TME_M68K_OPCODE_INSN(40) | param31;
+  params[5] = param23;
+  params[8] = param24;
+  params[10] = param25;
+  params[13] = param26;
+  params[14] = param27;
+  params[15] = param37;
+  params[16] = TME_M68K_OPCODE_EA_READ | param52 | param28 | TME_M68K_OPCODE_SPECOP;
+  params[17] = TME_M68K_OPCODE_IMM_32 | param49;
+  params[18] = TME_M68K_OPCODE_EA_WRITE | param53;
+  params[19] = TME_M68K_OPCODE_INSN(1);
+  params[20] = TME_M68K_OPCODE_INSN(38);
+
+  /* root 179: */
+  _tme_m68k_opcode_root_init_17(opcodes + (179 * 64), params);
+
+  params[4] = TME_M68K_OPCODE_INSN(41) | param31;
+
+  /* root 180: */
+  _tme_m68k_opcode_root_init_17(opcodes + (180 * 64), params);
+
+  params[4] = param31;
+  params[9] = TME_M68K_OPCODE_INSN(40) | param34;
+
+  /* root 187: */
+  _tme_m68k_opcode_root_init_18(opcodes + (187 * 64), params);
+
+  params[9] = TME_M68K_OPCODE_INSN(41) | param34;
+
+  /* root 188: */
+  _tme_m68k_opcode_root_init_18(opcodes + (188 * 64), params);
+
+  params[0] = TME_M68K_OPCODE_INSN(1);
+
+  /* roots 3, 11, 19, 27, 43, 51, 56, 57, 58, 59, 65, 73, 81, 87, 89, 95, 97, 103, 105, 111, 113, 119, 121, 127, 151, 159, 167, 175, 183, 191, 215, 223, 231, 239, 247, 255, 261, 267, 269, 277, 285, 293, 301, 304, 305, 309, 312, 317, 452, 453, 454, 455, 460, 461, 462, 463, 468, 469, 470, 471, 476, 477, 478, 479, 484, 485, 486, 487, 492, 493, 494, 495, 500, 501, 502, 503, 508, 509, 510, 511: */
+  for (root_i = 0; root_i < 80; root_i++) {
+    _tme_m68k_opcode_root_init_2(opcodes + (root_group4[root_i] * 64), params);
+  }
+
+  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(3) | param77 | param19;
+
+  /* root 517: */
+  _tme_m68k_opcode_root_init_29(opcodes + (517 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(5) | param50 | param28;
+
+  /* root 518: */
+  _tme_m68k_opcode_root_init_29(opcodes + (518 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(3) | param80 | param19;
+
+  /* root 525: */
+  _tme_m68k_opcode_root_init_29(opcodes + (525 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(5) | param54 | param28;
+
+  /* root 526: */
+  _tme_m68k_opcode_root_init_29(opcodes + (526 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(3) | param81 | param19;
+
+  /* root 533: */
+  _tme_m68k_opcode_root_init_29(opcodes + (533 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(5) | param56 | param28;
+
+  /* root 534: */
+  _tme_m68k_opcode_root_init_29(opcodes + (534 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(3) | param82 | param19;
+
+  /* root 541: */
+  _tme_m68k_opcode_root_init_29(opcodes + (541 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(5) | param58 | param28;
+
+  /* root 542: */
+  _tme_m68k_opcode_root_init_29(opcodes + (542 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(3) | param83 | param19;
+
+  /* root 549: */
+  _tme_m68k_opcode_root_init_29(opcodes + (549 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(5) | param60 | param28;
+
+  /* root 550: */
+  _tme_m68k_opcode_root_init_29(opcodes + (550 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(3) | param84 | param19;
+
+  /* root 557: */
+  _tme_m68k_opcode_root_init_29(opcodes + (557 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(5) | param62 | param28;
+
+  /* root 558: */
+  _tme_m68k_opcode_root_init_29(opcodes + (558 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(3) | param85 | param19;
+
+  /* root 565: */
+  _tme_m68k_opcode_root_init_29(opcodes + (565 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(5) | param64 | param28;
+
+  /* root 566: */
+  _tme_m68k_opcode_root_init_29(opcodes + (566 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(3) | param86 | param19;
+
+  /* root 573: */
+  _tme_m68k_opcode_root_init_29(opcodes + (573 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(5) | param66 | param28;
+
+  /* root 574: */
+  _tme_m68k_opcode_root_init_29(opcodes + (574 * 64), params);
+
+
+  /* roots 640, 641, 642, 643, 644, 645, 646, 647, 648, 649, 650, 651, 652, 653, 654, 655, 656, 657, 658, 659, 660, 661, 662, 663, 664, 665, 666, 667, 668, 669, 670, 671, 672, 673, 674, 675, 676, 677, 678, 679, 680, 681, 682, 683, 684, 685, 686, 687, 688, 689, 690, 691, 692, 693, 694, 695, 696, 697, 698, 699, 700, 701, 702, 703: */
+  for (root_i = 0; root_i < 64; root_i++) {
+    _tme_m68k_opcode_root_init_2(opcodes + (root_group5[root_i] * 64), params);
+  }
+
+  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(123) | param92 | param19;
+
+  /* root 899: */
+  _tme_m68k_opcode_root_init_29(opcodes + (899 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(135) | param92 | param19;
+
+  /* root 903: */
+  _tme_m68k_opcode_root_init_29(opcodes + (903 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(124) | param92 | param19;
+
+  /* root 907: */
+  _tme_m68k_opcode_root_init_29(opcodes + (907 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(136) | param92 | param19;
+
+  /* root 911: */
+  _tme_m68k_opcode_root_init_29(opcodes + (911 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(125) | param92 | param19;
+
+  /* root 915: */
+  _tme_m68k_opcode_root_init_29(opcodes + (915 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(137) | param92 | param19;
+
+  /* root 919: */
+  _tme_m68k_opcode_root_init_29(opcodes + (919 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(126) | param92 | param19;
+
+  /* root 923: */
+  _tme_m68k_opcode_root_init_29(opcodes + (923 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(138) | param92 | param19;
+
+  /* root 927: */
+  _tme_m68k_opcode_root_init_29(opcodes + (927 * 64), params);
+
+
+  /* roots 931, 935, 939, 943, 947, 951, 955, 959, 960, 961, 962, 963, 964, 965, 966, 967, 968, 969, 970, 971, 972, 973, 974, 975, 976, 977, 978, 979, 980, 981, 982, 983, 984, 985, 986, 987, 988, 989, 990, 991, 992, 993, 994, 995, 996, 997, 998, 999, 1000, 1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010, 1011, 1012, 1013, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022, 1023: */
+  for (root_i = 0; root_i < 72; root_i++) {
+    _tme_m68k_opcode_root_init_2(opcodes + (root_group6[root_i] * 64), params);
+  }
+
+  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(52) | param51 | param87;
   params[1] = TME_M68K_OPCODE_INSN(1);
 
   /* root 263: */
-  _tme_m68k_opcode_root_init_11(opcodes + (263 * 64), params);
+  _tme_m68k_opcode_root_init_19(opcodes + (263 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(48) | param55 | param87;
+  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(52) | param55 | param87;
 
   /* root 271: */
-  _tme_m68k_opcode_root_init_11(opcodes + (271 * 64), params);
+  _tme_m68k_opcode_root_init_19(opcodes + (271 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(48) | param57 | param87;
+  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(52) | param57 | param87;
 
   /* root 279: */
-  _tme_m68k_opcode_root_init_11(opcodes + (279 * 64), params);
+  _tme_m68k_opcode_root_init_19(opcodes + (279 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(48) | param59 | param87;
+  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(52) | param59 | param87;
 
   /* root 287: */
-  _tme_m68k_opcode_root_init_11(opcodes + (287 * 64), params);
+  _tme_m68k_opcode_root_init_19(opcodes + (287 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(48) | param61 | param87;
+  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(52) | param61 | param87;
 
   /* root 295: */
-  _tme_m68k_opcode_root_init_11(opcodes + (295 * 64), params);
+  _tme_m68k_opcode_root_init_19(opcodes + (295 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(48) | param63 | param87;
+  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(52) | param63 | param87;
 
   /* root 303: */
-  _tme_m68k_opcode_root_init_11(opcodes + (303 * 64), params);
+  _tme_m68k_opcode_root_init_19(opcodes + (303 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(72) | param87 | TME_M68K_OPCODE_SPECOP;
+  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(76) | param87 | TME_M68K_OPCODE_SPECOP;
 
   /* root 306: */
-  _tme_m68k_opcode_root_init_15(opcodes + (306 * 64), params);
+  _tme_m68k_opcode_root_init_23(opcodes + (306 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(73) | param87 | TME_M68K_OPCODE_SPECOP;
+  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(77) | param87 | TME_M68K_OPCODE_SPECOP;
 
   /* root 307: */
-  _tme_m68k_opcode_root_init_15(opcodes + (307 * 64), params);
+  _tme_m68k_opcode_root_init_23(opcodes + (307 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(48) | param65 | param87;
+  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(52) | param65 | param87;
 
   /* root 311: */
-  _tme_m68k_opcode_root_init_11(opcodes + (311 * 64), params);
+  _tme_m68k_opcode_root_init_19(opcodes + (311 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(85) | param87;
+  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(89) | param87;
 
   /* root 314: */
-  _tme_m68k_opcode_root_init_11(opcodes + (314 * 64), params);
+  _tme_m68k_opcode_root_init_19(opcodes + (314 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(86) | param87;
+  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(90) | param87;
 
   /* root 315: */
-  _tme_m68k_opcode_root_init_11(opcodes + (315 * 64), params);
+  _tme_m68k_opcode_root_init_19(opcodes + (315 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(48) | param67 | param87;
+  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(52) | param67 | param87;
 
   /* root 319: */
-  _tme_m68k_opcode_root_init_11(opcodes + (319 * 64), params);
+  _tme_m68k_opcode_root_init_19(opcodes + (319 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_INSN(97);
+  params[0] = TME_M68K_OPCODE_INSN(101);
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(0) | param39 | param9;
 
   /* root 516: */
-  _tme_m68k_opcode_root_init_20(opcodes + (516 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (516 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(0) | param40 | param9;
 
   /* root 524: */
-  _tme_m68k_opcode_root_init_20(opcodes + (524 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (524 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(0) | param41 | param9;
 
   /* root 532: */
-  _tme_m68k_opcode_root_init_20(opcodes + (532 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (532 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(0) | param42 | param9;
 
   /* root 540: */
-  _tme_m68k_opcode_root_init_20(opcodes + (540 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (540 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(0) | param43 | param9;
 
   /* root 548: */
-  _tme_m68k_opcode_root_init_20(opcodes + (548 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (548 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(0) | param44 | param9;
 
   /* root 556: */
-  _tme_m68k_opcode_root_init_20(opcodes + (556 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (556 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(0) | param45 | param9;
 
   /* root 564: */
-  _tme_m68k_opcode_root_init_20(opcodes + (564 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (564 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(0) | param46 | param9;
 
   /* root 572: */
-  _tme_m68k_opcode_root_init_20(opcodes + (572 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (572 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_INSN(100);
+  params[0] = TME_M68K_OPCODE_INSN(104);
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(23) | param39 | param9;
 
   /* root 580: */
-  _tme_m68k_opcode_root_init_20(opcodes + (580 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (580 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(23) | param40 | param9;
 
   /* root 588: */
-  _tme_m68k_opcode_root_init_20(opcodes + (588 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (588 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(23) | param41 | param9;
 
   /* root 596: */
-  _tme_m68k_opcode_root_init_20(opcodes + (596 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (596 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(23) | param42 | param9;
 
   /* root 604: */
-  _tme_m68k_opcode_root_init_20(opcodes + (604 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (604 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(23) | param43 | param9;
 
   /* root 612: */
-  _tme_m68k_opcode_root_init_20(opcodes + (612 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (612 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(23) | param44 | param9;
 
   /* root 620: */
-  _tme_m68k_opcode_root_init_20(opcodes + (620 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (620 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(23) | param45 | param9;
 
   /* root 628: */
-  _tme_m68k_opcode_root_init_20(opcodes + (628 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (628 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(23) | param46 | param9;
 
   /* root 636: */
-  _tme_m68k_opcode_root_init_20(opcodes + (636 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (636 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_INSN(101);
+  params[0] = TME_M68K_OPCODE_INSN(105);
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(24) | param77 | param19;
 
   /* root 581: */
-  _tme_m68k_opcode_root_init_20(opcodes + (581 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (581 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(24) | param80 | param19;
 
   /* root 589: */
-  _tme_m68k_opcode_root_init_20(opcodes + (589 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (589 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(24) | param81 | param19;
 
   /* root 597: */
-  _tme_m68k_opcode_root_init_20(opcodes + (597 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (597 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(24) | param82 | param19;
 
   /* root 605: */
-  _tme_m68k_opcode_root_init_20(opcodes + (605 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (605 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(24) | param83 | param19;
 
   /* root 613: */
-  _tme_m68k_opcode_root_init_20(opcodes + (613 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (613 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(24) | param84 | param19;
 
   /* root 621: */
-  _tme_m68k_opcode_root_init_20(opcodes + (621 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (621 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(24) | param85 | param19;
 
   /* root 629: */
-  _tme_m68k_opcode_root_init_20(opcodes + (629 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (629 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(24) | param86 | param19;
 
   /* root 637: */
-  _tme_m68k_opcode_root_init_20(opcodes + (637 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (637 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_INSN(102);
+  params[0] = TME_M68K_OPCODE_INSN(106);
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(25) | param50 | param28;
 
   /* root 582: */
-  _tme_m68k_opcode_root_init_20(opcodes + (582 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (582 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(25) | param54 | param28;
 
   /* root 590: */
-  _tme_m68k_opcode_root_init_20(opcodes + (590 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (590 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(25) | param56 | param28;
 
   /* root 598: */
-  _tme_m68k_opcode_root_init_20(opcodes + (598 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (598 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(25) | param58 | param28;
 
   /* root 606: */
-  _tme_m68k_opcode_root_init_20(opcodes + (606 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (606 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(25) | param60 | param28;
 
   /* root 614: */
-  _tme_m68k_opcode_root_init_20(opcodes + (614 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (614 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(25) | param62 | param28;
 
   /* root 622: */
-  _tme_m68k_opcode_root_init_20(opcodes + (622 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (622 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(25) | param64 | param28;
 
   /* root 630: */
-  _tme_m68k_opcode_root_init_20(opcodes + (630 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (630 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(25) | param66 | param28;
 
   /* root 638: */
-  _tme_m68k_opcode_root_init_20(opcodes + (638 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (638 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_INSN(108);
+  params[0] = TME_M68K_OPCODE_INSN(112);
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(18) | param39 | param9;
 
   /* root 772: */
-  _tme_m68k_opcode_root_init_20(opcodes + (772 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (772 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(18) | param40 | param9;
 
   /* root 780: */
-  _tme_m68k_opcode_root_init_20(opcodes + (780 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (780 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(18) | param41 | param9;
 
   /* root 788: */
-  _tme_m68k_opcode_root_init_20(opcodes + (788 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (788 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(18) | param42 | param9;
 
   /* root 796: */
-  _tme_m68k_opcode_root_init_20(opcodes + (796 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (796 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(18) | param43 | param9;
 
   /* root 804: */
-  _tme_m68k_opcode_root_init_20(opcodes + (804 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (804 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(18) | param44 | param9;
 
   /* root 812: */
-  _tme_m68k_opcode_root_init_20(opcodes + (812 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (812 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(18) | param45 | param9;
 
   /* root 820: */
-  _tme_m68k_opcode_root_init_20(opcodes + (820 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (820 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(18) | param46 | param9;
 
   /* root 828: */
-  _tme_m68k_opcode_root_init_20(opcodes + (828 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (828 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_INSN(112);
+  params[0] = TME_M68K_OPCODE_INSN(116);
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(26) | param39 | param9;
 
   /* root 836: */
-  _tme_m68k_opcode_root_init_20(opcodes + (836 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (836 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(26) | param40 | param9;
 
   /* root 844: */
-  _tme_m68k_opcode_root_init_20(opcodes + (844 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (844 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(26) | param41 | param9;
 
   /* root 852: */
-  _tme_m68k_opcode_root_init_20(opcodes + (852 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (852 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(26) | param42 | param9;
 
   /* root 860: */
-  _tme_m68k_opcode_root_init_20(opcodes + (860 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (860 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(26) | param43 | param9;
 
   /* root 868: */
-  _tme_m68k_opcode_root_init_20(opcodes + (868 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (868 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(26) | param44 | param9;
 
   /* root 876: */
-  _tme_m68k_opcode_root_init_20(opcodes + (876 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (876 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(26) | param45 | param9;
 
   /* root 884: */
-  _tme_m68k_opcode_root_init_20(opcodes + (884 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (884 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(26) | param46 | param9;
 
   /* root 892: */
-  _tme_m68k_opcode_root_init_20(opcodes + (892 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (892 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_INSN(113);
+  params[0] = TME_M68K_OPCODE_INSN(117);
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(27) | param77 | param19;
 
   /* root 837: */
-  _tme_m68k_opcode_root_init_20(opcodes + (837 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (837 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(27) | param80 | param19;
 
   /* root 845: */
-  _tme_m68k_opcode_root_init_20(opcodes + (845 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (845 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(27) | param81 | param19;
 
   /* root 853: */
-  _tme_m68k_opcode_root_init_20(opcodes + (853 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (853 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(27) | param82 | param19;
 
   /* root 861: */
-  _tme_m68k_opcode_root_init_20(opcodes + (861 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (861 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(27) | param83 | param19;
 
   /* root 869: */
-  _tme_m68k_opcode_root_init_20(opcodes + (869 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (869 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(27) | param84 | param19;
 
   /* root 877: */
-  _tme_m68k_opcode_root_init_20(opcodes + (877 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (877 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(27) | param85 | param19;
 
   /* root 885: */
-  _tme_m68k_opcode_root_init_20(opcodes + (885 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (885 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(27) | param86 | param19;
 
   /* root 893: */
-  _tme_m68k_opcode_root_init_20(opcodes + (893 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (893 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_INSN(114);
+  params[0] = TME_M68K_OPCODE_INSN(118);
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(28) | param50 | param28;
 
   /* root 838: */
-  _tme_m68k_opcode_root_init_20(opcodes + (838 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (838 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(28) | param54 | param28;
 
   /* root 846: */
-  _tme_m68k_opcode_root_init_20(opcodes + (846 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (846 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(28) | param56 | param28;
 
   /* root 854: */
-  _tme_m68k_opcode_root_init_20(opcodes + (854 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (854 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(28) | param58 | param28;
 
   /* root 862: */
-  _tme_m68k_opcode_root_init_20(opcodes + (862 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (862 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(28) | param60 | param28;
 
   /* root 870: */
-  _tme_m68k_opcode_root_init_20(opcodes + (870 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (870 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(28) | param62 | param28;
 
   /* root 878: */
-  _tme_m68k_opcode_root_init_20(opcodes + (878 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (878 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(28) | param64 | param28;
 
   /* root 886: */
-  _tme_m68k_opcode_root_init_20(opcodes + (886 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (886 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(28) | param66 | param28;
 
   /* root 894: */
-  _tme_m68k_opcode_root_init_20(opcodes + (894 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (894 * 64), params);
 
   params[0] = param65;
   params[1] = param59;
-  params[2] = TME_M68K_OPCODE_IMM_16 | TME_M68K_OPCODE_INSN(75) | param29;
+  params[2] = TME_M68K_OPCODE_IMM_16 | TME_M68K_OPCODE_INSN(79) | param29;
   params[3] = param51;
   params[4] = param67;
   params[5] = param61;
   params[6] = param55;
-  params[7] = TME_M68K_OPCODE_INSN(76);
+  params[7] = TME_M68K_OPCODE_INSN(80);
   params[8] = param63;
-  params[9] = TME_M68K_OPCODE_INSN(74);
+  params[9] = TME_M68K_OPCODE_INSN(78);
   params[10] = param57;
   params[11] = param30;
-  params[12] = TME_M68K_OPCODE_INSN(79);
+  params[12] = TME_M68K_OPCODE_INSN(83);
   params[13] = param31;
   params[14] = param32;
-  params[15] = TME_M68K_OPCODE_INSN(82);
+  params[15] = TME_M68K_OPCODE_INSN(86);
   params[16] = param33;
-  params[17] = TME_M68K_OPCODE_INSN(80) | TME_M68K_OPCODE_SPECOP;
+  params[17] = TME_M68K_OPCODE_INSN(84) | TME_M68K_OPCODE_SPECOP;
   params[18] = param34;
   params[19] = param35;
-  params[20] = TME_M68K_OPCODE_INSN(83);
+  params[20] = TME_M68K_OPCODE_INSN(87);
   params[21] = TME_M68K_OPCODE_INSN(1);
   params[22] = param36;
-  params[23] = TME_M68K_OPCODE_INSN(81);
-  params[24] = TME_M68K_OPCODE_INSN(77);
-  params[25] = TME_M68K_OPCODE_INSN(78);
+  params[23] = TME_M68K_OPCODE_INSN(85);
+  params[24] = TME_M68K_OPCODE_INSN(81);
+  params[25] = TME_M68K_OPCODE_INSN(82);
   params[26] = param37;
-  params[27] = TME_M68K_OPCODE_INSN(84);
+  params[27] = TME_M68K_OPCODE_INSN(88);
 
   /* root 313: */
-  _tme_m68k_opcode_root_init_16(opcodes + (313 * 64), params);
+  _tme_m68k_opcode_root_init_24(opcodes + (313 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_IMM_16 | TME_M68K_OPCODE_INSN(91) | param29;
-  params[1] = TME_M68K_OPCODE_INSN(92);
+  params[0] = TME_M68K_OPCODE_IMM_16 | TME_M68K_OPCODE_INSN(95) | param29;
+  params[1] = TME_M68K_OPCODE_INSN(96);
 
   /* roots 384, 392, 396, 400, 404, 408, 412, 416, 420, 424, 428, 432, 436, 440, 444: */
   for (root_i = 0; root_i < 15; root_i++) {
-    _tme_m68k_opcode_root_init_19(opcodes + (root_group7[root_i] * 64), params);
+    _tme_m68k_opcode_root_init_27(opcodes + (root_group7[root_i] * 64), params);
   }
 
-  params[0] = TME_M68K_OPCODE_INSN(92);
+  params[0] = TME_M68K_OPCODE_INSN(96);
 
   /* roots 385, 386, 387, 393, 394, 395, 397, 398, 399, 401, 402, 403, 405, 406, 407, 409, 410, 411, 413, 414, 415, 417, 418, 419, 421, 422, 423, 425, 426, 427, 429, 430, 431, 433, 434, 435, 437, 438, 439, 441, 442, 443, 445, 446, 447: */
   for (root_i = 0; root_i < 45; root_i++) {
     _tme_m68k_opcode_root_init_2(opcodes + (root_group8[root_i] * 64), params);
   }
 
-  params[0] = TME_M68K_OPCODE_IMM_16 | TME_M68K_OPCODE_INSN(93) | param29;
-  params[1] = TME_M68K_OPCODE_INSN(94);
+  params[0] = TME_M68K_OPCODE_IMM_16 | TME_M68K_OPCODE_INSN(97) | param29;
+  params[1] = TME_M68K_OPCODE_INSN(98);
 
   /* root 388: */
-  _tme_m68k_opcode_root_init_19(opcodes + (388 * 64), params);
+  _tme_m68k_opcode_root_init_27(opcodes + (388 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_INSN(94);
+  params[0] = TME_M68K_OPCODE_INSN(98);
 
   /* roots 389, 390, 391: */
   for (root_i = 0; root_i < 3; root_i++) {
     _tme_m68k_opcode_root_init_2(opcodes + (root_group9[root_i] * 64), params);
   }
 
-  params[0] = TME_M68K_OPCODE_INSN(95) | param20;
+  params[0] = TME_M68K_OPCODE_INSN(99) | param20;
 
   /* roots 448, 449, 450, 451: */
   for (root_i = 0; root_i < 4; root_i++) {
     _tme_m68k_opcode_root_init_2(opcodes + (root_group10[root_i] * 64), params);
   }
 
-  params[0] = TME_M68K_OPCODE_INSN(95) | param23;
+  params[0] = TME_M68K_OPCODE_INSN(99) | param23;
 
   /* roots 456, 457, 458, 459: */
   for (root_i = 0; root_i < 4; root_i++) {
     _tme_m68k_opcode_root_init_2(opcodes + (root_group11[root_i] * 64), params);
   }
 
-  params[0] = TME_M68K_OPCODE_INSN(95) | param25;
+  params[0] = TME_M68K_OPCODE_INSN(99) | param25;
 
   /* roots 464, 465, 466, 467: */
   for (root_i = 0; root_i < 4; root_i++) {
     _tme_m68k_opcode_root_init_2(opcodes + (root_group12[root_i] * 64), params);
   }
 
-  params[0] = TME_M68K_OPCODE_INSN(95) | param27;
+  params[0] = TME_M68K_OPCODE_INSN(99) | param27;
 
   /* roots 472, 473, 474, 475: */
   for (root_i = 0; root_i < 4; root_i++) {
     _tme_m68k_opcode_root_init_2(opcodes + (root_group13[root_i] * 64), params);
   }
 
-  params[0] = TME_M68K_OPCODE_INSN(95) | param22;
+  params[0] = TME_M68K_OPCODE_INSN(99) | param22;
 
   /* roots 480, 481, 482, 483: */
   for (root_i = 0; root_i < 4; root_i++) {
     _tme_m68k_opcode_root_init_2(opcodes + (root_group14[root_i] * 64), params);
   }
 
-  params[0] = TME_M68K_OPCODE_INSN(95) | param24;
+  params[0] = TME_M68K_OPCODE_INSN(99) | param24;
 
   /* roots 488, 489, 490, 491: */
   for (root_i = 0; root_i < 4; root_i++) {
     _tme_m68k_opcode_root_init_2(opcodes + (root_group15[root_i] * 64), params);
   }
 
-  params[0] = TME_M68K_OPCODE_INSN(95) | param26;
+  params[0] = TME_M68K_OPCODE_INSN(99) | param26;
 
   /* roots 496, 497, 498, 499: */
   for (root_i = 0; root_i < 4; root_i++) {
     _tme_m68k_opcode_root_init_2(opcodes + (root_group16[root_i] * 64), params);
   }
 
-  params[0] = TME_M68K_OPCODE_INSN(95) | param21;
+  params[0] = TME_M68K_OPCODE_INSN(99) | param21;
 
   /* roots 504, 505, 506, 507: */
   for (root_i = 0; root_i < 4; root_i++) {
@@ -5139,174 +5889,62 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   params[0] = param89;
   params[1] = param6;
   params[2] = param7;
-  params[3] = TME_M68K_OPCODE_INSN(117);
+  params[3] = TME_M68K_OPCODE_INSN(121);
   params[4] = param0;
   params[5] = param1;
-  params[6] = TME_M68K_OPCODE_INSN(115);
+  params[6] = TME_M68K_OPCODE_INSN(119);
   params[7] = param2;
   params[8] = param3;
-  params[9] = TME_M68K_OPCODE_INSN(118);
+  params[9] = TME_M68K_OPCODE_INSN(122);
   params[10] = param39;
   params[11] = param4;
-  params[12] = TME_M68K_OPCODE_INSN(116);
+  params[12] = TME_M68K_OPCODE_INSN(120);
   params[13] = param5;
 
   /* root 896: */
-  _tme_m68k_opcode_root_init_25(opcodes + (896 * 64), params);
+  _tme_m68k_opcode_root_init_33(opcodes + (896 * 64), params);
 
   params[0] = param92;
   params[10] = param40;
 
   /* root 904: */
-  _tme_m68k_opcode_root_init_25(opcodes + (904 * 64), params);
+  _tme_m68k_opcode_root_init_33(opcodes + (904 * 64), params);
 
   params[0] = param95;
   params[10] = param41;
 
   /* root 912: */
-  _tme_m68k_opcode_root_init_25(opcodes + (912 * 64), params);
+  _tme_m68k_opcode_root_init_33(opcodes + (912 * 64), params);
 
   params[0] = param98;
   params[10] = param42;
 
   /* root 920: */
-  _tme_m68k_opcode_root_init_25(opcodes + (920 * 64), params);
+  _tme_m68k_opcode_root_init_33(opcodes + (920 * 64), params);
 
   params[0] = param101;
   params[10] = param43;
 
   /* root 928: */
-  _tme_m68k_opcode_root_init_25(opcodes + (928 * 64), params);
+  _tme_m68k_opcode_root_init_33(opcodes + (928 * 64), params);
 
   params[0] = param104;
   params[10] = param44;
 
   /* root 936: */
-  _tme_m68k_opcode_root_init_25(opcodes + (936 * 64), params);
+  _tme_m68k_opcode_root_init_33(opcodes + (936 * 64), params);
 
   params[0] = param107;
   params[10] = param45;
 
   /* root 944: */
-  _tme_m68k_opcode_root_init_25(opcodes + (944 * 64), params);
+  _tme_m68k_opcode_root_init_33(opcodes + (944 * 64), params);
 
   params[0] = param110;
   params[10] = param46;
 
   /* root 952: */
-  _tme_m68k_opcode_root_init_25(opcodes + (952 * 64), params);
-
-  params[0] = param89;
-  params[3] = TME_M68K_OPCODE_INSN(129);
-  params[6] = TME_M68K_OPCODE_INSN(127);
-  params[9] = TME_M68K_OPCODE_INSN(130);
-  params[10] = param39;
-  params[12] = TME_M68K_OPCODE_INSN(128);
-
-  /* root 900: */
-  _tme_m68k_opcode_root_init_25(opcodes + (900 * 64), params);
-
-  params[0] = param92;
-  params[10] = param40;
-
-  /* root 908: */
-  _tme_m68k_opcode_root_init_25(opcodes + (908 * 64), params);
-
-  params[0] = param95;
-  params[10] = param41;
-
-  /* root 916: */
-  _tme_m68k_opcode_root_init_25(opcodes + (916 * 64), params);
-
-  params[0] = param98;
-  params[10] = param42;
-
-  /* root 924: */
-  _tme_m68k_opcode_root_init_25(opcodes + (924 * 64), params);
-
-  params[0] = param101;
-  params[10] = param43;
-
-  /* root 932: */
-  _tme_m68k_opcode_root_init_25(opcodes + (932 * 64), params);
-
-  params[0] = param104;
-  params[10] = param44;
-
-  /* root 940: */
-  _tme_m68k_opcode_root_init_25(opcodes + (940 * 64), params);
-
-  params[0] = param107;
-  params[10] = param45;
-
-  /* root 948: */
-  _tme_m68k_opcode_root_init_25(opcodes + (948 * 64), params);
-
-  params[0] = param110;
-  params[10] = param46;
-
-  /* root 956: */
-  _tme_m68k_opcode_root_init_25(opcodes + (956 * 64), params);
-
-  params[0] = param89;
-  params[1] = param16;
-  params[2] = param17;
-  params[3] = TME_M68K_OPCODE_INSN(121);
-  params[4] = param10;
-  params[5] = param11;
-  params[6] = TME_M68K_OPCODE_INSN(119);
-  params[7] = param12;
-  params[8] = param13;
-  params[9] = TME_M68K_OPCODE_INSN(122);
-  params[10] = param39;
-  params[11] = param14;
-  params[12] = TME_M68K_OPCODE_INSN(120);
-  params[13] = param15;
-
-  /* root 897: */
-  _tme_m68k_opcode_root_init_25(opcodes + (897 * 64), params);
-
-  params[0] = param92;
-  params[10] = param40;
-
-  /* root 905: */
-  _tme_m68k_opcode_root_init_25(opcodes + (905 * 64), params);
-
-  params[0] = param95;
-  params[10] = param41;
-
-  /* root 913: */
-  _tme_m68k_opcode_root_init_25(opcodes + (913 * 64), params);
-
-  params[0] = param98;
-  params[10] = param42;
-
-  /* root 921: */
-  _tme_m68k_opcode_root_init_25(opcodes + (921 * 64), params);
-
-  params[0] = param101;
-  params[10] = param43;
-
-  /* root 929: */
-  _tme_m68k_opcode_root_init_25(opcodes + (929 * 64), params);
-
-  params[0] = param104;
-  params[10] = param44;
-
-  /* root 937: */
-  _tme_m68k_opcode_root_init_25(opcodes + (937 * 64), params);
-
-  params[0] = param107;
-  params[10] = param45;
-
-  /* root 945: */
-  _tme_m68k_opcode_root_init_25(opcodes + (945 * 64), params);
-
-  params[0] = param110;
-  params[10] = param46;
-
-  /* root 953: */
-  _tme_m68k_opcode_root_init_25(opcodes + (953 * 64), params);
+  _tme_m68k_opcode_root_init_33(opcodes + (952 * 64), params);
 
   params[0] = param89;
   params[3] = TME_M68K_OPCODE_INSN(133);
@@ -5315,110 +5953,110 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   params[10] = param39;
   params[12] = TME_M68K_OPCODE_INSN(132);
 
-  /* root 901: */
-  _tme_m68k_opcode_root_init_25(opcodes + (901 * 64), params);
+  /* root 900: */
+  _tme_m68k_opcode_root_init_33(opcodes + (900 * 64), params);
 
   params[0] = param92;
   params[10] = param40;
 
-  /* root 909: */
-  _tme_m68k_opcode_root_init_25(opcodes + (909 * 64), params);
+  /* root 908: */
+  _tme_m68k_opcode_root_init_33(opcodes + (908 * 64), params);
 
   params[0] = param95;
   params[10] = param41;
 
-  /* root 917: */
-  _tme_m68k_opcode_root_init_25(opcodes + (917 * 64), params);
+  /* root 916: */
+  _tme_m68k_opcode_root_init_33(opcodes + (916 * 64), params);
 
   params[0] = param98;
   params[10] = param42;
 
-  /* root 925: */
-  _tme_m68k_opcode_root_init_25(opcodes + (925 * 64), params);
+  /* root 924: */
+  _tme_m68k_opcode_root_init_33(opcodes + (924 * 64), params);
 
   params[0] = param101;
   params[10] = param43;
 
-  /* root 933: */
-  _tme_m68k_opcode_root_init_25(opcodes + (933 * 64), params);
+  /* root 932: */
+  _tme_m68k_opcode_root_init_33(opcodes + (932 * 64), params);
 
   params[0] = param104;
   params[10] = param44;
 
-  /* root 941: */
-  _tme_m68k_opcode_root_init_25(opcodes + (941 * 64), params);
+  /* root 940: */
+  _tme_m68k_opcode_root_init_33(opcodes + (940 * 64), params);
 
   params[0] = param107;
   params[10] = param45;
 
-  /* root 949: */
-  _tme_m68k_opcode_root_init_25(opcodes + (949 * 64), params);
+  /* root 948: */
+  _tme_m68k_opcode_root_init_33(opcodes + (948 * 64), params);
 
   params[0] = param110;
   params[10] = param46;
 
-  /* root 957: */
-  _tme_m68k_opcode_root_init_25(opcodes + (957 * 64), params);
+  /* root 956: */
+  _tme_m68k_opcode_root_init_33(opcodes + (956 * 64), params);
 
   params[0] = param89;
-  params[1] = param26;
-  params[2] = param27;
+  params[1] = param16;
+  params[2] = param17;
   params[3] = TME_M68K_OPCODE_INSN(125);
-  params[4] = param20;
-  params[5] = param21;
+  params[4] = param10;
+  params[5] = param11;
   params[6] = TME_M68K_OPCODE_INSN(123);
-  params[7] = param22;
-  params[8] = param23;
+  params[7] = param12;
+  params[8] = param13;
   params[9] = TME_M68K_OPCODE_INSN(126);
   params[10] = param39;
-  params[11] = param24;
+  params[11] = param14;
   params[12] = TME_M68K_OPCODE_INSN(124);
-  params[13] = param25;
+  params[13] = param15;
 
-  /* root 898: */
-  _tme_m68k_opcode_root_init_25(opcodes + (898 * 64), params);
+  /* root 897: */
+  _tme_m68k_opcode_root_init_33(opcodes + (897 * 64), params);
 
   params[0] = param92;
   params[10] = param40;
 
-  /* root 906: */
-  _tme_m68k_opcode_root_init_25(opcodes + (906 * 64), params);
+  /* root 905: */
+  _tme_m68k_opcode_root_init_33(opcodes + (905 * 64), params);
 
   params[0] = param95;
   params[10] = param41;
 
-  /* root 914: */
-  _tme_m68k_opcode_root_init_25(opcodes + (914 * 64), params);
+  /* root 913: */
+  _tme_m68k_opcode_root_init_33(opcodes + (913 * 64), params);
 
   params[0] = param98;
   params[10] = param42;
 
-  /* root 922: */
-  _tme_m68k_opcode_root_init_25(opcodes + (922 * 64), params);
+  /* root 921: */
+  _tme_m68k_opcode_root_init_33(opcodes + (921 * 64), params);
 
   params[0] = param101;
   params[10] = param43;
 
-  /* root 930: */
-  _tme_m68k_opcode_root_init_25(opcodes + (930 * 64), params);
+  /* root 929: */
+  _tme_m68k_opcode_root_init_33(opcodes + (929 * 64), params);
 
   params[0] = param104;
   params[10] = param44;
 
-  /* root 938: */
-  _tme_m68k_opcode_root_init_25(opcodes + (938 * 64), params);
+  /* root 937: */
+  _tme_m68k_opcode_root_init_33(opcodes + (937 * 64), params);
 
   params[0] = param107;
   params[10] = param45;
 
-  /* root 946: */
-  _tme_m68k_opcode_root_init_25(opcodes + (946 * 64), params);
+  /* root 945: */
+  _tme_m68k_opcode_root_init_33(opcodes + (945 * 64), params);
 
   params[0] = param110;
   params[10] = param46;
 
-  /* root 954: */
-  _tme_m68k_opcode_root_init_25(opcodes + (954 * 64), params);
+  /* root 953: */
+  _tme_m68k_opcode_root_init_33(opcodes + (953 * 64), params);
 
   params[0] = param89;
   params[3] = TME_M68K_OPCODE_INSN(137);
@@ -5427,56 +6065,168 @@ tme_m68k_opcodes_init_m68000(tme_uint32_t *opcodes)
   params[10] = param39;
   params[12] = TME_M68K_OPCODE_INSN(136);
 
+  /* root 901: */
+  _tme_m68k_opcode_root_init_33(opcodes + (901 * 64), params);
+
+  params[0] = param92;
+  params[10] = param40;
+
+  /* root 909: */
+  _tme_m68k_opcode_root_init_33(opcodes + (909 * 64), params);
+
+  params[0] = param95;
+  params[10] = param41;
+
+  /* root 917: */
+  _tme_m68k_opcode_root_init_33(opcodes + (917 * 64), params);
+
+  params[0] = param98;
+  params[10] = param42;
+
+  /* root 925: */
+  _tme_m68k_opcode_root_init_33(opcodes + (925 * 64), params);
+
+  params[0] = param101;
+  params[10] = param43;
+
+  /* root 933: */
+  _tme_m68k_opcode_root_init_33(opcodes + (933 * 64), params);
+
+  params[0] = param104;
+  params[10] = param44;
+
+  /* root 941: */
+  _tme_m68k_opcode_root_init_33(opcodes + (941 * 64), params);
+
+  params[0] = param107;
+  params[10] = param45;
+
+  /* root 949: */
+  _tme_m68k_opcode_root_init_33(opcodes + (949 * 64), params);
+
+  params[0] = param110;
+  params[10] = param46;
+
+  /* root 957: */
+  _tme_m68k_opcode_root_init_33(opcodes + (957 * 64), params);
+
+  params[0] = param89;
+  params[1] = param26;
+  params[2] = param27;
+  params[3] = TME_M68K_OPCODE_INSN(129);
+  params[4] = param20;
+  params[5] = param21;
+  params[6] = TME_M68K_OPCODE_INSN(127);
+  params[7] = param22;
+  params[8] = param23;
+  params[9] = TME_M68K_OPCODE_INSN(130);
+  params[10] = param39;
+  params[11] = param24;
+  params[12] = TME_M68K_OPCODE_INSN(128);
+  params[13] = param25;
+
+  /* root 898: */
+  _tme_m68k_opcode_root_init_33(opcodes + (898 * 64), params);
+
+  params[0] = param92;
+  params[10] = param40;
+
+  /* root 906: */
+  _tme_m68k_opcode_root_init_33(opcodes + (906 * 64), params);
+
+  params[0] = param95;
+  params[10] = param41;
+
+  /* root 914: */
+  _tme_m68k_opcode_root_init_33(opcodes + (914 * 64), params);
+
+  params[0] = param98;
+  params[10] = param42;
+
+  /* root 922: */
+  _tme_m68k_opcode_root_init_33(opcodes + (922 * 64), params);
+
+  params[0] = param101;
+  params[10] = param43;
+
+  /* root 930: */
+  _tme_m68k_opcode_root_init_33(opcodes + (930 * 64), params);
+
+  params[0] = param104;
+  params[10] = param44;
+
+  /* root 938: */
+  _tme_m68k_opcode_root_init_33(opcodes + (938 * 64), params);
+
+  params[0] = param107;
+  params[10] = param45;
+
+  /* root 946: */
+  _tme_m68k_opcode_root_init_33(opcodes + (946 * 64), params);
+
+  params[0] = param110;
+  params[10] = param46;
+
+  /* root 954: */
+  _tme_m68k_opcode_root_init_33(opcodes + (954 * 64), params);
+
+  params[0] = param89;
+  params[3] = TME_M68K_OPCODE_INSN(141);
+  params[6] = TME_M68K_OPCODE_INSN(139);
+  params[9] = TME_M68K_OPCODE_INSN(142);
+  params[10] = param39;
+  params[12] = TME_M68K_OPCODE_INSN(140);
+
   /* root 902: */
-  _tme_m68k_opcode_root_init_25(opcodes + (902 * 64), params);
+  _tme_m68k_opcode_root_init_33(opcodes + (902 * 64), params);
 
   params[0] = param92;
   params[10] = param40;
 
   /* root 910: */
-  _tme_m68k_opcode_root_init_25(opcodes + (910 * 64), params);
+  _tme_m68k_opcode_root_init_33(opcodes + (910 * 64), params);
 
   params[0] = param95;
   params[10] = param41;
 
   /* root 918: */
-  _tme_m68k_opcode_root_init_25(opcodes + (918 * 64), params);
+  _tme_m68k_opcode_root_init_33(opcodes + (918 * 64), params);
 
   params[0] = param98;
   params[10] = param42;
 
   /* root 926: */
-  _tme_m68k_opcode_root_init_25(opcodes + (926 * 64), params);
+  _tme_m68k_opcode_root_init_33(opcodes + (926 * 64), params);
 
   params[0] = param101;
   params[10] = param43;
 
   /* root 934: */
-  _tme_m68k_opcode_root_init_25(opcodes + (934 * 64), params);
+  _tme_m68k_opcode_root_init_33(opcodes + (934 * 64), params);
 
   params[0] = param104;
   params[10] = param44;
 
   /* root 942: */
-  _tme_m68k_opcode_root_init_25(opcodes + (942 * 64), params);
+  _tme_m68k_opcode_root_init_33(opcodes + (942 * 64), params);
 
   params[0] = param107;
   params[10] = param45;
 
   /* root 950: */
-  _tme_m68k_opcode_root_init_25(opcodes + (950 * 64), params);
+  _tme_m68k_opcode_root_init_33(opcodes + (950 * 64), params);
 
   params[0] = param110;
   params[10] = param46;
 
   /* root 958: */
-  _tme_m68k_opcode_root_init_25(opcodes + (958 * 64), params);
+  _tme_m68k_opcode_root_init_33(opcodes + (958 * 64), params);
 
 }
 
-/* root init 26: */
+/* root init 34: */
 static void
-_tme_m68k_opcode_root_init_26(tme_uint32_t *root, const tme_uint32_t *params)
+_tme_m68k_opcode_root_init_34(tme_uint32_t *root, const tme_uint32_t *params)
 {
   root[0] = params[0] | params[4];
   root[1] = params[3] | params[4];
@@ -5544,9 +6294,9 @@ _tme_m68k_opcode_root_init_26(tme_uint32_t *root, const tme_uint32_t *params)
   root[63] = params[11];
 }
 
-/* root init 27: */
+/* root init 35: */
 static void
-_tme_m68k_opcode_root_init_27(tme_uint32_t *root, const tme_uint32_t *params)
+_tme_m68k_opcode_root_init_35(tme_uint32_t *root, const tme_uint32_t *params)
 {
   root[0] = params[9];
   root[1] = params[9];
@@ -5671,20 +6421,20 @@ tme_m68k_opcodes_init_m68010(tme_uint32_t *opcodes)
   tme_m68k_opcodes_init_m68000(opcodes);
 
   params[0] = TME_M68K_OPCODE_INSN(1);
-  params[1] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(139) | param0 | TME_M68K_OPCODE_SPECOP;
+  params[1] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(143) | param0 | TME_M68K_OPCODE_SPECOP;
 
   /* root 56: */
-  _tme_m68k_opcode_root_init_21(opcodes + (56 * 64), params);
+  _tme_m68k_opcode_root_init_29(opcodes + (56 * 64), params);
 
-  params[1] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(140) | param0 | TME_M68K_OPCODE_SPECOP;
+  params[1] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(144) | param0 | TME_M68K_OPCODE_SPECOP;
 
   /* root 57: */
-  _tme_m68k_opcode_root_init_21(opcodes + (57 * 64), params);
+  _tme_m68k_opcode_root_init_29(opcodes + (57 * 64), params);
 
-  params[1] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(141) | param0 | TME_M68K_OPCODE_SPECOP;
+  params[1] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(145) | param0 | TME_M68K_OPCODE_SPECOP;
 
   /* root 58: */
-  _tme_m68k_opcode_root_init_21(opcodes + (58 * 64), params);
+  _tme_m68k_opcode_root_init_29(opcodes + (58 * 64), params);
 
   params[0] = param1;
   params[1] = param2;
@@ -5696,17 +6446,17 @@ tme_m68k_opcodes_init_m68010(tme_uint32_t *opcodes)
   params[7] = param8;
   params[8] = TME_M68K_OPCODE_INSN(1);
   params[9] = TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | param9;
-  params[10] = TME_M68K_OPCODE_INSN(142);
+  params[10] = TME_M68K_OPCODE_INSN(146);
 
   /* root 259: */
   _tme_m68k_opcode_root_init_1(opcodes + (259 * 64), params);
 
-  params[10] = TME_M68K_OPCODE_INSN(50);
+  params[10] = TME_M68K_OPCODE_INSN(54);
 
   /* root 265: */
   _tme_m68k_opcode_root_init_1(opcodes + (265 * 64), params);
 
-  params[10] = TME_M68K_OPCODE_INSN(143);
+  params[10] = TME_M68K_OPCODE_INSN(147);
 
   /* root 267: */
   _tme_m68k_opcode_root_init_1(opcodes + (267 * 64), params);
@@ -5720,7 +6470,7 @@ tme_m68k_opcodes_init_m68010(tme_uint32_t *opcodes)
   params[6] = param16;
   params[7] = param17;
   params[9] = TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | param18;
-  params[10] = TME_M68K_OPCODE_INSN(49);
+  params[10] = TME_M68K_OPCODE_INSN(53);
 
   /* root 264: */
   _tme_m68k_opcode_root_init_1(opcodes + (264 * 64), params);
@@ -5734,64 +6484,64 @@ tme_m68k_opcodes_init_m68010(tme_uint32_t *opcodes)
   params[6] = param25;
   params[7] = param26;
   params[9] = TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | param27;
-  params[10] = TME_M68K_OPCODE_INSN(51);
+  params[10] = TME_M68K_OPCODE_INSN(55);
 
   /* root 266: */
   _tme_m68k_opcode_root_init_1(opcodes + (266 * 64), params);
 
-  params[4] = TME_M68K_OPCODE_INSN(61);
+  params[4] = TME_M68K_OPCODE_INSN(65);
   params[5] = param23;
   params[6] = param24;
   params[7] = param25;
-  params[8] = TME_M68K_OPCODE_INSN(144);
+  params[8] = TME_M68K_OPCODE_INSN(148);
   params[9] = param26;
-  params[10] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(62) | param0;
+  params[10] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(66) | param0;
   params[11] = TME_M68K_OPCODE_INSN(1);
 
   /* root 289: */
-  _tme_m68k_opcode_root_init_26(opcodes + (289 * 64), params);
+  _tme_m68k_opcode_root_init_34(opcodes + (289 * 64), params);
 
   params[0] = param28;
   params[1] = param29;
-  params[2] = TME_M68K_OPCODE_INSN(75);
+  params[2] = TME_M68K_OPCODE_INSN(79);
   params[3] = param30;
   params[4] = param31;
   params[5] = param32;
   params[6] = param33;
-  params[7] = TME_M68K_OPCODE_INSN(76);
+  params[7] = TME_M68K_OPCODE_INSN(80);
   params[8] = param34;
-  params[9] = TME_M68K_OPCODE_INSN(74);
+  params[9] = TME_M68K_OPCODE_INSN(78);
   params[10] = param35;
   params[11] = param36;
-  params[12] = TME_M68K_OPCODE_INSN(145);
+  params[12] = TME_M68K_OPCODE_INSN(149);
   params[13] = TME_M68K_OPCODE_IMM_16 | param37;
-  params[14] = TME_M68K_OPCODE_INSN(79);
+  params[14] = TME_M68K_OPCODE_INSN(83);
   params[15] = param38;
-  params[16] = TME_M68K_OPCODE_INSN(146);
+  params[16] = TME_M68K_OPCODE_INSN(150);
   params[17] = TME_M68K_OPCODE_SPECOP;
   params[18] = param39;
-  params[19] = TME_M68K_OPCODE_INSN(82);
+  params[19] = TME_M68K_OPCODE_INSN(86);
   params[20] = param40;
-  params[21] = TME_M68K_OPCODE_INSN(80);
+  params[21] = TME_M68K_OPCODE_INSN(84);
   params[22] = param41;
   params[23] = TME_M68K_OPCODE_INSN(1);
   params[24] = param42;
-  params[25] = TME_M68K_OPCODE_INSN(83);
+  params[25] = TME_M68K_OPCODE_INSN(87);
   params[26] = param43;
-  params[27] = TME_M68K_OPCODE_INSN(81);
-  params[28] = TME_M68K_OPCODE_INSN(77);
-  params[29] = TME_M68K_OPCODE_INSN(78);
+  params[27] = TME_M68K_OPCODE_INSN(85);
+  params[28] = TME_M68K_OPCODE_INSN(81);
+  params[29] = TME_M68K_OPCODE_INSN(82);
   params[30] = param44;
-  params[31] = TME_M68K_OPCODE_INSN(84);
+  params[31] = TME_M68K_OPCODE_INSN(88);
 
   /* root 313: */
-  _tme_m68k_opcode_root_init_27(opcodes + (313 * 64), params);
+  _tme_m68k_opcode_root_init_35(opcodes + (313 * 64), params);
 
 }
 
-/* root init 28: */
+/* root init 36: */
 static void
-_tme_m68k_opcode_root_init_28(tme_uint32_t *root, const tme_uint32_t *params)
+_tme_m68k_opcode_root_init_36(tme_uint32_t *root, const tme_uint32_t *params)
 {
   root[0] = params[0] | params[14];
   root[1] = params[5] | params[14];
@@ -5859,9 +6609,9 @@ _tme_m68k_opcode_root_init_28(tme_uint32_t *root, const tme_uint32_t *params)
   root[63] = params[18];
 }
 
-/* root init 29: */
+/* root init 37: */
 static void
-_tme_m68k_opcode_root_init_29(tme_uint32_t *root, const tme_uint32_t *params)
+_tme_m68k_opcode_root_init_37(tme_uint32_t *root, const tme_uint32_t *params)
 {
   root[0] = params[0] | params[9];
   root[1] = params[3] | params[9];
@@ -5929,79 +6679,79 @@ _tme_m68k_opcode_root_init_29(tme_uint32_t *root, const tme_uint32_t *params)
   root[63] = params[10];
 }
 
-/* root init 30: */
+/* root init 38: */
 static void
-_tme_m68k_opcode_root_init_30(tme_uint32_t *root, const tme_uint32_t *params)
+_tme_m68k_opcode_root_init_38(tme_uint32_t *root, const tme_uint32_t *params)
 {
-  root[0] = params[1];
-  root[1] = params[1];
-  root[2] = params[1];
-  root[3] = params[1];
-  root[4] = params[1];
-  root[5] = params[1];
-  root[6] = params[1];
-  root[7] = params[1];
-  root[8] = params[1];
-  root[9] = params[1];
-  root[10] = params[1];
-  root[11] = params[1];
-  root[12] = params[1];
-  root[13] = params[1];
-  root[14] = params[1];
-  root[15] = params[1];
-  root[16] = params[2];
-  root[17] = params[2];
-  root[18] = params[2];
-  root[19] = params[2];
-  root[20] = params[2];
-  root[21] = params[2];
-  root[22] = params[2];
-  root[23] = params[2];
-  root[24] = params[2];
-  root[25] = params[2];
-  root[26] = params[2];
-  root[27] = params[2];
-  root[28] = params[2];
-  root[29] = params[2];
-  root[30] = params[2];
-  root[31] = params[2];
-  root[32] = params[2];
-  root[33] = params[2];
-  root[34] = params[2];
-  root[35] = params[2];
-  root[36] = params[2];
-  root[37] = params[2];
-  root[38] = params[2];
-  root[39] = params[2];
-  root[40] = params[2];
-  root[41] = params[2];
-  root[42] = params[2];
-  root[43] = params[2];
-  root[44] = params[2];
-  root[45] = params[2];
-  root[46] = params[2];
-  root[47] = params[2];
-  root[48] = params[2];
-  root[49] = params[2];
-  root[50] = params[2];
-  root[51] = params[2];
-  root[52] = params[2];
-  root[53] = params[2];
-  root[54] = params[2];
-  root[55] = params[2];
-  root[56] = params[2];
-  root[57] = params[2];
-  root[58] = params[1];
-  root[59] = params[1];
-  root[60] = params[0];
-  root[61] = params[1];
-  root[62] = params[1];
-  root[63] = params[1];
+  root[0] = params[2];
+  root[1] = params[2];
+  root[2] = params[2];
+  root[3] = params[2];
+  root[4] = params[2];
+  root[5] = params[2];
+  root[6] = params[2];
+  root[7] = params[2];
+  root[8] = params[2];
+  root[9] = params[2];
+  root[10] = params[2];
+  root[11] = params[2];
+  root[12] = params[2];
+  root[13] = params[2];
+  root[14] = params[2];
+  root[15] = params[2];
+  root[16] = params[1] | params[3];
+  root[17] = params[1] | params[3];
+  root[18] = params[1] | params[3];
+  root[19] = params[1] | params[3];
+  root[20] = params[1] | params[3];
+  root[21] = params[1] | params[3];
+  root[22] = params[1] | params[3];
+  root[23] = params[1] | params[3];
+  root[24] = params[1] | params[3];
+  root[25] = params[1] | params[3];
+  root[26] = params[1] | params[3];
+  root[27] = params[1] | params[3];
+  root[28] = params[1] | params[3];
+  root[29] = params[1] | params[3];
+  root[30] = params[1] | params[3];
+  root[31] = params[1] | params[3];
+  root[32] = params[1] | params[3];
+  root[33] = params[1] | params[3];
+  root[34] = params[1] | params[3];
+  root[35] = params[1] | params[3];
+  root[36] = params[1] | params[3];
+  root[37] = params[1] | params[3];
+  root[38] = params[1] | params[3];
+  root[39] = params[1] | params[3];
+  root[40] = params[1] | params[3];
+  root[41] = params[1] | params[3];
+  root[42] = params[1] | params[3];
+  root[43] = params[1] | params[3];
+  root[44] = params[1] | params[3];
+  root[45] = params[1] | params[3];
+  root[46] = params[1] | params[3];
+  root[47] = params[1] | params[3];
+  root[48] = params[1] | params[3];
+  root[49] = params[1] | params[3];
+  root[50] = params[1] | params[3];
+  root[51] = params[1] | params[3];
+  root[52] = params[1] | params[3];
+  root[53] = params[1] | params[3];
+  root[54] = params[1] | params[3];
+  root[55] = params[1] | params[3];
+  root[56] = params[1] | params[3];
+  root[57] = params[1] | params[3];
+  root[58] = params[2];
+  root[59] = params[2];
+  root[60] = params[0] | params[1];
+  root[61] = params[2];
+  root[62] = params[2];
+  root[63] = params[2];
 }
 
-/* root init 31: */
+/* root init 39: */
 static void
-_tme_m68k_opcode_root_init_31(tme_uint32_t *root, const tme_uint32_t *params)
+_tme_m68k_opcode_root_init_39(tme_uint32_t *root, const tme_uint32_t *params)
 {
   root[0] = params[0] | params[21];
   root[1] = params[5] | params[21];
@@ -6069,9 +6819,9 @@ _tme_m68k_opcode_root_init_31(tme_uint32_t *root, const tme_uint32_t *params)
   root[63] = params[18];
 }
 
-/* root init 32: */
+/* root init 40: */
 static void
-_tme_m68k_opcode_root_init_32(tme_uint32_t *root, const tme_uint32_t *params)
+_tme_m68k_opcode_root_init_40(tme_uint32_t *root, const tme_uint32_t *params)
 {
   root[0] = params[0];
   root[1] = params[0];
@@ -6139,9 +6889,9 @@ _tme_m68k_opcode_root_init_32(tme_uint32_t *root, const tme_uint32_t *params)
   root[63] = params[1];
 }
 
-/* root init 33: */
+/* root init 41: */
 static void
-_tme_m68k_opcode_root_init_33(tme_uint32_t *root, const tme_uint32_t *params)
+_tme_m68k_opcode_root_init_41(tme_uint32_t *root, const tme_uint32_t *params)
 {
   root[0] = params[1];
   root[1] = params[1];
@@ -6209,9 +6959,9 @@ _tme_m68k_opcode_root_init_33(tme_uint32_t *root, const tme_uint32_t *params)
   root[63] = params[2];
 }
 
-/* root init 34: */
+/* root init 42: */
 static void
-_tme_m68k_opcode_root_init_34(tme_uint32_t *root, const tme_uint32_t *params)
+_tme_m68k_opcode_root_init_42(tme_uint32_t *root, const tme_uint32_t *params)
 {
   root[0] = params[2];
   root[1] = params[2];
@@ -6279,9 +7029,9 @@ _tme_m68k_opcode_root_init_34(tme_uint32_t *root, const tme_uint32_t *params)
   root[63] = params[0];
 }
 
-/* root init 35: */
+/* root init 43: */
 static void
-_tme_m68k_opcode_root_init_35(tme_uint32_t *root, const tme_uint32_t *params)
+_tme_m68k_opcode_root_init_43(tme_uint32_t *root, const tme_uint32_t *params)
 {
   root[0] = params[0] | params[20] | params[22];
   root[1] = params[5] | params[20] | params[22];
@@ -6349,9 +7099,9 @@ _tme_m68k_opcode_root_init_35(tme_uint32_t *root, const tme_uint32_t *params)
   root[63] = params[18];
 }
 
-/* root init 36: */
+/* root init 44: */
 static void
-_tme_m68k_opcode_root_init_36(tme_uint32_t *root, const tme_uint32_t *params)
+_tme_m68k_opcode_root_init_44(tme_uint32_t *root, const tme_uint32_t *params)
 {
   root[0] = params[0];
   root[1] = params[0];
@@ -6508,112 +7258,100 @@ tme_m68k_opcodes_init_m68020(tme_uint32_t *opcodes)
 
   tme_m68k_opcodes_init_m68010(opcodes);
 
-  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(147) | param0 | TME_M68K_OPCODE_SPECOP;
+  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(151) | param0 | TME_M68K_OPCODE_SPECOP;
   params[1] = TME_M68K_OPCODE_INSN(1);
 
   /* roots 3, 11, 19: */
   for (root_i = 0; root_i < 3; root_i++) {
-    _tme_m68k_opcode_root_init_11(opcodes + (root_group0[root_i] * 64), params);
+    _tme_m68k_opcode_root_init_19(opcodes + (root_group0[root_i] * 64), params);
   }
 
-  params[0] = TME_M68K_OPCODE_IMM_16 | TME_M68K_OPCODE_INSN(152) | param36 | TME_M68K_OPCODE_SPECOP;
-  params[2] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(151) | param0;
-
-  /* root 51: */
-  _tme_m68k_opcode_root_init_30(opcodes + (51 * 64), params);
-
-  params[0] = TME_M68K_OPCODE_IMM_16 | TME_M68K_OPCODE_INSN(154) | param36 | TME_M68K_OPCODE_SPECOP;
-  params[2] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(153) | param0;
-
-  /* root 59: */
-  _tme_m68k_opcode_root_init_30(opcodes + (59 * 64), params);
-
-  params[0] = TME_M68K_OPCODE_INSN(159) | TME_M68K_OPCODE_SPECOP;
+  params[0] = TME_M68K_OPCODE_INSN(163) | TME_M68K_OPCODE_SPECOP;
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(3) | param69 | param35;
 
   /* root 517: */
-  _tme_m68k_opcode_root_init_20(opcodes + (517 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (517 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(3) | param72 | param35;
 
   /* root 525: */
-  _tme_m68k_opcode_root_init_20(opcodes + (525 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (525 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(3) | param66 | param35;
 
   /* root 533: */
-  _tme_m68k_opcode_root_init_20(opcodes + (533 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (533 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(3) | param68 | param35;
 
   /* root 541: */
-  _tme_m68k_opcode_root_init_20(opcodes + (541 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (541 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(3) | param71 | param35;
 
   /* root 549: */
-  _tme_m68k_opcode_root_init_20(opcodes + (549 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (549 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(3) | param73 | param35;
 
   /* root 557: */
-  _tme_m68k_opcode_root_init_20(opcodes + (557 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (557 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(3) | param67 | param35;
 
   /* root 565: */
-  _tme_m68k_opcode_root_init_20(opcodes + (565 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (565 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(3) | param70 | param35;
 
   /* root 573: */
-  _tme_m68k_opcode_root_init_20(opcodes + (573 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (573 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_INSN(160) | TME_M68K_OPCODE_SPECOP;
+  params[0] = TME_M68K_OPCODE_INSN(164) | TME_M68K_OPCODE_SPECOP;
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(5) | param1 | param45;
 
   /* root 518: */
-  _tme_m68k_opcode_root_init_20(opcodes + (518 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (518 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(5) | param6 | param45;
 
   /* root 526: */
-  _tme_m68k_opcode_root_init_20(opcodes + (526 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (526 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(5) | param11 | param45;
 
   /* root 534: */
-  _tme_m68k_opcode_root_init_20(opcodes + (534 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (534 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(5) | param15 | param45;
 
   /* root 542: */
-  _tme_m68k_opcode_root_init_20(opcodes + (542 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (542 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(5) | param4 | param45;
 
   /* root 550: */
-  _tme_m68k_opcode_root_init_20(opcodes + (550 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (550 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(5) | param9 | param45;
 
   /* root 558: */
-  _tme_m68k_opcode_root_init_20(opcodes + (558 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (558 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(5) | param14 | param45;
 
   /* root 566: */
-  _tme_m68k_opcode_root_init_20(opcodes + (566 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (566 * 64), params);
 
   params[2] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | TME_M68K_OPCODE_EA_WRITE | TME_M68K_OPCODE_INSN(5) | param3 | param45;
 
   /* root 574: */
-  _tme_m68k_opcode_root_init_20(opcodes + (574 * 64), params);
+  _tme_m68k_opcode_root_init_28(opcodes + (574 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(175) | param0;
+  params[0] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(179) | param0;
 
   /* root 973: */
-  _tme_m68k_opcode_root_init_15(opcodes + (973 * 64), params);
+  _tme_m68k_opcode_root_init_23(opcodes + (973 * 64), params);
 
   params[0] = param1;
   params[1] = param2;
@@ -6629,46 +7367,46 @@ tme_m68k_opcodes_init_m68020(tme_uint32_t *opcodes)
   params[11] = param12;
   params[12] = param13;
   params[13] = param14;
-  params[14] = TME_M68K_OPCODE_INSN(148);
+  params[14] = TME_M68K_OPCODE_INSN(152);
   params[15] = param15;
   params[16] = param16;
-  params[17] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_IMM_16 | TME_M68K_OPCODE_INSN(149) | param17 | param0;
+  params[17] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_IMM_16 | TME_M68K_OPCODE_INSN(153) | param17 | param0;
   params[18] = TME_M68K_OPCODE_INSN(1);
 
   /* root 27: */
-  _tme_m68k_opcode_root_init_28(opcodes + (27 * 64), params);
+  _tme_m68k_opcode_root_init_36(opcodes + (27 * 64), params);
 
   params[0] = TME_M68K_OPCODE_INSN(1);
-  params[1] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(150) | param0;
+  params[1] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(154) | param0 | TME_M68K_OPCODE_SPECOP;
 
   /* root 43: */
-  _tme_m68k_opcode_root_init_21(opcodes + (43 * 64), params);
+  _tme_m68k_opcode_root_init_29(opcodes + (43 * 64), params);
 
   params[1] = TME_M68K_OPCODE_EA_UNSIZED | param0;
-  params[2] = TME_M68K_OPCODE_INSN(163) | TME_M68K_OPCODE_SPECOP;
-
-  /* root 939: */
-  _tme_m68k_opcode_root_init_34(opcodes + (939 * 64), params);
-
-  params[2] = TME_M68K_OPCODE_INSN(165) | TME_M68K_OPCODE_SPECOP;
-
-  /* root 947: */
-  _tme_m68k_opcode_root_init_34(opcodes + (947 * 64), params);
-
   params[2] = TME_M68K_OPCODE_INSN(167) | TME_M68K_OPCODE_SPECOP;
 
-  /* root 955: */
-  _tme_m68k_opcode_root_init_34(opcodes + (955 * 64), params);
+  /* root 939: */
+  _tme_m68k_opcode_root_init_42(opcodes + (939 * 64), params);
 
-  params[2] = TME_M68K_OPCODE_INSN(168) | TME_M68K_OPCODE_SPECOP;
+  params[2] = TME_M68K_OPCODE_INSN(169) | TME_M68K_OPCODE_SPECOP;
+
+  /* root 947: */
+  _tme_m68k_opcode_root_init_42(opcodes + (947 * 64), params);
+
+  params[2] = TME_M68K_OPCODE_INSN(171) | TME_M68K_OPCODE_SPECOP;
+
+  /* root 955: */
+  _tme_m68k_opcode_root_init_42(opcodes + (955 * 64), params);
+
+  params[2] = TME_M68K_OPCODE_INSN(172) | TME_M68K_OPCODE_SPECOP;
 
   /* root 959: */
-  _tme_m68k_opcode_root_init_34(opcodes + (959 * 64), params);
+  _tme_m68k_opcode_root_init_42(opcodes + (959 * 64), params);
 
-  params[1] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(174) | param0;
+  params[1] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(178) | param0;
 
   /* root 972: */
-  _tme_m68k_opcode_root_init_36(opcodes + (972 * 64), params);
+  _tme_m68k_opcode_root_init_44(opcodes + (972 * 64), params);
 
   params[0] = param18;
   params[1] = param19;
@@ -6683,10 +7421,10 @@ tme_m68k_opcodes_init_m68020(tme_uint32_t *opcodes)
   params[10] = TME_M68K_OPCODE_INSN(1);
 
   /* root 48: */
-  _tme_m68k_opcode_root_init_29(opcodes + (48 * 64), params);
+  _tme_m68k_opcode_root_init_37(opcodes + (48 * 64), params);
 
   params[9] = TME_M68K_OPCODE_IMM_16 | param55;
-  params[11] = TME_M68K_OPCODE_INSN(67);
+  params[11] = TME_M68K_OPCODE_INSN(71);
 
   /* root 296: */
   _tme_m68k_opcode_root_init_7(opcodes + (296 * 64), params);
@@ -6704,15 +7442,15 @@ tme_m68k_opcodes_init_m68020(tme_uint32_t *opcodes)
   params[11] = param52;
   params[12] = param53;
   params[13] = param24;
-  params[14] = TME_M68K_OPCODE_IMM_32 | TME_M68K_OPCODE_INSN(75) | param46;
+  params[14] = TME_M68K_OPCODE_IMM_32 | TME_M68K_OPCODE_INSN(79) | param46;
   params[15] = param25;
   params[16] = param54;
   params[17] = TME_M68K_OPCODE_INSN(1);
   params[18] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | param26;
-  params[19] = TME_M68K_OPCODE_INSN(60);
+  params[19] = TME_M68K_OPCODE_INSN(64);
 
   /* root 288: */
-  _tme_m68k_opcode_root_init_17(opcodes + (288 * 64), params);
+  _tme_m68k_opcode_root_init_25(opcodes + (288 * 64), params);
 
   params[1] = param66;
   params[4] = param67;
@@ -6721,31 +7459,31 @@ tme_m68k_opcodes_init_m68020(tme_uint32_t *opcodes)
   params[9] = param70;
   params[11] = param71;
   params[12] = param72;
-  params[14] = TME_M68K_OPCODE_INSN(89) | param64;
+  params[14] = TME_M68K_OPCODE_INSN(93) | param64;
   params[16] = param73;
   params[17] = TME_M68K_OPCODE_IMM_32 | param46;
   params[18] = TME_M68K_OPCODE_INSN(1);
-  params[19] = TME_M68K_OPCODE_INSN(158);
+  params[19] = TME_M68K_OPCODE_INSN(162);
   params[20] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | param26;
-  params[21] = TME_M68K_OPCODE_INSN(88);
+  params[21] = TME_M68K_OPCODE_INSN(92);
   params[22] = param36;
   params[23] = TME_M68K_OPCODE_IMM_16;
 
   /* roots 323, 327, 331, 335, 339, 343, 347, 351, 355, 359, 363, 367, 371, 375, 379, 383: */
   for (root_i = 0; root_i < 16; root_i++) {
-    _tme_m68k_opcode_root_init_31(opcodes + (root_group1[root_i] * 64), params);
+    _tme_m68k_opcode_root_init_39(opcodes + (root_group1[root_i] * 64), params);
   }
 
-  params[14] = TME_M68K_OPCODE_INSN(171) | param64;
-  params[19] = TME_M68K_OPCODE_INSN(172);
+  params[14] = TME_M68K_OPCODE_INSN(175) | param64;
+  params[19] = TME_M68K_OPCODE_INSN(176);
   params[20] = TME_M68K_OPCODE_SPECOP;
   params[21] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_8) | TME_M68K_OPCODE_EA_WRITE | param26;
-  params[22] = TME_M68K_OPCODE_INSN(170);
+  params[22] = TME_M68K_OPCODE_INSN(174);
   params[23] = param36;
   params[24] = TME_M68K_OPCODE_IMM_16;
 
   /* root 969: */
-  _tme_m68k_opcode_root_init_35(opcodes + (969 * 64), params);
+  _tme_m68k_opcode_root_init_43(opcodes + (969 * 64), params);
 
   params[0] = param37;
   params[1] = param47;
@@ -6765,12 +7503,12 @@ tme_m68k_opcodes_init_m68020(tme_uint32_t *opcodes)
   params[15] = param54;
   params[16] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_32) | param45;
   params[17] = TME_M68K_OPCODE_IMM_32 | param65;
-  params[19] = TME_M68K_OPCODE_INSN(69);
+  params[19] = TME_M68K_OPCODE_INSN(73);
 
   /* root 298: */
   _tme_m68k_opcode_root_init_9(opcodes + (298 * 64), params);
 
-  params[19] = TME_M68K_OPCODE_INSN(169) | TME_M68K_OPCODE_SPECOP;
+  params[19] = TME_M68K_OPCODE_INSN(173) | TME_M68K_OPCODE_SPECOP;
 
   /* root 968: */
   _tme_m68k_opcode_root_init_9(opcodes + (968 * 64), params);
@@ -6788,7 +7526,7 @@ tme_m68k_opcodes_init_m68020(tme_uint32_t *opcodes)
   params[10] = TME_M68K_OPCODE_INSN(1);
 
   /* root 49: */
-  _tme_m68k_opcode_root_init_29(opcodes + (49 * 64), params);
+  _tme_m68k_opcode_root_init_37(opcodes + (49 * 64), params);
 
   params[1] = param56;
   params[2] = param28;
@@ -6807,7 +7545,7 @@ tme_m68k_opcodes_init_m68020(tme_uint32_t *opcodes)
   params[15] = param63;
   params[16] = TME_M68K_OPCODE_EA_READ | TME_M68K_OPCODE_EA_SIZE(TME_M68K_SIZE_16) | param35;
   params[17] = TME_M68K_OPCODE_IMM_16 | param64;
-  params[19] = TME_M68K_OPCODE_INSN(68);
+  params[19] = TME_M68K_OPCODE_INSN(72);
 
   /* root 297: */
   _tme_m68k_opcode_root_init_9(opcodes + (297 * 64), params);
@@ -6825,71 +7563,84 @@ tme_m68k_opcodes_init_m68020(tme_uint32_t *opcodes)
   params[10] = TME_M68K_OPCODE_INSN(1);
 
   /* root 50: */
-  _tme_m68k_opcode_root_init_29(opcodes + (50 * 64), params);
+  _tme_m68k_opcode_root_init_37(opcodes + (50 * 64), params);
 
   params[9] = TME_M68K_OPCODE_IMM_32 | param65;
-  params[11] = TME_M68K_OPCODE_INSN(156) | TME_M68K_OPCODE_SPECOP;
+  params[11] = TME_M68K_OPCODE_INSN(160) | TME_M68K_OPCODE_SPECOP;
 
   /* root 304: */
   _tme_m68k_opcode_root_init_7(opcodes + (304 * 64), params);
 
-  params[11] = TME_M68K_OPCODE_INSN(157) | TME_M68K_OPCODE_SPECOP;
+  params[11] = TME_M68K_OPCODE_INSN(161) | TME_M68K_OPCODE_SPECOP;
 
   /* root 305: */
   _tme_m68k_opcode_root_init_7(opcodes + (305 * 64), params);
 
-  params[4] = TME_M68K_OPCODE_INSN(155);
+  params[4] = TME_M68K_OPCODE_INSN(159);
   params[5] = param41;
   params[6] = param42;
   params[7] = param43;
   params[8] = param44;
-  params[9] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(48) | param12 | param0;
+  params[9] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(52) | param12 | param0;
 
   /* root 295: */
-  _tme_m68k_opcode_root_init_12(opcodes + (295 * 64), params);
+  _tme_m68k_opcode_root_init_20(opcodes + (295 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_INSN(92);
-  params[1] = TME_M68K_OPCODE_IMM_32 | TME_M68K_OPCODE_INSN(91) | param46;
+  params[0] = TME_M68K_OPCODE_IMM_16 | TME_M68K_OPCODE_INSN(156) | param36;
+  params[1] = TME_M68K_OPCODE_SPECOP;
+  params[2] = TME_M68K_OPCODE_INSN(1);
+  params[3] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(155) | param0;
+
+  /* root 51: */
+  _tme_m68k_opcode_root_init_38(opcodes + (51 * 64), params);
+
+  params[0] = TME_M68K_OPCODE_IMM_16 | TME_M68K_OPCODE_INSN(158) | param36;
+  params[3] = TME_M68K_OPCODE_EA_UNSIZED | TME_M68K_OPCODE_INSN(157) | param0;
+
+  /* root 59: */
+  _tme_m68k_opcode_root_init_38(opcodes + (59 * 64), params);
+
+  params[0] = TME_M68K_OPCODE_INSN(96);
+  params[1] = TME_M68K_OPCODE_IMM_32 | TME_M68K_OPCODE_INSN(95) | param46;
 
   /* roots 387, 395, 399, 403, 407, 411, 415, 419, 423, 427, 431, 435, 439, 443, 447: */
   for (root_i = 0; root_i < 15; root_i++) {
-    _tme_m68k_opcode_root_init_32(opcodes + (root_group2[root_i] * 64), params);
+    _tme_m68k_opcode_root_init_40(opcodes + (root_group2[root_i] * 64), params);
   }
 
-  params[0] = TME_M68K_OPCODE_INSN(94);
-  params[1] = TME_M68K_OPCODE_IMM_32 | TME_M68K_OPCODE_INSN(93) | param46;
+  params[0] = TME_M68K_OPCODE_INSN(98);
+  params[1] = TME_M68K_OPCODE_IMM_32 | TME_M68K_OPCODE_INSN(97) | param46;
 
   /* root 391: */
-  _tme_m68k_opcode_root_init_32(opcodes + (391 * 64), params);
+  _tme_m68k_opcode_root_init_40(opcodes + (391 * 64), params);
 
   params[0] = TME_M68K_OPCODE_EA_UNSIZED | param0;
-  params[1] = TME_M68K_OPCODE_INSN(161) | TME_M68K_OPCODE_SPECOP;
-  params[2] = TME_M68K_OPCODE_INSN(1);
+  params[1] = TME_M68K_OPCODE_INSN(165) | TME_M68K_OPCODE_SPECOP;
 
   /* root 931: */
-  _tme_m68k_opcode_root_init_33(opcodes + (931 * 64), params);
-
-  params[1] = TME_M68K_OPCODE_INSN(162) | TME_M68K_OPCODE_SPECOP;
-
-  /* root 935: */
-  _tme_m68k_opcode_root_init_33(opcodes + (935 * 64), params);
-
-  params[1] = TME_M68K_OPCODE_INSN(164) | TME_M68K_OPCODE_SPECOP;
-
-  /* root 943: */
-  _tme_m68k_opcode_root_init_33(opcodes + (943 * 64), params);
+  _tme_m68k_opcode_root_init_41(opcodes + (931 * 64), params);
 
   params[1] = TME_M68K_OPCODE_INSN(166) | TME_M68K_OPCODE_SPECOP;
 
-  /* root 951: */
-  _tme_m68k_opcode_root_init_33(opcodes + (951 * 64), params);
+  /* root 935: */
+  _tme_m68k_opcode_root_init_41(opcodes + (935 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_IMM_16 | TME_M68K_OPCODE_INSN(173) | param46;
+  params[1] = TME_M68K_OPCODE_INSN(168) | TME_M68K_OPCODE_SPECOP;
+
+  /* root 943: */
+  _tme_m68k_opcode_root_init_41(opcodes + (943 * 64), params);
+
+  params[1] = TME_M68K_OPCODE_INSN(170) | TME_M68K_OPCODE_SPECOP;
+
+  /* root 951: */
+  _tme_m68k_opcode_root_init_41(opcodes + (951 * 64), params);
+
+  params[0] = TME_M68K_OPCODE_IMM_16 | TME_M68K_OPCODE_INSN(177) | param46;
 
   /* root 970: */
   _tme_m68k_opcode_root_init_2(opcodes + (970 * 64), params);
 
-  params[0] = TME_M68K_OPCODE_IMM_32 | TME_M68K_OPCODE_INSN(173) | param46;
+  params[0] = TME_M68K_OPCODE_IMM_32 | TME_M68K_OPCODE_INSN(177) | param46;
 
   /* root 971: */
   _tme_m68k_opcode_root_init_2(opcodes + (971 * 64), params);
@@ -6938,8 +7689,12 @@ const _tme_m68k_insn tme_m68k_opcode_insns[] = {
   tme_m68k_move8,
   tme_m68k_move32,
   tme_m68k_movea32,
+  tme_m68k_move_srpi32,
+  tme_m68k_move_srpd32,
   tme_m68k_move16,
   tme_m68k_movea16,
+  tme_m68k_move_srpi16,
+  tme_m68k_move_srpd16,
   tme_m68k_negx8,
   tme_m68k_negx16,
   tme_m68k_negx32,
@@ -7049,9 +7804,9 @@ const _tme_m68k_insn tme_m68k_opcode_insns[] = {
   tme_m68k_rtm,
   tme_m68k_callm,
   tme_m68k_cas8,
-  tme_m68k_cas32,
-  tme_m68k_cas2_16,
   tme_m68k_cas16,
+  tme_m68k_cas2_16,
+  tme_m68k_cas32,
   tme_m68k_cas2_32,
   tme_m68k_extbl,
   tme_m68k_mull,

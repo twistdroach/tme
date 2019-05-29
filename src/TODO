@@ -84,3 +84,51 @@ driver gets this right.
 
 - bus: DRQ(x) and DACK(x), with an UNSPEC
 - ncr5380: bug where a SCSI callout deferred because of a higher-priority callout isn't put into later_callouts
+
+in ncr5380.c:_tme_ncr5380_bus_tlb_fill(), the structure assignment
+of *tlb from *ncr5380->tme_ncr5380_dma_tlb may copy fields partially
+and/or out-of-order, such that the subsequent relevance test succeeds
+when it should fail?  we should probably test at least the important,
+invalidating fields in *ncr5380->tme_ncr5380_dma_tlb instead of the
+local *tlb?  XXX actually, ncr5380.c needs to use the new TLB
+valid/invalid tests, and be made more thread-safe.
+
+in ncr5380.c:_tme_ncr5380_scsi_cycle(), we test if tme_scsi_dma_in
+points to the internal FIFO to determine if the transfer was a read;
+however, if the transfer was a write this value may be garbage (under
+NDEBUG, it isn't initialized in _tme_ncr5380_callout()) that happens
+to match the internal FIFO anyways.
+
+the SCSI DMA structure needs to be expanded to support tme_shared
+pointers and bus boundary values, and scsi-bus.c needs to use
+tme_memory_bus_read_buffer(), tme_memory_bus_write_buffer() as
+appropriate.
+
+make sure all callers of *_tlb_allocate have tme_shared tlb set pointers
+
+need barriers in the m68k read/write/fetch, etc. functions
+
+remove the locks argument from the generic bus-device DMA functions, since
+elements are only supposed to have a single mutex (and provide a pointer
+to the mutex in the struct tme_bus_device, or maybe have the mutex in the
+struct tme_bus_device).
+
+sun4: log when cache and memerr become visible/invisible
+sun4: log when FPU compliance changes
+
+bus-device-auto.sh: keep bus router from device structure in a local,
+in case it gets changed during a callout
+
+ncr53c9x: the SS2 esp is really an ESP100A, not an ESP100.
+
+sparc: for long-lived idle types, print address when first detected
+
+sparc: most unimplemented instructions cause NULL dereferences from opcode table
+
+gtk-keyboard.c: some X servers actually *don't* give locking behavior
+to the Caps_Lock, Num_Lock, etc., keysyms, and this causes problems.
+see the comments in _tme_gtk_keyboard_x11_new().
+
+sun4: FAILURE: SEVAR (60000004) Power-Up, Exp = 00000000, Obs = ffed9000
+
+sparc: is the test "x${sign}" = xs in sparc-insns-auto.sh right?

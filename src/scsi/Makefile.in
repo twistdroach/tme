@@ -201,8 +201,11 @@ tme_scsi_la_SOURCES = \
 	acb4000.c \
 	emulexmt02.c \
 	disk-tme.c \
+	tape-tme.c \
+	cdrom-tme.c \
 	scsi-disk.c \
 	scsi-tape.c \
+	scsi-cdrom.c \
 	scsi-cdb.c \
 	scsi-msg.c \
 	scsi-device.c \
@@ -221,19 +224,21 @@ LTLIBRARIES = $(pkglib_LTLIBRARIES)
 tme_scsi_la_DEPENDENCIES = $(top_builddir)/libtme/libtme.la \
 	$(top_builddir)/generic/libtme-generic.la
 am_tme_scsi_la_OBJECTS = acb4000.lo emulexmt02.lo disk-tme.lo \
-	scsi-disk.lo scsi-tape.lo scsi-cdb.lo scsi-msg.lo \
-	scsi-device.lo scsi-bus.lo
+	tape-tme.lo cdrom-tme.lo scsi-disk.lo scsi-tape.lo \
+	scsi-cdrom.lo scsi-cdb.lo scsi-msg.lo scsi-device.lo \
+	scsi-bus.lo
 tme_scsi_la_OBJECTS = $(am_tme_scsi_la_OBJECTS)
 
 DEFAULT_INCLUDES =  -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
-@AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/acb4000.Plo ./$(DEPDIR)/disk-tme.Plo \
+@AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/acb4000.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/cdrom-tme.Plo ./$(DEPDIR)/disk-tme.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/emulexmt02.Plo ./$(DEPDIR)/scsi-bus.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/scsi-cdb.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/scsi-cdb.Plo ./$(DEPDIR)/scsi-cdrom.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/scsi-device.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/scsi-disk.Plo ./$(DEPDIR)/scsi-msg.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/scsi-tape.Plo
+@AMDEP_TRUE@	./$(DEPDIR)/scsi-tape.Plo ./$(DEPDIR)/tape-tme.Plo
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) \
@@ -292,14 +297,17 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/acb4000.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cdrom-tme.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/disk-tme.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/emulexmt02.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scsi-bus.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scsi-cdb.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scsi-cdrom.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scsi-device.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scsi-disk.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scsi-msg.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scsi-tape.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tape-tme.Plo@am__quote@
 
 distclean-depend:
 	-rm -rf ./$(DEPDIR)

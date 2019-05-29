@@ -1,4 +1,4 @@
-/* $Id: z8530.c,v 1.15 2004/04/30 11:51:30 fredette Exp $ */
+/* $Id: z8530.c,v 1.18 2007/08/25 20:53:51 fredette Exp $ */
 
 /* ic/z8530.c - implementation of Zilog 8530 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: z8530.c,v 1.15 2004/04/30 11:51:30 fredette Exp $");
+_TME_RCSID("$Id: z8530.c,v 1.18 2007/08/25 20:53:51 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -163,7 +163,9 @@ static const tme_bus_lane_t tme_z8530_router[TME_BUS_ROUTER_SIZE(TME_BUS8_LOG2)]
 
 /* this resets one channel of a z8530: */
 static void
-_tme_z8530_channel_reset(struct tme_z8530_chan *chan, int hardware_reset)
+_tme_z8530_channel_reset(struct tme_z8530 *z8530,
+			 struct tme_z8530_chan *chan,
+			 int hardware_reset)
 {
   
   /* these reset values are taken from the SCC User's Manual: */
@@ -176,7 +178,7 @@ _tme_z8530_channel_reset(struct tme_z8530_chan *chan, int hardware_reset)
   chan->tme_z8530_chan_wrreg[6] = 0x00;
   chan->tme_z8530_chan_wrreg[7] = 0x00;
   chan->tme_z8530_chan_wrreg[8] = 0x00;
-  chan->tme_z8530_chan_wrreg[9] = (hardware_reset ? 0xc0 : 0x00);
+  z8530->tme_z8530_wr9 = (hardware_reset ? 0xc0 : 0x00);
   chan->tme_z8530_chan_wrreg[10] = 0x00;
   chan->tme_z8530_chan_wrreg[11] = 0x08;
   chan->tme_z8530_chan_wrreg[12] = 0x00;
@@ -184,18 +186,29 @@ _tme_z8530_channel_reset(struct tme_z8530_chan *chan, int hardware_reset)
   chan->tme_z8530_chan_wrreg[14] = (hardware_reset ? 0x30 : 0x20);
   chan->tme_z8530_chan_wrreg[15] = 0xf8;
   chan->tme_z8530_chan_rdreg[0] = 0x44;
-  chan->tme_z8530_chan_rdreg[1] = 0x06;
-  chan->tme_z8530_chan_rdreg[3] = 0x00;
+  chan->tme_z8530_chan_rdreg[1] = 0x07;
+  z8530->tme_z8530_rr3 = 0x00;
   chan->tme_z8530_chan_rdreg[10] = 0x00;
 
   /* the raw (unlatched) RR0 status bits: */
   chan->tme_z8530_chan_rr0_status_raw = 0;
   chan->tme_z8530_chan_rr0_status_diff_mask = 0;
+
+  /* if this is a hardware reset: */
+  if (hardware_reset) {
+
+    /* clear the IUS bits: */
+    z8530->tme_z8530_ius = 0;
+
+    /* set the modified interrupt vector stored in RR2 of channel B: */
+    z8530->tme_z8530_chan_b.tme_z8530_chan_rdreg[2] = (TME_Z8530_INT_CHAN_RX_SPCL << 1);
+  }
 }
 
 /* this initializes one channel of a z8530: */
 static void
-_tme_z8530_channel_init(struct tme_z8530_chan *chan)
+_tme_z8530_channel_init(struct tme_z8530 *z8530,
+			struct tme_z8530_chan *chan)
 {
 
   /* allocate the Tx and Rx FIFOs: */  
@@ -205,7 +218,7 @@ _tme_z8530_channel_init(struct tme_z8530_chan *chan)
 			 TME_Z8530_BUFFER_SIZE_RX);
 
   /* reset the channel: */
-  _tme_z8530_channel_reset(chan, TRUE);
+  _tme_z8530_channel_reset(z8530, chan, TRUE);
 }
 
 /* this returns TRUE iff the data at the top of the Rx FIFO has a
@@ -379,7 +392,7 @@ _tme_z8530_rr0_update(struct tme_z8530 *z8530,
 
   /* if interrupts are enabled: */
   if (chan->tme_z8530_chan_wrreg[1] & TME_Z8530_WR1_STATUS_INT_ENABLE) {
-    wr15 = chan->tme_z8530_chan_rdreg[15];
+    wr15 = chan->tme_z8530_chan_wrreg[15];
 
     /* if CTS interrupts are enabled, and CTS has changed, we need a
        status interrupt.  similarly for DCD: */
@@ -434,54 +447,37 @@ _tme_z8530_rr0_update(struct tme_z8530 *z8530,
   return (0);
 }
 
-/* this does an interrupt acknowledge.  it returns TME_OK iff an
-   interrupt was acknowledged, else it returns some error.  iff
-   _vector is non-NULL this is a hardware interrupt acknowledge: */
+/* this updates the modified interrupt vector stored in RR2 of
+   channel B: */
 static int
-_tme_z8530_intack(struct tme_z8530 *z8530, int *_vector)
+_tme_z8530_rr2_update(struct tme_z8530 *z8530)
 {
-  tme_uint8_t rr3, wr9;
+  tme_uint8_t ius;
   struct tme_z8530_chan *chan;
   int int_type;
   int vector;
 
-  /* get the current RR3 and WR9 values: */
-  rr3 = z8530->tme_z8530_rr3;
-  wr9 = z8530->tme_z8530_wr9;
-
-  /* if there is no pending interrupt with a higher priority than the
-     highest-priority interrupt currently under service, or if the
-     Master Interrupt Enable isn't set, the interrupt signal should
-     not have been asserted: */
-  if (rr3 <= z8530->tme_z8530_ius
-      || !(wr9 & TME_Z8530_WR9_MIE)) {
-    return (ENOENT);
-  }
-
-  /* get the highest-priority IP bit: */
-  for (; (rr3 & (rr3 - 1)) != 0; ) {
-    rr3 &= (rr3 - 1);
-  }
-  assert(rr3 <= TME_Z8530_RR3_CHAN_A_IP_RX);
-
-  /* set the corresponding IUS bit: */
-  z8530->tme_z8530_ius |= rr3;
+  /* get the highest-priority interrupt currently under service: */
+  for (ius = z8530->tme_z8530_ius;
+       ius & (ius - 1);
+       ius &= (ius - 1));
+  assert(ius <= TME_Z8530_RR3_CHAN_A_IP_RX);
 
   /* get which channel this IP bit is for, and make sure the IP bit is
      shifted down to a TME_Z8530_RR3_CHAN_B_IP_ value: */
-  if (rr3 <= TME_Z8530_RR3_CHAN_B_IP_RX) {    
+  if (ius <= TME_Z8530_RR3_CHAN_B_IP_RX) {    
     chan = &z8530->tme_z8530_chan_b;
-    rr3 /= TME_Z8530_RR3_CHAN_B_IP_STATUS;
+    ius /= TME_Z8530_RR3_CHAN_B_IP_STATUS;
     int_type = TME_Z8530_INT_CHAN_B;
   }
   else {
     chan = &z8530->tme_z8530_chan_a;
-    rr3 /= TME_Z8530_RR3_CHAN_A_IP_STATUS;
+    ius /= TME_Z8530_RR3_CHAN_A_IP_STATUS;
     int_type = TME_Z8530_INT_CHAN_A;
   }
 
   /* map that bit into an interrupt type: */
-  switch (rr3) {
+  switch (ius) {
   case TME_Z8530_RR3_CHAN_B_IP_RX:
     int_type
       |= (_tme_z8530_rx_fifo_special(chan)
@@ -496,7 +492,11 @@ _tme_z8530_intack(struct tme_z8530 *z8530, int *_vector)
     int_type
       |= TME_Z8530_INT_CHAN_STATUS;
     break;
-  default: abort();
+  default:
+    /* "If no interrupts are pending, the status is V3,V2,V1 -011, or
+       V6,V5,V4-110." */
+    int_type = TME_Z8530_INT_CHAN_RX_SPCL;
+    break;
   }
 
   /* come up with the modified interrupt vector.  iff
@@ -505,7 +505,7 @@ _tme_z8530_intack(struct tme_z8530 *z8530, int *_vector)
      3 respectively take bits 0, 1, and 2 of the interrupt type.  this
      strangness is found in Table 5-6 of my SCC manual: */
   vector = z8530->tme_z8530_chan_a.tme_z8530_chan_wrreg[2];
-  if (wr9 & TME_Z8530_WR9_INTVEC_STATUS) {
+  if (z8530->tme_z8530_wr9 & TME_Z8530_WR9_INTVEC_STATUS) {
     vector
       = ((vector & 0x8f)
 	 | ((vector << 6) & 0x40)
@@ -519,6 +519,64 @@ _tme_z8530_intack(struct tme_z8530 *z8530, int *_vector)
   /* save this modified interrupt vector in the channel B RR2: */
   z8530->tme_z8530_chan_b.tme_z8530_chan_rdreg[2] = vector;
 
+  /* return the vector: */
+  return (vector);
+}
+
+/* this returns any pending interrupt with higher priority than the
+   highest-priority interrupt currently under service, or zero if
+   there is no such interrupt (or if interrupts are disabled): */
+static int
+_tme_z8530_int_pending(const struct tme_z8530 *z8530)
+{
+  tme_uint8_t rr3;
+
+  /* if interrupts are disabled, return zero now: */
+  if (!(z8530->tme_z8530_wr9 & TME_Z8530_WR9_MIE)) {
+    return (0);
+  }
+
+  /* get the highest priority IP bit: */
+  rr3 = z8530->tme_z8530_rr3;
+  for (; (rr3 & (rr3 - 1)) != 0; ) {
+    rr3 &= (rr3 - 1);
+  }
+  assert(rr3 <= TME_Z8530_RR3_CHAN_A_IP_RX);
+
+  /* if the highest priority IP bit isn't currently under service,
+     return it, else return zero: */
+  return (rr3 > z8530->tme_z8530_ius
+	  ? rr3
+	  : 0);
+}
+
+/* this does an interrupt acknowledge.  it returns TME_OK iff an
+   interrupt was acknowledged, else it returns some error.  iff
+   _vector is non-NULL this is a hardware interrupt acknowledge: */
+static int
+_tme_z8530_intack(struct tme_z8530 *z8530, int *_vector)
+{
+  tme_uint8_t rr3, wr9;
+  int vector;
+
+  /* if there is no pending interrupt with a higher priority than the
+     highest-priority interrupt currently under service, or if the
+     Master Interrupt Enable isn't set, the interrupt signal should
+     not have been asserted: */
+  rr3 = _tme_z8530_int_pending(z8530);
+  if (rr3 == 0) {
+    return (ENOENT);
+  }
+
+  /* set the corresponding IUS bit: */
+  z8530->tme_z8530_ius |= rr3;
+
+  /* update RR2 and get the vector: */
+  vector = _tme_z8530_rr2_update(z8530);
+
+  /* get the current WR9 value: */
+  wr9 = z8530->tme_z8530_wr9;
+
   /* if this is a hard interrupt acknowledge: */
   if (_vector != NULL) {
   
@@ -528,13 +586,19 @@ _tme_z8530_intack(struct tme_z8530 *z8530, int *_vector)
       *_vector = TME_BUS_INTERRUPT_VECTOR_UNDEF;
     }
 
-    /* XXX we currently have no emulation of the chip's IEI pin.  for
-       now, we behave as if this pin is tied *low*, which means we
-       never drive an interrupt vector on the bus.  when we do have
-       some IEI support, this else statement should be removed: */
-    else if (TRUE) {
+    /* if the chip's IEI pin is tied low, return no vector: */
+    else if (z8530->tme_z8530_socket.tme_z8530_socket_flags & TME_Z8530_SOCKET_FLAG_IEI_TIED_LOW) {
       *_vector = TME_BUS_INTERRUPT_VECTOR_UNDEF;
     }
+
+    /* otherwise, we behave as if the IEI pin is tied *high*, which
+       means we always drive an interrupt vector on the bus.  this
+       isn't a problem, even if there are multiple devices that can
+       interrupt at our level, because we're not really driving a bus
+       here, we're responding to a directed request for an interrupt
+       vector.  we assume that if there really is an important
+       priority system within our interrupt level, that it's enforced
+       by the bus implementation: */
 
     /* if we're supposed to acknowledge hard interrupts with the
        modified vector, return the modified vector: */
@@ -802,8 +866,7 @@ _tme_z8530_callout(struct tme_z8530 *z8530, struct tme_z8530_chan *chan, int new
 	 the highest-priority interrupt currently under service,
 	 and the Master Interrupt Enable is set,
 	 we are supposed to be asserting an interrupt: */
-      if (z8530->tme_z8530_rr3 > z8530->tme_z8530_ius
-	  && (z8530->tme_z8530_wr9 & TME_Z8530_WR9_MIE)) {
+      if (_tme_z8530_int_pending(z8530)) {
 	int_asserted = TRUE;
       }
     }
@@ -818,8 +881,9 @@ _tme_z8530_callout(struct tme_z8530 *z8530, struct tme_z8530_chan *chan, int new
     tme_mutex_unlock(&z8530->tme_z8530_mutex);
     
     /* get our bus connection: */
-    conn_bus = TME_ATOMIC_READ(struct tme_bus_connection *,
-			       z8530->tme_z8530_device.tme_bus_device_connection);
+    conn_bus = tme_memory_atomic_pointer_read(struct tme_bus_connection *,
+					      z8530->tme_z8530_device.tme_bus_device_connection,
+					      &z8530->tme_z8530_device.tme_bus_device_connection_rwlock);
     
     /* call out the bus interrupt signal edge: */
     rc = (*conn_bus->tme_bus_signal)
@@ -1000,6 +1064,9 @@ _tme_z8530_bus_cycle(void *_z8530, struct tme_bus_cycle *cycle_init)
 	     ius & (ius - 1);
 	     ius &= (ius - 1));
 	z8530->tme_z8530_ius ^= ius;
+
+	/* update RR2: */
+	_tme_z8530_rr2_update(z8530);
 	
 	/* always check for an interrupt callout: */
 	new_callouts |= TME_Z8530_CALLOUT_INT;
@@ -1118,6 +1185,9 @@ _tme_z8530_bus_cycle(void *_z8530, struct tme_bus_cycle *cycle_init)
 
       /* update RR0: */
       chan->tme_z8530_chan_rdreg[0] &= ~TME_Z8530_RR0_TX_EMPTY;
+
+      /* update RR1: */
+      chan->tme_z8530_chan_rdreg[1] &= ~TME_Z8530_RR1_ALL_SENT;
       break;
 
       /* WR9: */
@@ -1128,14 +1198,14 @@ _tme_z8530_bus_cycle(void *_z8530, struct tme_bus_cycle *cycle_init)
       case TME_Z8530_WR9_RESET_NULL:
 	break;
       case TME_Z8530_WR9_RESET_CHAN_B:
-	_tme_z8530_channel_reset(&z8530->tme_z8530_chan_b, FALSE);
+	_tme_z8530_channel_reset(z8530, &z8530->tme_z8530_chan_b, FALSE);
 	break;
       case TME_Z8530_WR9_RESET_CHAN_A:
-	_tme_z8530_channel_reset(&z8530->tme_z8530_chan_a, FALSE);
+	_tme_z8530_channel_reset(z8530, &z8530->tme_z8530_chan_a, FALSE);
 	break;
       case TME_Z8530_WR9_RESET_CHIP:
-	_tme_z8530_channel_reset(&z8530->tme_z8530_chan_a, TRUE);
-	_tme_z8530_channel_reset(&z8530->tme_z8530_chan_b, TRUE);
+	_tme_z8530_channel_reset(z8530, &z8530->tme_z8530_chan_a, TRUE);
+	_tme_z8530_channel_reset(z8530, &z8530->tme_z8530_chan_b, TRUE);
 	break;
       }
 
@@ -1196,7 +1266,7 @@ _tme_z8530_bus_cycle(void *_z8530, struct tme_bus_cycle *cycle_init)
       break;
 
       /* RR1: */
-      /* RR5 (an image of RR0 on the 8530): */
+      /* RR5 (an image of RR1 on the 8530): */
     case 1:
     case 5:
       value = chan->tme_z8530_chan_rdreg[1];
@@ -1405,6 +1475,9 @@ _tme_z8530_read(struct tme_serial_connection *conn_serial,
     /* update RR0: */
     chan->tme_z8530_chan_rdreg[0] |= TME_Z8530_RR0_TX_EMPTY;
 
+    /* update RR1: */
+    chan->tme_z8530_chan_rdreg[1] |= TME_Z8530_RR1_ALL_SENT;
+
     /* if Tx interrupts are enabled: */
     if (chan->tme_z8530_chan_wrreg[1] & TME_Z8530_WR1_TX_INT_ENABLE) {
 
@@ -1454,8 +1527,8 @@ _tme_z8530_tlb_fill(void *_z8530, struct tme_bus_tlb *tlb,
   tme_bus_tlb_initialize(tlb);
 
   /* this TLB entry can cover the whole device: */
-  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first, 0);
-  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last, z8530_address_last);
+  tlb->tme_bus_tlb_addr_first = 0;
+  tlb->tme_bus_tlb_addr_last = z8530_address_last;
 
   /* allow reading and writing: */
   tlb->tme_bus_tlb_cycles_ok = TME_BUS_CYCLE_READ | TME_BUS_CYCLE_WRITE;
@@ -1665,8 +1738,8 @@ TME_ELEMENT_NEW_DECL(tme_ic_z8530) {
   z8530 = tme_new0(struct tme_z8530, 1);
   z8530->tme_z8530_socket = socket_real;
   tme_mutex_init(&z8530->tme_z8530_mutex);
-  _tme_z8530_channel_init(&z8530->tme_z8530_chan_a);
-  _tme_z8530_channel_init(&z8530->tme_z8530_chan_b);
+  _tme_z8530_channel_init(z8530, &z8530->tme_z8530_chan_a);
+  _tme_z8530_channel_init(z8530, &z8530->tme_z8530_chan_b);
 
   /* figure our address mask, up to the nearest power of two: */
   address_mask = TME_MAX(z8530->tme_z8530_address_chan_a,

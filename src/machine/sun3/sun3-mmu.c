@@ -1,4 +1,4 @@
-/* $Id: sun3-mmu.c,v 1.3 2005/04/30 15:09:44 fredette Exp $ */
+/* $Id: sun3-mmu.c,v 1.5 2006/09/30 12:43:39 fredette Exp $ */
 
 /* machine/sun3/sun3-mmu.c - implementation of Sun 3 MMU emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun3-mmu.c,v 1.3 2005/04/30 15:09:44 fredette Exp $");
+_TME_RCSID("$Id: sun3-mmu.c,v 1.5 2006/09/30 12:43:39 fredette Exp $");
 
 /* includes: */
 #include "sun3-impl.h"
@@ -284,12 +284,8 @@ _tme_sun3_tlb_fill(struct tme_sun3 *sun3, struct tme_bus_tlb *tlb, tme_uint8_t c
 	 cycles);
 	
       /* create the mapping TLB entry: */
-      TME_ATOMIC_WRITE(tme_bus_addr_t,
-		       tlb_bus.tme_bus_tlb_addr_first,
-		       address & (((tme_bus_addr_t) 0) - TME_SUN3_PROM_SIZE));
-      TME_ATOMIC_WRITE(tme_bus_addr_t,
-		       tlb_bus.tme_bus_tlb_addr_last,
-		       address | (TME_SUN3_PROM_SIZE - 1));
+      tlb_bus.tme_bus_tlb_addr_first = address & (((tme_bus_addr_t) 0) - TME_SUN3_PROM_SIZE);
+      tlb_bus.tme_bus_tlb_addr_last = address | (TME_SUN3_PROM_SIZE - 1);
       tlb_bus.tme_bus_tlb_cycles_ok
 	= TME_BUS_CYCLE_READ;
   
@@ -314,15 +310,13 @@ _tme_sun3_tlb_fill(struct tme_sun3 *sun3, struct tme_bus_tlb *tlb, tme_uint8_t c
        happen to be the same as this TLB entry, invalidate it: */
     if (sun3->tme_sun3_boot_state_tlbs[tlb_i] != NULL
 	&& (sun3->tme_sun3_boot_state_tlbs[tlb_i]
-	    != TME_ATOMIC_READ(struct tme_bus_tlb *, 
-			       tlb->tme_bus_tlb_backing_reservation))) {
+	    != tlb->tme_bus_tlb_global)) {
       tme_bus_tlb_invalidate(sun3->tme_sun3_boot_state_tlbs[tlb_i]);
     }
 
     /* add this TLB entry to the active list: */
     sun3->tme_sun3_boot_state_tlbs[tlb_i] =
-      TME_ATOMIC_READ(struct tme_bus_tlb *, 
-		      tlb->tme_bus_tlb_backing_reservation);
+      tlb->tme_bus_tlb_global;
 
     /* if this TLB entry ends up good for the supervisor, it's not
        good for the supervisor program function code: */
@@ -376,8 +370,7 @@ _tme_sun3_tlb_fill(struct tme_sun3 *sun3, struct tme_bus_tlb *tlb, tme_uint8_t c
 
       /* remember this TLB entry pointer, and its original bus cycle
 	 handler: */
-      sun3->tme_sun3_memerr_tlb = TME_ATOMIC_READ(struct tme_bus_tlb *, 
-						  tlb->tme_bus_tlb_backing_reservation);
+      sun3->tme_sun3_memerr_tlb = tlb->tme_bus_tlb_global;
       assert (sun3->tme_sun3_memerr_tlb != NULL);
       sun3->tme_sun3_memerr_cycle_private = tlb->tme_bus_tlb_cycle_private;
       sun3->tme_sun3_memerr_cycle = tlb->tme_bus_tlb_cycle;
@@ -428,12 +421,8 @@ _tme_sun3_m68k_tlb_fill(struct tme_m68k_bus_connection *conn_m68k, struct tme_m6
 	 cycles);
 
       /* create the mapping TLB entry: */
-      TME_ATOMIC_WRITE(tme_bus_addr_t,
-		       tlb_bus.tme_bus_tlb_addr_first,
-		       TME_SUN3_CONTROL_UART_BYPASS);
-      TME_ATOMIC_WRITE(tme_bus_addr_t,
-		       tlb_bus.tme_bus_tlb_addr_last,
-		       TME_SUN3_CONTROL_UART_BYPASS + TME_SUN_Z8530_SIZE - 1);
+      tlb_bus.tme_bus_tlb_addr_first = TME_SUN3_CONTROL_UART_BYPASS;
+      tlb_bus.tme_bus_tlb_addr_last = TME_SUN3_CONTROL_UART_BYPASS + TME_SUN_Z8530_SIZE - 1;
       tlb_bus.tme_bus_tlb_cycles_ok
 	= (TME_BUS_CYCLE_READ
 	   | TME_BUS_CYCLE_WRITE);
@@ -449,8 +438,8 @@ _tme_sun3_m68k_tlb_fill(struct tme_m68k_bus_connection *conn_m68k, struct tme_m6
       tme_bus_tlb_initialize(tlb);
 
       /* we cover the entire address space up to the UART bypass: */
-      TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first, 0);
-      TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last, TME_SUN3_CONTROL_UART_BYPASS - 1);
+      tlb->tme_bus_tlb_addr_first = 0;
+      tlb->tme_bus_tlb_addr_last = TME_SUN3_CONTROL_UART_BYPASS - 1;
 
       /* we allow reading and writing: */
       tlb->tme_bus_tlb_cycles_ok = TME_BUS_CYCLE_READ | TME_BUS_CYCLE_WRITE;
@@ -520,12 +509,12 @@ _tme_sun3_bus_tlb_fill(struct tme_bus_connection *conn_bus, struct tme_bus_tlb *
     tme_bus_tlb_initialize(tlb);
 
     /* the address range: */
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first, 0);
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last, 
-		     ((conn_sun3->tme_sun3_bus_connection_which == TME_SUN3_CONN_REG_MEMERR
-		       ? TME_SUN3_MEMERR_SIZ_REG
-		       : sizeof(sun3->tme_sun3_ints))
-		      - 1));
+    tlb->tme_bus_tlb_addr_first = 0;
+    tlb->tme_bus_tlb_addr_last
+      = ((conn_sun3->tme_sun3_bus_connection_which == TME_SUN3_CONN_REG_MEMERR
+	  ? TME_SUN3_MEMERR_SIZ_REG
+	  : sizeof(sun3->tme_sun3_ints))
+	 - 1);
 
     /* we allow reading and writing: */
     tlb->tme_bus_tlb_cycles_ok = TME_BUS_CYCLE_READ | TME_BUS_CYCLE_WRITE;
@@ -553,23 +542,21 @@ _tme_sun3_bus_tlb_fill(struct tme_bus_connection *conn_bus, struct tme_bus_tlb *
      happen to be the same as this TLB entry, invalidate it: */
   if (sun3->tme_sun3_sdvma_tlbs[tlb_i] != NULL
       && (sun3->tme_sun3_sdvma_tlbs[tlb_i]
-	  != TME_ATOMIC_READ(struct tme_bus_tlb *, 
-			     tlb->tme_bus_tlb_backing_reservation))) {
+	  != tlb->tme_bus_tlb_global)) {
     tme_bus_tlb_invalidate(sun3->tme_sun3_sdvma_tlbs[tlb_i]);
   }
 
   /* add this TLB entry to the active list: */
   sun3->tme_sun3_sdvma_tlbs[tlb_i] =
-    TME_ATOMIC_READ(struct tme_bus_tlb *, 
-		    tlb->tme_bus_tlb_backing_reservation);
+    tlb->tme_bus_tlb_global;
 
   /* if system DVMA is disabled: */
   if (__tme_predict_false(!(sun3->tme_sun3_enable & TME_SUN3_ENA_SDVMA))) {
 
     /* return a TLB entry that will generate a VME bus fault: */
     tme_bus_tlb_initialize(tlb);
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first, 0);
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last, size - 1);
+    tlb->tme_bus_tlb_addr_first = 0;
+    tlb->tme_bus_tlb_addr_last = size - 1;
     tlb->tme_bus_tlb_cycles_ok = TME_BUS_CYCLE_READ | TME_BUS_CYCLE_WRITE;
     tlb->tme_bus_tlb_cycle_private = sun3;
     tlb->tme_bus_tlb_cycle = _tme_sun3_sdvma_disabled;
@@ -588,12 +575,8 @@ _tme_sun3_bus_tlb_fill(struct tme_bus_connection *conn_bus, struct tme_bus_tlb *
   /* create the mapping TLB entry.  we do this even if base == 0,
      because the TLB entry as currently filled may cover more address
      space than DVMA space on this machine is supposed to cover: */
-  TME_ATOMIC_WRITE(tme_bus_addr_t,
-		   tlb_bus.tme_bus_tlb_addr_first,
-		   0);
-  TME_ATOMIC_WRITE(tme_bus_addr_t,
-		   tlb_bus.tme_bus_tlb_addr_last,
-		   size - 1);
+  tlb_bus.tme_bus_tlb_addr_first = 0;
+  tlb_bus.tme_bus_tlb_addr_last = size - 1;
   tlb_bus.tme_bus_tlb_cycles_ok
     = (TME_BUS_CYCLE_READ
        | TME_BUS_CYCLE_WRITE);
@@ -874,7 +857,8 @@ _tme_sun3_mmu_context_set(struct tme_sun3 *sun3)
 int
 _tme_sun3_mmu_tlb_set_allocate(struct tme_bus_connection *conn_bus_asker,
 			       unsigned int count, unsigned int sizeof_one, 
-			       TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb *) _tlbs)
+			       struct tme_bus_tlb * tme_shared *_tlbs,
+			       tme_rwlock_t *_tlbs_rwlock)
 {
   struct tme_sun3 *sun3;
   int rc;
@@ -883,7 +867,7 @@ _tme_sun3_mmu_tlb_set_allocate(struct tme_bus_connection *conn_bus_asker,
   sun3 = (struct tme_sun3 *) conn_bus_asker->tme_bus_connection.tme_connection_element->tme_element_private;
 
   /* get the MMU to allocate the TLB set: */
-  rc = tme_sun_mmu_tlb_set_allocate(sun3->tme_sun3_mmu, count, sizeof_one, _tlbs);
+  rc = tme_sun_mmu_tlb_set_allocate(sun3->tme_sun3_mmu, count, sizeof_one, _tlbs, _tlbs_rwlock);
 
   return (rc);
 }
@@ -894,13 +878,13 @@ _tme_sun3_mmu_new(struct tme_sun3 *sun3)
 {
   struct tme_sun_mmu_info mmu_info;
 
+  memset(&mmu_info, 0, sizeof(mmu_info));
   mmu_info.tme_sun_mmu_info_element = sun3->tme_sun3_element;
   mmu_info.tme_sun_mmu_info_address_bits = 28;
   mmu_info.tme_sun_mmu_info_pgoffset_bits = TME_SUN3_PAGE_SIZE_LOG2;
   mmu_info.tme_sun_mmu_info_pteindex_bits = 4;
   mmu_info.tme_sun_mmu_info_contexts = 1 + 8; /* internal context zero is for the boot state */
   mmu_info.tme_sun_mmu_info_pmegs = TME_SUN3_PMEGS;
-  mmu_info.tme_sun_mmu_info_seginv = 255;
   mmu_info.tme_sun_mmu_info_tlb_fill_private = sun3;
   mmu_info.tme_sun_mmu_info_tlb_fill = _tme_sun3_tlb_fill_mmu;
   mmu_info.tme_sun_mmu_info_proterr_private = sun3;

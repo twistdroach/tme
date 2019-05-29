@@ -1,4 +1,4 @@
-/* $Id: m6888x.c,v 1.3 2005/03/23 11:51:17 fredette Exp $ */
+/* $Id: m6888x.c,v 1.4 2007/08/25 20:37:30 fredette Exp $ */
 
 /* ic/m68k/m6888x.c - m68k floating-point implementation */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: m6888x.c,v 1.3 2005/03/23 11:51:17 fredette Exp $");
+_TME_RCSID("$Id: m6888x.c,v 1.4 2007/08/25 20:37:30 fredette Exp $");
 
 /* includes: */
 #include "m68k-impl.h"
@@ -169,7 +169,7 @@ do {							\
   _TME_M6888X_IEEE754_OP(((void (*) _TME_P(t)) TME_M6888X_IEEE754_OP_FUNC(ops_offset)), x)
 
 /* this gets the Nth raw unsigned 32-bit word from an EA operand: */
-#define TME_M6888X_EA_OP32(n)   (((const tme_uint32_t *) _op1)[(n)])
+#define TME_M6888X_EA_OP32(n)   (ic->tme_m68k_ireg_uint32(op1_ireg32 + (n)))
 
 /* this gets the Nth raw digit from a packed decimal operand: */
 #define TME_M6888X_PD_DIGIT(n)  ((TME_M6888X_EA_OP32((n) / 8) >> (4 * ((n) % 8))) & 0xf)
@@ -226,6 +226,7 @@ struct tme_m6888x_frame {
 /* prototypes: */
 TME_M6888X_FPGEN_DECL(_tme_m6888x_fmovecr);
 TME_M6888X_FPGEN_DECL(_tme_m6888x_fsincos);
+TME_M6888X_FPGEN_DECL(_tme_m6888x_fcmp);
 TME_M6888X_FPGEN_DECL(_tme_m6888x_ftst);
 TME_M6888X_FPGEN_DECL(_tme_m6888x_ftwotox);
 TME_M6888X_FPGEN_DECL(_tme_m6888x_ftentox);
@@ -545,6 +546,7 @@ TME_M68K_INSN(tme_m68k_fpgen)
   unsigned int ea_mode;
   unsigned int ea_reg;
   unsigned int ea_size;
+  unsigned int op1_ireg32;
   unsigned int src_specifier;
   unsigned int digit_i;
   tme_int32_t packed_value_int32;
@@ -614,6 +616,10 @@ TME_M68K_INSN(tme_m68k_fpgen)
   /* if the source operand uses the EA: */
   if (src_ea) {
 
+    /* assume that the most-significant first 32-bit part of the
+       source operand will end up in the internal memx register: */
+    op1_ireg32 = TME_M68K_IREG_MEMX32;
+
     /* get the EA mode and register fields: */
     ea_mode = TME_FIELD_EXTRACTU(TME_M68K_INSN_OPCODE, 3, 3);
     ea_reg = TME_FIELD_EXTRACTU(TME_M68K_INSN_OPCODE, 0, 3);
@@ -628,12 +634,13 @@ TME_M68K_INSN(tme_m68k_fpgen)
       switch (src_specifier) {
       case TME_M6888X_TYPE_LONG:
       case TME_M6888X_TYPE_SINGLE:
+	op1_ireg32 = TME_M68K_IREG_D0 + ea_reg;
 	break;
       case TME_M6888X_TYPE_WORD:
-	TME_M68K_INSN_OP1(tme_int32_t) = TME_EXT_S16_S32((tme_int16_t) TME_M68K_INSN_OP1(tme_int32_t));
+	ic->tme_m68k_ireg_int32(TME_M68K_IREG_MEMX32) = (tme_int16_t) TME_M68K_INSN_OP1(tme_int32_t);
 	break;
       case TME_M6888X_TYPE_BYTE:
-	TME_M68K_INSN_OP1(tme_int32_t) = TME_EXT_S8_S32((tme_int8_t) TME_M68K_INSN_OP1(tme_int32_t));
+	ic->tme_m68k_ireg_int32(TME_M68K_IREG_MEMX32) = (tme_int8_t) TME_M68K_INSN_OP1(tme_int32_t);
 	break;
       default:
 	TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_ILL);
@@ -652,6 +659,8 @@ TME_M68K_INSN(tme_m68k_fpgen)
 
       /* _op1 already points to the operand as one or more 32-bit
          words: */
+      assert (_op1 == &ic->tme_m68k_ireg_uint32(TME_M68K_IREG_IMM32 + 0));
+      op1_ireg32 = TME_M68K_IREG_IMM32;
     }
 
     /* otherwise, this is a memory EA: */
@@ -732,12 +741,9 @@ TME_M68K_INSN(tme_m68k_fpgen)
 
       /* dispatch on the operand size to read in the operand as one or
          more 32-bit words.  we will read up to three 32-bit words
-         into memx, memy, and memz, and we require that those
-         registers be contiguous in memory in that order: */
-      assert (((&ic->tme_m68k_ireg_memx32 + 1) == &ic->tme_m68k_ireg_memy32)
-	      && ((&ic->tme_m68k_ireg_memy32 + 1) == &ic->tme_m68k_ireg_memz32));
-      _op1 = &ic->tme_m68k_ireg_memx32;
-
+         into memx, memy, and memz: */
+      assert ((TME_M68K_IREG_MEMX32 + 1) == TME_M68K_IREG_MEMY32
+	      && (TME_M68K_IREG_MEMY32 + 1) == TME_M68K_IREG_MEMZ32);
       switch (ea_size) {
 
 	/* this can only happen when the source operand is a byte.  we
@@ -792,7 +798,7 @@ TME_M68K_INSN(tme_m68k_fpgen)
     case TME_M6888X_TYPE_BYTE:
     case TME_M6888X_TYPE_WORD:
     case TME_M6888X_TYPE_LONG:
-      tme_ieee754_extended80_from_int32(TME_M68K_INSN_OP1(tme_int32_t), &src_buffer);
+      tme_ieee754_extended80_from_int32((tme_int32_t) TME_M6888X_EA_OP32(0), &src_buffer);
       break;
 
       /* convert a single-precision value: */
@@ -1009,6 +1015,81 @@ TME_M6888X_FPGEN(_tme_m6888x_fsincos)
   TME_M6888X_IEEE754_OP_MONADIC(tme_ieee754_ops_extended80_sin,
 				src, 
 				dst);
+}
+
+TME_M6888X_FPGEN(_tme_m6888x_fcmp)
+{
+  int dst_is_negative;
+  int src_is_negative;
+
+  /* check for a NaN operand: */
+  if (__tme_predict_false(tme_ieee754_extended80_check_nan_dyadic(&ic->tme_m68k_fpu_ieee754_ctl, src, dst, dst))) {
+    return;
+  }
+
+  /* see if the destination is negative: */
+  dst_is_negative
+    = (tme_float_is_negative(dst,
+			     (TME_FLOAT_FORMAT_IEEE754_EXTENDED80
+			      | TME_FLOAT_FORMAT_IEEE754_EXTENDED80_BUILTIN))
+       != 0);
+
+  /* if the source operand is an infinity: */
+  if (tme_ieee754_extended80_is_inf(src)) {
+
+    /* see if the source operand is negative infinity: */
+    src_is_negative
+      = (tme_float_is_negative(src,
+			       (TME_FLOAT_FORMAT_IEEE754_EXTENDED80
+				| TME_FLOAT_FORMAT_IEEE754_EXTENDED80_BUILTIN))
+	 != 0);
+
+    /* if the destination operand is the same infinity as the source operand: */
+    if (tme_ieee754_extended80_is_inf(dst)
+	&& dst_is_negative == src_is_negative) {
+
+      /* return a zero, to set Z, with the same sign as the source
+	 operand, to set N appropriately: */
+      tme_ieee754_extended80_value_set_constant(dst, &tme_ieee754_extended80_constant_zero);
+      if (src_is_negative) {
+	assert (dst->tme_float_format == TME_FLOAT_FORMAT_IEEE754_EXTENDED80);
+	dst->tme_float_value_ieee754_extended80.tme_float_ieee754_extended80_sexp |= 0x8000;
+      }
+    }
+
+    /* otherwise, either the destination operand is not an infinity
+       or it is the other infinity: */
+    else {
+
+      /* return a one with the opposite sign as the source operand, to
+	 set N appropriately: */
+      tme_ieee754_extended80_value_set_constant(dst, &tme_ieee754_extended80_constant_one);
+      if (!src_is_negative) {
+	assert (dst->tme_float_format == TME_FLOAT_FORMAT_IEEE754_EXTENDED80);
+	dst->tme_float_value_ieee754_extended80.tme_float_ieee754_extended80_sexp |= 0x8000;
+      }
+    }
+    return;
+  }
+
+  /* otherwise, if the destination operand is an infinity: */
+  else if (tme_ieee754_extended80_is_inf(dst)) {
+
+    /* return a one with the same sign as the destination operand, to
+       set N appropriately: */
+    tme_ieee754_extended80_value_set_constant(dst, &tme_ieee754_extended80_constant_one);
+    if (dst_is_negative) {
+      assert (dst->tme_float_format == TME_FLOAT_FORMAT_IEEE754_EXTENDED80);
+      dst->tme_float_value_ieee754_extended80.tme_float_ieee754_extended80_sexp |= 0x8000;
+    }
+    return;
+  }
+
+  /* do the subtraction: */
+  TME_M6888X_IEEE754_OP_DYADIC(tme_ieee754_ops_extended80_sub,
+			       dst,
+			       src,
+			       dst);
 }
 
 TME_M6888X_FPGEN(_tme_m6888x_ftst)
@@ -1443,12 +1524,7 @@ TME_M68K_INSN(tme_m68k_fmove_rm)
 
     /* dispatch on the operand size to write in the destination as one
        or more 32-bit words.  we will write up to three 32-bit words
-       into memx, memy, and memz, and we require that those registers
-       be contiguous in memory in that order: */
-    assert (((&ic->tme_m68k_ireg_memx32 + 1) == &ic->tme_m68k_ireg_memy32)
-	    && ((&ic->tme_m68k_ireg_memy32 + 1) == &ic->tme_m68k_ireg_memz32));
-    _op1 = &ic->tme_m68k_ireg_memx32;
-
+       from memx, memy, and memz: */
     switch (ea_size) {
 
       /* this can only happen when the source operand is a byte: */
@@ -1614,6 +1690,9 @@ TME_M68K_INSN(tme_m68k_fmovem)
 	ic->tme_m68k_ireg_memx32 = extended80->tme_float_ieee754_extended80_significand.tme_value64_uint32_lo;
       }
       tme_m68k_write_memx32(ic);
+      if (!TME_M68K_SEQUENCE_RESTARTING) {
+	ic->_tme_m68k_ea_address += TME_M68K_SIZE_32;
+      }
     }
 
     /* otherwise, this is a memory-to-register operation: */
@@ -1916,7 +1995,7 @@ TME_M68K_INSN(tme_m68k_fsave)
   if (ic->tme_m68k_fpu_type & TME_M68K_FPU_M6888X) {
 
     /* fill in a minimal BIU flags field: */
-    frame.tme_m6888x_frame_words[frame.tme_m6888x_frame_size / sizeof(tme_uint32_t)] = tme_htobe_u32(0x70000000);
+    frame.tme_m6888x_frame_words[(frame.tme_m6888x_frame_size / sizeof(tme_uint32_t)) - 2] = tme_htobe_u32(0x70000000);
   }
 
   /* get the total size of the frame: */

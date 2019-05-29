@@ -11,6 +11,7 @@ INCLUDES = -I$(top_srcdir) -I$(srcdir) -I. -D_TME_IMPL
 pkglib_LTLIBRARIES = tme_serial_kb.la
 
 tme_serial_kb_la_SOURCES = \
+	serial-sink.c \
 	serial-kb.h \
 	serial-kb.c \
 	kb-sun.c \

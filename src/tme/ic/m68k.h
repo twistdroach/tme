@@ -1,4 +1,4 @@
-/* $Id: m68k.h,v 1.6 2005/02/18 02:52:02 fredette Exp $ */
+/* $Id: m68k.h,v 1.7 2006/09/30 12:43:39 fredette Exp $ */
 
 /* tme/ic/m68k.h - public header file for Motorola 68k emulation */
 
@@ -37,7 +37,7 @@
 #define _TME_IC_M68K_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: m68k.h,v 1.6 2005/02/18 02:52:02 fredette Exp $");
+_TME_RCSID("$Id: m68k.h,v 1.7 2006/09/30 12:43:39 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -89,6 +89,12 @@ _TME_RCSID("$Id: m68k.h,v 1.6 2005/02/18 02:52:02 fredette Exp $");
   (((tlb)->tme_m68k_tlb_function_codes_mask & TME_BIT(function_code))		\
    && TME_BUS_TLB_OK_SLOW_WRITE(&(tlb)->tme_m68k_tlb_bus_tlb, address_first))
 
+/* these busy and unbusy a TLB entry: */
+#define tme_m68k_tlb_busy(tlb)					\
+  tme_bus_tlb_busy(&(tlb)->tme_m68k_tlb_bus_tlb)
+#define tme_m68k_tlb_unbusy(tlb)				\
+  tme_bus_tlb_unbusy(&(tlb)->tme_m68k_tlb_bus_tlb)
+
 /* this indexes an m68k bus router array for an m68k with a port size
    of 8 * (2 ^ siz_lg2) bits: */
 #define TME_M68K_BUS_ROUTER_INDEX(siz_lg2, cycle_size, address)	\
@@ -119,6 +125,7 @@ struct tme_m68k_tlb {
 #define tme_m68k_tlb_linear_first tme_m68k_tlb_bus_tlb.tme_bus_tlb_addr_first
 #define tme_m68k_tlb_linear_last tme_m68k_tlb_bus_tlb.tme_bus_tlb_addr_last
 #define tme_m68k_tlb_bus_rwlock tme_m68k_tlb_bus_tlb.tme_bus_tlb_rwlock
+#define tme_m68k_tlb_cycles_ok tme_m68k_tlb_bus_tlb.tme_bus_tlb_cycles_ok
 #define tme_m68k_tlb_addr_offset tme_m68k_tlb_bus_tlb.tme_bus_tlb_addr_offset
 #define tme_m68k_tlb_addr_shift tme_m68k_tlb_bus_tlb.tme_bus_tlb_addr_shift
 #define tme_m68k_tlb_emulator_off_read tme_m68k_tlb_bus_tlb.tme_bus_tlb_emulator_off_read

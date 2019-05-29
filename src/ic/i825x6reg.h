@@ -1,4 +1,4 @@
-/* $Id: i825x6reg.h,v 1.1 2004/05/04 01:17:27 fredette Exp $ */
+/* $Id: i825x6reg.h,v 1.2 2007/02/21 01:26:19 fredette Exp $ */
 
 /* ic/i825x6reg.h - register definitions for Intel 82586/82596 emulation: */
 
@@ -37,7 +37,7 @@
 #define _TME_I825X6REG_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: i825x6reg.h,v 1.1 2004/05/04 01:17:27 fredette Exp $");
+_TME_RCSID("$Id: i825x6reg.h,v 1.2 2007/02/21 01:26:19 fredette Exp $");
 
 /* macros: */
 
@@ -156,7 +156,7 @@ _TME_RCSID("$Id: i825x6reg.h,v 1.1 2004/05/04 01:17:27 fredette Exp $");
 /* the i82586 and 32-bit segmented i82586 Transmit Buffer: */
 #define TME_I82586_TBD_EOF_SIZE		(0)
 #define  TME_I82586_TBD_EOF		 (0x8000)
-#define  TME_I82586_TBD_SIZE_MASK	 (0x7fff)
+#define  TME_I82586_TBD_SIZE_MASK	 (0x3fff)
 #define TME_I82586_TBD_TBD_OFFSET	(2)
 #define TME_I82586_TBD_TB_ADDRESS	(4)
 

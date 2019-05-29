@@ -169,6 +169,10 @@ tmeicinclude_HEADERS = m68k.h \
 	mm58167.h \
 	isil7170.h \
 	i825x6.h \
+	sparc.h \
+	mk48txx.h \
+	nec765.h \
+	bt458.h \
 	ieee754.h
 
 subdir = tme/ic

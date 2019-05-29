@@ -1,4 +1,4 @@
-/* $Id: sun-mmu.c,v 1.8 2005/02/17 13:26:57 fredette Exp $ */
+/* $Id: sun-mmu.c,v 1.11 2006/11/16 02:37:05 fredette Exp $ */
 
 /* machine/sun/sun-mmu.c - classic Sun MMU emulation implementation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun-mmu.c,v 1.8 2005/02/17 13:26:57 fredette Exp $");
+_TME_RCSID("$Id: sun-mmu.c,v 1.11 2006/11/16 02:37:05 fredette Exp $");
 
 /* includes: */
 #include <tme/machine/sun.h>
@@ -51,7 +51,8 @@ struct tme_sun_mmu_tlb_set {
   struct tme_sun_mmu_tlb_set *tme_sun_mmu_tlb_set_next;
 
   /* the user's pointer into the TLB set: */
-  TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb *) tme_sun_mmu_tlb_set_pointer;
+  struct tme_bus_tlb * tme_shared *tme_sun_mmu_tlb_set_pointer;
+  tme_rwlock_t *tme_sun_mmu_tlb_set_pointer_rwlock;
 
   /* the base of this TLB set: */
   struct tme_bus_tlb *tme_sun_mmu_tlb_set_base;
@@ -83,9 +84,15 @@ struct tme_sun_mmu {
 #define tme_sun_mmu_pteindex_bits tme_sun_mmu_info.tme_sun_mmu_info_pteindex_bits
 #define tme_sun_mmu_contexts tme_sun_mmu_info.tme_sun_mmu_info_contexts
 #define tme_sun_mmu_pmegs_count tme_sun_mmu_info.tme_sun_mmu_info_pmegs
-#define tme_sun_mmu_seginv tme_sun_mmu_info.tme_sun_mmu_info_seginv
 #define _tme_sun_mmu_tlb_fill_private tme_sun_mmu_info.tme_sun_mmu_info_tlb_fill_private
 #define _tme_sun_mmu_tlb_fill tme_sun_mmu_info.tme_sun_mmu_info_tlb_fill
+
+  /* if nonzero, this address space has a hole, and this has only the
+     last true address bit set: */
+  tme_uint32_t tme_sun_mmu_address_hole_bit;
+
+  /* a PTE for addresses in the hole.  this is always all-bits-zero: */
+  struct tme_sun_mmu_pte tme_sun_mmu_address_hole_pte;
 
   /* the number of bits in a segment map index: */
   tme_uint8_t tme_sun_mmu_segment_bits;
@@ -117,6 +124,22 @@ tme_sun_mmu_new(struct tme_sun_mmu_info *info)
   /* copy the user-provided information: */
   mmu->tme_sun_mmu_info = *info;
 
+  /* if there is an address hole: */
+  if (mmu->tme_sun_mmu_info.tme_sun_mmu_info_topindex_bits < 0) {
+
+    /* there must be 32 address bits: */
+    assert (mmu->tme_sun_mmu_address_bits == 32);
+
+    /* adjust the number of address bits for the hole: */
+    mmu->tme_sun_mmu_address_bits += (mmu->tme_sun_mmu_info.tme_sun_mmu_info_topindex_bits + 1);
+
+    /* make the hole address bit: */
+    mmu->tme_sun_mmu_address_hole_bit = TME_BIT(mmu->tme_sun_mmu_address_bits - 1);
+
+    /* zero the number of top index bits: */
+    mmu->tme_sun_mmu_info.tme_sun_mmu_info_topindex_bits = 0;
+  }
+
   /* allocate the segment map and initialize it to all invalid: */
   mmu->tme_sun_mmu_segment_bits = (mmu->tme_sun_mmu_address_bits
 				   - (mmu->tme_sun_mmu_pteindex_bits
@@ -125,7 +148,7 @@ tme_sun_mmu_new(struct tme_sun_mmu_info *info)
 		  * (1 << mmu->tme_sun_mmu_segment_bits));
   mmu->tme_sun_mmu_segment_map = tme_new(unsigned short, segmap_count);
   for (segmap_i = 0; segmap_i < segmap_count; segmap_i++) {
-    mmu->tme_sun_mmu_segment_map[segmap_i] = mmu->tme_sun_mmu_seginv;
+    mmu->tme_sun_mmu_segment_map[segmap_i] = mmu->tme_sun_mmu_pmegs_count - 1;
   }
 
   /* allocate the PMEGs: */
@@ -151,6 +174,17 @@ _tme_sun_mmu_lookup(struct tme_sun_mmu *mmu, tme_uint8_t context, tme_uint32_t a
   unsigned short segment;
   unsigned short segment_map_index;
   unsigned short pmeg;
+
+  /* if there is an address hole, and this address is in it: */
+  if (__tme_predict_false(((address
+			    + (address & mmu->tme_sun_mmu_address_hole_bit))
+			   & (((tme_uint32_t) 0)
+			      - mmu->tme_sun_mmu_address_hole_bit)) != 0)) {
+
+    /* return the hole PTE, and zero for the segment map index: */
+    *_pte = &mmu->tme_sun_mmu_address_hole_pte;
+    return (0);
+  }
 
   /* lose the page offset bits: */
   address >>= mmu->tme_sun_mmu_pgoffset_bits;
@@ -211,14 +245,6 @@ tme_sun_mmu_pte_get(void *_mmu, tme_uint8_t context, tme_uint32_t address,
   mmu = (struct tme_sun_mmu *) _mmu;
   segment_map_index = _tme_sun_mmu_lookup(mmu, context, address, &pte);
 
-#if 0
-  /* if this segment is invalid, return failure: */
-  if (mmu->tme_sun_mmu_segment_map[segment_map_index]
-      == mmu->tme_sun_mmu_seginv) {
-    return (ENOENT);
-  }
-#endif
-
   /* otherwise, copy the PTE: */
   *_pte = *pte;
   return (TME_OK);
@@ -236,14 +262,9 @@ tme_sun_mmu_pte_set(void *_mmu, tme_uint8_t context, tme_uint32_t address,
   /* lookup this address: */
   mmu = (struct tme_sun_mmu *) _mmu;
   segment_map_index = _tme_sun_mmu_lookup(mmu, context, address, &pte);
-
-#if 0
-  /* if this segment is invalid, return failure: */
-  if (mmu->tme_sun_mmu_segment_map[segment_map_index]
-      == mmu->tme_sun_mmu_seginv) {
-    return (ENOENT);
+  if (__tme_predict_false(pte == &mmu->tme_sun_mmu_address_hole_pte)) {
+    return (TME_OK);
   }
-#endif
 
   /* invalidate all TLB entries that are affected by changes to this PMEG: */
   _tme_sun_mmu_pmeg_invalidate(mmu, segment_map_index);
@@ -264,6 +285,9 @@ tme_sun_mmu_segmap_get(void *_mmu, tme_uint8_t context, tme_uint32_t address)
   /* lookup this address: */
   mmu = (struct tme_sun_mmu *) _mmu;
   segment_map_index = _tme_sun_mmu_lookup(mmu, context, address, &pte);
+  if (__tme_predict_false(pte == &mmu->tme_sun_mmu_address_hole_pte)) {
+    return (mmu->tme_sun_mmu_pmegs_count - 1);
+  }
   pmeg = mmu->tme_sun_mmu_segment_map[segment_map_index];
   tme_log(&mmu->tme_sun_mmu_element->tme_element_log_handle, 1000, TME_OK,
 	  (&mmu->tme_sun_mmu_element->tme_element_log_handle,
@@ -285,20 +309,13 @@ tme_sun_mmu_segmap_set(void *_mmu, tme_uint8_t context, tme_uint32_t address, un
   /* lookup this address: */
   mmu = (struct tme_sun_mmu *) _mmu;
   segment_map_index = _tme_sun_mmu_lookup(mmu, context, address, &pte);
-
-  /* if the old segment is valid, invalidate all TLB entries that
-     are affected by changes to this PMEG - losing a spot in the
-     segment map counts as such a change: */
-  if (
-#if 0
-      mmu->tme_sun_mmu_segment_map[segment_map_index]
-      != mmu->tme_sun_mmu_seginv
-#else
-      TRUE
-#endif
-      ) {
-    _tme_sun_mmu_pmeg_invalidate(mmu, segment_map_index);
+  if (__tme_predict_false(pte == &mmu->tme_sun_mmu_address_hole_pte)) {
+    return;
   }
+
+  /* invalidate all TLB entries that are affected by changes to this
+     PMEG - losing a spot in the segment map counts as such a change: */
+  _tme_sun_mmu_pmeg_invalidate(mmu, segment_map_index);
 
   /* set the new segment: */
   mmu->tme_sun_mmu_segment_map[segment_map_index] = pmeg;
@@ -339,25 +356,25 @@ tme_sun_mmu_tlb_fill(void *_mmu, struct tme_bus_tlb *tlb,
   addr_last = (address | (TME_BIT(mmu->tme_sun_mmu_pgoffset_bits) - 1));
 
   /* remember this TLB entry in the PMEG: */
-  pmeg = mmu->tme_sun_mmu_pmegs + mmu->tme_sun_mmu_segment_map[segment_map_index];
-  tlb_i = pmeg->tme_sun_mmu_pmeg_tlbs_head;
-  tlb_old = pmeg->tme_sun_mmu_pmeg_tlbs[tlb_i];
-  if (tlb_old != NULL
-      && tlb_old != TME_ATOMIC_READ(struct tme_bus_tlb *, 
-				    tlb->tme_bus_tlb_backing_reservation)) {
-    tme_bus_tlb_invalidate(tlb_old);
+  if (__tme_predict_true(pte != &mmu->tme_sun_mmu_address_hole_pte)) {
+    pmeg = mmu->tme_sun_mmu_pmegs + mmu->tme_sun_mmu_segment_map[segment_map_index];
+    tlb_i = pmeg->tme_sun_mmu_pmeg_tlbs_head;
+    tlb_old = pmeg->tme_sun_mmu_pmeg_tlbs[tlb_i];
+    if (tlb_old != NULL
+	&& tlb_old != tlb->tme_bus_tlb_global) {
+      tme_bus_tlb_invalidate(tlb_old);
+    }
+    pmeg->tme_sun_mmu_pmeg_tlbs[tlb_i]
+      = tlb->tme_bus_tlb_global;
+    pmeg->tme_sun_mmu_pmeg_tlbs_head = (tlb_i + 1) & (TME_SUN_MMU_PMEG_TLBS - 1);
   }
-  pmeg->tme_sun_mmu_pmeg_tlbs[tlb_i]
-    = TME_ATOMIC_READ(struct tme_bus_tlb *, 
-		      tlb->tme_bus_tlb_backing_reservation);
-  pmeg->tme_sun_mmu_pmeg_tlbs_head = (tlb_i + 1) & (TME_SUN_MMU_PMEG_TLBS - 1);
 
   /* if this page is invalid, return the page-invalid cycle handler,
      which is valid for reading and writing for the user and system: */
   if (!(pte->tme_sun_mmu_pte_flags & TME_SUN_MMU_PTE_VALID)) {
     tme_bus_tlb_initialize(tlb);
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first, addr_first);
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last, addr_last);
+    tlb->tme_bus_tlb_addr_first = addr_first;
+    tlb->tme_bus_tlb_addr_last = addr_last;
     tlb->tme_bus_tlb_cycles_ok = TME_BUS_CYCLE_READ | TME_BUS_CYCLE_WRITE;
     tlb->tme_bus_tlb_cycle_private = mmu->tme_sun_mmu_info.tme_sun_mmu_info_invalid_private;
     tlb->tme_bus_tlb_cycle = mmu->tme_sun_mmu_info.tme_sun_mmu_info_invalid;
@@ -409,8 +426,8 @@ tme_sun_mmu_tlb_fill(void *_mmu, struct tme_bus_tlb *tlb,
       abort();
     }
     tme_bus_tlb_initialize(tlb);
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first, addr_first);
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last, addr_last);
+    tlb->tme_bus_tlb_addr_first = addr_first;
+    tlb->tme_bus_tlb_addr_last = addr_last;
     tlb->tme_bus_tlb_cycles_ok = (TME_BUS_CYCLE_WRITE
 				  | (protection == TME_SUN_MMU_PTE_PROT_ERROR
 				     ? TME_BUS_CYCLE_READ
@@ -435,8 +452,8 @@ tme_sun_mmu_tlb_fill(void *_mmu, struct tme_bus_tlb *tlb,
       : TME_BUS_CYCLE_READ));
 
   /* create the mapping TLB entry, and update the PTE flags: */
-  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb_virtual.tme_bus_tlb_addr_first, addr_first);
-  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb_virtual.tme_bus_tlb_addr_last, addr_last);
+  tlb_virtual.tme_bus_tlb_addr_first = addr_first;
+  tlb_virtual.tme_bus_tlb_addr_last = addr_last;
   pte->tme_sun_mmu_pte_flags |= TME_SUN_MMU_PTE_REF;
   tlb_virtual.tme_bus_tlb_cycles_ok = TME_BUS_CYCLE_READ;
   if (access == TME_SUN_MMU_PTE_PROT_RW) {
@@ -493,13 +510,14 @@ tme_sun_mmu_tlbs_context_set(void *_mmu, tme_uint8_t context)
   for (tlb_set = mmu->tme_sun_mmu_tlb_sets;
        tlb_set != NULL;
        tlb_set = tlb_set->tme_sun_mmu_tlb_set_next) {
-    TME_ATOMIC_WRITE(struct tme_bus_tlb *,
-		     *tlb_set->tme_sun_mmu_tlb_set_pointer,
-		     (struct tme_bus_tlb *)
-		     (((tme_uint8_t *) tlb_set->tme_sun_mmu_tlb_set_base)
-		      + (((unsigned long) tlb_set->tme_sun_mmu_tlb_set_count)
-			 * tlb_set->tme_sun_mmu_tlb_set_sizeof_one
-			 * context)));
+    tme_memory_atomic_pointer_write(struct tme_bus_tlb *,
+				    *tlb_set->tme_sun_mmu_tlb_set_pointer,
+				    (struct tme_bus_tlb *)
+				    (((tme_uint8_t *) tlb_set->tme_sun_mmu_tlb_set_base)
+				     + (((unsigned long) tlb_set->tme_sun_mmu_tlb_set_count)
+					* tlb_set->tme_sun_mmu_tlb_set_sizeof_one
+					* context)),
+				    tlb_set->tme_sun_mmu_tlb_set_pointer_rwlock);
   }
 }
 
@@ -507,7 +525,8 @@ tme_sun_mmu_tlbs_context_set(void *_mmu, tme_uint8_t context)
 int
 tme_sun_mmu_tlb_set_allocate(void *_mmu,
 			     unsigned int count, unsigned int sizeof_one, 
-			     TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb *) _tlbs)
+			     struct tme_bus_tlb * tme_shared *_tlbs,
+			     tme_rwlock_t *_tlbs_rwlock)
 {
   struct tme_sun_mmu *mmu;
   struct tme_bus_tlb *tlbs, *tlb;
@@ -522,7 +541,7 @@ tme_sun_mmu_tlb_set_allocate(void *_mmu,
   tlbs = (struct tme_bus_tlb *) tme_malloc(tlb_i * sizeof_one);
   tlb = tlbs;
   for (; tlb_i-- > 0; ) {
-    tme_bus_tlb_invalidate(tlb);
+    tme_bus_tlb_construct(tlb);
     tlb = (struct tme_bus_tlb *) (((tme_uint8_t *) tlb) + sizeof_one);
   }
 
@@ -530,12 +549,16 @@ tme_sun_mmu_tlb_set_allocate(void *_mmu,
   tlb_set = tme_new0(struct tme_sun_mmu_tlb_set, 1);
   tlb_set->tme_sun_mmu_tlb_set_next = mmu->tme_sun_mmu_tlb_sets;
   tlb_set->tme_sun_mmu_tlb_set_pointer = _tlbs;
+  tlb_set->tme_sun_mmu_tlb_set_pointer_rwlock = _tlbs_rwlock;
   tlb_set->tme_sun_mmu_tlb_set_base = tlbs;
   tlb_set->tme_sun_mmu_tlb_set_sizeof_one = sizeof_one;
   tlb_set->tme_sun_mmu_tlb_set_count = count;
   mmu->tme_sun_mmu_tlb_sets = tlb_set;
   
-  TME_ATOMIC_WRITE(struct tme_bus_tlb *, *_tlbs, tlbs);
+  tme_memory_atomic_pointer_write(struct tme_bus_tlb *,
+				  *_tlbs,
+				  tlbs,
+				  _tlbs_rwlock);
   return (TME_OK);
 }
 

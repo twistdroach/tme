@@ -1,9 +1,9 @@
-/* $Id: sun-bwtwo.c,v 1.2 2005/04/30 15:12:56 fredette Exp $ */
+/* $Id: sun-bwtwo.c,v 1.4 2007/02/15 02:05:12 fredette Exp $ */
 
 /* machine/sun/sun-bwtwo.c - Sun bwtwo emulation: */
 
 /*
- * Copyright (c) 2003, 2004 Matt Fredette
+ * Copyright (c) 2003, 2004, 2006 Matt Fredette
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun-bwtwo.c,v 1.2 2005/04/30 15:12:56 fredette Exp $");
+_TME_RCSID("$Id: sun-bwtwo.c,v 1.4 2007/02/15 02:05:12 fredette Exp $");
 
 /* includes: */
 #include <tme/machine/sun.h>
@@ -50,14 +50,13 @@ _TME_RCSID("$Id: sun-bwtwo.c,v 1.2 2005/04/30 15:12:56 fredette Exp $");
 #define TME_SUNBW2_TYPE_OLD_ONBOARD	(2)
 #define TME_SUNBW2_TYPE_ONBOARD		(3)
 #define TME_SUNBW2_TYPE_P4		(4)
+#define TME_SUNBW2_TYPE_SBUS		(5)
 
 /* register offsets and sizes: */
 #define TME_SUNBW2_REG_CSR_MULTIBUS	(0x81800)
 #define TME_SUNBW2_REG_CSR_OLD_ONBOARD	(0x20000)
 #define TME_SUNBW2_SIZ_CSR		(0x00002)
 #define TME_SUNBW2_SIZ_CSR_PAGE		(0x00800)
-#define TME_SUNBW2_REG_P4		(0x00000)
-#define TME_SUNBW2_SIZ_P4_PAGE		(sizeof(tme_uint32_t))
 
 /* the bits in the Multibus and old-onboard Control/Status register: */
 #define TME_SUNBW2_CSR_ENABLE_VIDEO	(0x8000)	/* enable video */
@@ -79,49 +78,18 @@ _TME_RCSID("$Id: sun-bwtwo.c,v 1.2 2005/04/30 15:12:56 fredette Exp $");
 /* the card: */
 struct tme_sunbw2 {
 
-  /* our simple bus device header: */
-  struct tme_bus_device tme_sunbw2_device;
-#define tme_sunbw2_element tme_sunbw2_device.tme_bus_device_element
-
-  /* the mutex protecting the card: */
-  tme_mutex_t tme_sunbw2_mutex;
-
-  /* the rwlock protecting the card: */
-  tme_rwlock_t tme_sunbw2_rwlock;
-
-  /* the framebuffer connection: */
-  struct tme_fb_connection *tme_sunbw2_fb_connection;
+  /* our generic Sun framebuffer: */
+  struct tme_sunfb tme_sunbw2_sunfb;
+#define tme_sunbw2_mutex tme_sunbw2_sunfb.tme_sunfb_mutex
+#define tme_sunbw2_bus_subregion_memory tme_sunbw2_sunfb.tme_sunfb_bus_subregion_memory
+#define tme_sunbw2_bus_subregion_regs tme_sunbw2_sunfb.tme_sunfb_bus_subregion_regs
+#define tme_sunbw2_csr_address tme_sunbw2_bus_subregion_regs.tme_bus_subregion_address_first
 
   /* the type of the bwtwo: */
   tme_uint32_t tme_sunbw2_type;
 
-  /* the size of the bwtwo: */
-  tme_uint32_t tme_sunbw2_size;
-
-  /* the (relative) bus address of our csr register: */
-  tme_bus_addr_t tme_sunbw2_csr_address;
-
-  /* the (relative) bus addresses of the first byte of framebuffer
-     memory, the last byte of displayed framebuffer memory, and the
-     last byte of framebuffer memory: */
-  tme_bus_addr_t tme_sunbw2_fb_address_first;
-  tme_bus_addr_t tme_sunbw2_fb_address_last_displayed;
-  tme_bus_addr_t tme_sunbw2_fb_address_last;
-
-  /* the framebuffer memory: */
-  tme_uint8_t *tme_sunbw2_fb_memory;
-
-  /* any pad memory: */
-  tme_uint8_t *tme_sunbw2_pad_memory;
-
   /* our csr: */
   tme_uint16_t tme_sunbw2_csr;
-
-  /* our P4 register: */
-  tme_uint32_t tme_sunbw2_p4;
-
-  /* our second bus subregion: */
-  struct tme_bus_subregion tme_sunbw2_subregion1;
 };
 
 #ifdef TME_SUNBW2_DEBUG
@@ -174,61 +142,6 @@ _tme_sunbw2_update_debug(struct tme_fb_connection *conn_fb)
 #undef TME_SUNBW2_LO_WIDTH
 #undef TME_SUNBW2_LO_HEIGHT
 #endif /* TME_SUNBW2_DEBUG */
-
-/* the sunbw2 framebuffer bus cycle handler: */
-static int
-_tme_sunbw2_bus_cycle_fb(void *_sunbw2, struct tme_bus_cycle *cycle_init)
-{
-  struct tme_sunbw2 *sunbw2;
-
-  /* recover our data structure: */
-  sunbw2 = (struct tme_sunbw2 *) _sunbw2;
-
-  /* lock the mutex: */
-  tme_mutex_lock(&sunbw2->tme_sunbw2_mutex);
-
-  /* run the cycle: */
-  assert (cycle_init->tme_bus_cycle_address
-	  >= sunbw2->tme_sunbw2_fb_address_first);
-  tme_bus_cycle_xfer_memory(cycle_init, 
-			    (sunbw2->tme_sunbw2_fb_memory
-			     - sunbw2->tme_sunbw2_fb_address_first),
-			    sunbw2->tme_sunbw2_fb_address_last_displayed);
-  
-  /* unlock the mutex: */
-  tme_mutex_unlock(&sunbw2->tme_sunbw2_mutex);
-
-  /* no faults: */
-  return (TME_OK);
-}
-
-/* the sunbw2 pad bus cycle handler: */
-static int
-_tme_sunbw2_bus_cycle_pad(void *_sunbw2, struct tme_bus_cycle *cycle_init)
-{
-  struct tme_sunbw2 *sunbw2;
-
-  /* recover our data structure: */
-  sunbw2 = (struct tme_sunbw2 *) _sunbw2;
-
-  /* lock the mutex: */
-  tme_mutex_lock(&sunbw2->tme_sunbw2_mutex);
-
-  /* run the cycle: */
-  assert (cycle_init->tme_bus_cycle_address
-	  > sunbw2->tme_sunbw2_fb_address_last_displayed);
-  tme_bus_cycle_xfer_memory(cycle_init, 
-			    (sunbw2->tme_sunbw2_pad_memory
-			     - (sunbw2->tme_sunbw2_fb_address_last_displayed
-				+ 1)),
-			    sunbw2->tme_sunbw2_fb_address_last);
-
-  /* unlock the mutex: */
-  tme_mutex_unlock(&sunbw2->tme_sunbw2_mutex);
-
-  /* no faults: */
-  return (TME_OK);
-}
 
 /* the sunbw2 CSR bus cycle handler: */
 static int
@@ -303,340 +216,115 @@ _tme_sunbw2_bus_cycle_csr(void *_sunbw2, struct tme_bus_cycle *cycle_init)
   return (TME_OK);
 }
 
-/* the sunbw2 P4 bus cycle handler: */
-static int
-_tme_sunbw2_bus_cycle_p4(void *_sunbw2, struct tme_bus_cycle *cycle_init)
+/* this sets the bwtwo type: */
+static const char *
+_tme_sunbw2_type_set(struct tme_sunfb *sunfb, const char *bw2_type_string)
 {
   struct tme_sunbw2 *sunbw2;
-  tme_uint32_t p4_old, p4_new;
-  tme_bus_addr_t undecoded;
+  tme_uint32_t bw2_type;
 
   /* recover our data structure: */
-  sunbw2 = (struct tme_sunbw2 *) _sunbw2;
+  sunbw2 = (struct tme_sunbw2 *) sunfb;
 
-  /* lock the mutex: */
-  tme_mutex_lock(&sunbw2->tme_sunbw2_mutex);
-
-  /* get the old P4 value: */
-  p4_old = tme_betoh_u32(sunbw2->tme_sunbw2_p4);
-
-  /* the entire ?KB (one page's) worth of addresses at
-     TME_SUNBW2_REG_P4 are all decoded (or, rather, not decoded)
-     as the P4: */
-  undecoded
-    = (cycle_init->tme_bus_cycle_address
-       & (TME_SUNBW2_SIZ_P4_PAGE - sizeof(sunbw2->tme_sunbw2_p4)));
-  cycle_init->tme_bus_cycle_address
-    -= undecoded;
-
-  /* run the cycle: */
-  assert (cycle_init->tme_bus_cycle_address
-	  >= TME_SUNBW2_REG_P4);
-  tme_bus_cycle_xfer_memory(cycle_init, 
-			    (((tme_uint8_t *) &sunbw2->tme_sunbw2_p4)
-			     - TME_SUNBW2_REG_P4),
-			    (TME_SUNBW2_REG_P4
-			     + sizeof(sunbw2->tme_sunbw2_p4)
-			     - 1));
-  cycle_init->tme_bus_cycle_address
-    += undecoded;
-
-  /* get the new P4 value: */
-  p4_new = tme_betoh_u32(sunbw2->tme_sunbw2_p4);
-
-  /* put back the unchanging bits: */
-  p4_new
-    = ((p4_new
-	& ~TME_SUN_P4_RO_MASK)
-       | (p4_old
-	  & TME_SUN_P4_RO_MASK));
-
-  /* we do not support these bits: */
-  if (p4_new
-      & (TME_SUN_P4_REG_SYNC_RAMDAC
-	 | TME_SUN_P4_REG_ENABLE_INT)) {
-    abort();
+  /* see if this is a good type: */
+  bw2_type = TME_SUNBW2_TYPE_NULL;
+  if (TME_ARG_IS(bw2_type_string, "multibus")) {
+    bw2_type = TME_SUNBW2_TYPE_MULTIBUS;
+  }
+  else if (TME_ARG_IS(bw2_type_string, "old-onboard")) {
+    bw2_type = TME_SUNBW2_TYPE_OLD_ONBOARD;
+  }
+  else if (TME_ARG_IS(bw2_type_string, "onboard")) {
+    bw2_type = TME_SUNBW2_TYPE_ONBOARD;
+  }
+  else if (TME_ARG_IS(bw2_type_string, "P4")) {
+    bw2_type = TME_SUNBW2_TYPE_P4;
+  }
+  else if (TME_ARG_IS(bw2_type_string, "sbus")) {
+    bw2_type = TME_SUNBW2_TYPE_SBUS;
   }
 
-  /* set the new P4 value: */
-  sunbw2->tme_sunbw2_p4 = tme_htobe_u32(p4_new);
+  /* set the new type: */
+  sunbw2->tme_sunbw2_type = bw2_type;
 
-  /* unlock the mutex: */
-  tme_mutex_unlock(&sunbw2->tme_sunbw2_mutex);
+  /* assume the (relative) bus address of the first byte of displayed
+     framebuffer memory is zero: */
+  sunbw2->tme_sunbw2_bus_subregion_memory.tme_bus_subregion_address_first = 0;
 
-  /* no faults: */
-  return (TME_OK);
-}
+  /* dispatch on the new type: */
+  switch (bw2_type) {
 
-/* the sunbw2 TLB filler: */
-static int
-_tme_sunbw2_tlb_fill(void *_sunbw2, struct tme_bus_tlb *tlb, 
-		      tme_bus_addr_t address, unsigned int cycles)
-{
-  struct tme_sunbw2 *sunbw2;
+    /* if this was a bad type, return a string of types: */
+  default: assert(FALSE);
+  case TME_SUNBW2_TYPE_NULL:
+    return ("multibus | old-onboard | onboard | P4 | sbus");
 
-  /* recover our data structure: */
-  sunbw2 = (struct tme_sunbw2 *) _sunbw2;
+  case TME_SUNBW2_TYPE_MULTIBUS:
+  case TME_SUNBW2_TYPE_OLD_ONBOARD:
 
-  /* initialize the TLB entry: */
-  tme_bus_tlb_initialize(tlb);
+    /* set the addresses of the CSR bus subregion: */
+    sunbw2->tme_sunbw2_csr_address
+      = (bw2_type == TME_SUNBW2_TYPE_MULTIBUS
+	 ? TME_SUNBW2_REG_CSR_MULTIBUS
+	 : TME_SUNBW2_REG_CSR_OLD_ONBOARD);
+    sunbw2->tme_sunbw2_bus_subregion_regs.tme_bus_subregion_address_last
+      = (sunbw2->tme_sunbw2_csr_address
+	 + TME_SUNBW2_SIZ_CSR_PAGE
+	 - 1);
 
-  /* if this is a Multibus or old-onboard bwtwo, and the address falls in the CSR: */
-  if (((sunbw2->tme_sunbw2_type
-	== TME_SUNBW2_TYPE_MULTIBUS)
-       || (sunbw2->tme_sunbw2_type
-	   == TME_SUNBW2_TYPE_OLD_ONBOARD))
-      && (sunbw2->tme_sunbw2_csr_address
-	  <= address)
-      && (address
-	  < (sunbw2->tme_sunbw2_csr_address
-	     + TME_SUNBW2_SIZ_CSR_PAGE))) {
+    /* set the CSR bus cycle handler: */
+    sunfb->tme_sunfb_bus_handler_regs = _tme_sunbw2_bus_cycle_csr;
 
-    tlb->tme_bus_tlb_cycle = _tme_sunbw2_bus_cycle_csr;
+    /* the original Multibus bwtwo and onboard bwtwo only support
+       1152x900 and 1024x1024: */
+    sunfb->tme_sunfb_size
+      = (TME_SUNFB_SIZE_1152_900
+	 | TME_SUNFB_SIZE_1024_1024);
+    break;
 
-    /* this TLB entry covers this range: */
-    TME_ATOMIC_WRITE(tme_bus_addr_t, 
-		     tlb->tme_bus_tlb_addr_first,
-		     sunbw2->tme_sunbw2_csr_address);
-    TME_ATOMIC_WRITE(tme_bus_addr_t, 
-		     tlb->tme_bus_tlb_addr_last, 
-		     (sunbw2->tme_sunbw2_csr_address
-		      + TME_SUNBW2_SIZ_CSR
-		      - 1));
+  case TME_SUNBW2_TYPE_ONBOARD:
 
-    /* this TLB entry cannot allow fast reading, since the page the
-       CSR is on isn't fully decoded - all words on the 2KB page are
-       the CSR: */
-  }
-
-  /* if this is a P4 bwtwo, and the address falls in the P4 register: */
-  else if ((sunbw2->tme_sunbw2_type
-	    == TME_SUNBW2_TYPE_P4)
-	   && (address
-	       < (TME_SUNBW2_REG_P4
-		  + TME_SUNBW2_SIZ_P4_PAGE))) {
-
-    tlb->tme_bus_tlb_cycle = _tme_sunbw2_bus_cycle_p4;
-
-    /* this TLB entry covers this range: */
-    TME_ATOMIC_WRITE(tme_bus_addr_t, 
-		     tlb->tme_bus_tlb_addr_first,
-		     TME_SUNBW2_REG_P4);
-    TME_ATOMIC_WRITE(tme_bus_addr_t, 
-		     tlb->tme_bus_tlb_addr_last, 
-		     (TME_SUNBW2_REG_P4
-		      + TME_SUNBW2_SIZ_P4_PAGE
-		      - 1));
-
-    /* this TLB entry cannot allow fast reading, since the page the
-       P4 register is on isn't fully decoded - all words on the ?KB page are
-       the P4 register: */
-  }
-
-  /* if this address falls in the displayed framebuffer memory: */
-  else if ((sunbw2->tme_sunbw2_fb_address_first
-	    <= address)
-	   && (address
-	       <= sunbw2->tme_sunbw2_fb_address_last_displayed)) {
-
-    assert (sunbw2->tme_sunbw2_fb_connection != NULL);
-
-    tlb->tme_bus_tlb_cycle = _tme_sunbw2_bus_cycle_fb;
-
-    /* this TLB entry covers this range: */
-    TME_ATOMIC_WRITE(tme_bus_addr_t,
-		     tlb->tme_bus_tlb_addr_first, 
-		     sunbw2->tme_sunbw2_fb_address_first);
-    TME_ATOMIC_WRITE(tme_bus_addr_t,
-		     tlb->tme_bus_tlb_addr_last,
-		     sunbw2->tme_sunbw2_fb_address_last_displayed);
-
-    /* this TLB entry allows fast reading and writing: */
-    tlb->tme_bus_tlb_emulator_off_read
-      = (sunbw2->tme_sunbw2_fb_memory
-	 - sunbw2->tme_sunbw2_fb_address_first);
-    tlb->tme_bus_tlb_emulator_off_write
-      = (sunbw2->tme_sunbw2_fb_memory
-	 - sunbw2->tme_sunbw2_fb_address_first);
-  }
-
-  /* if this address falls in the pad memory: */
-  else if ((sunbw2->tme_sunbw2_fb_address_last_displayed
-	    < address)
-	   && (address
-	       <= sunbw2->tme_sunbw2_fb_address_last)) {
-
-    tlb->tme_bus_tlb_cycle = _tme_sunbw2_bus_cycle_pad;
-
-    /* this TLB entry covers this range: */
-    TME_ATOMIC_WRITE(tme_bus_addr_t,
-		     tlb->tme_bus_tlb_addr_first, 
-		     (sunbw2->tme_sunbw2_fb_address_last_displayed
-		      + 1));
-    TME_ATOMIC_WRITE(tme_bus_addr_t,
-		     tlb->tme_bus_tlb_addr_last,
-		     sunbw2->tme_sunbw2_fb_address_last);
-
-    /* this TLB entry allows fast reading and writing: */
-    tlb->tme_bus_tlb_emulator_off_read
-      = (sunbw2->tme_sunbw2_pad_memory
-	 - (sunbw2->tme_sunbw2_fb_address_last_displayed
-	    + 1));
-    tlb->tme_bus_tlb_emulator_off_write
-      = (sunbw2->tme_sunbw2_pad_memory
-	 - (sunbw2->tme_sunbw2_fb_address_last_displayed
-	    + 1));
-  }
-
-  /* the fast reading and writing rwlock: */
-  tlb->tme_bus_tlb_rwlock = &sunbw2->tme_sunbw2_rwlock;
-
-  /* allow reading and writing: */
-  tlb->tme_bus_tlb_cycles_ok = TME_BUS_CYCLE_READ | TME_BUS_CYCLE_WRITE;
-
-  /* our bus cycle handler private data: */
-  tlb->tme_bus_tlb_cycle_private = _sunbw2;
-
-  return (TME_OK);
-}
-
-/* this makes a new framebuffer connection: */
-static int
-_tme_sunbw2_connection_make(struct tme_connection *conn, unsigned int state)
-{
-  struct tme_sunbw2 *sunbw2;
-  struct tme_fb_connection *conn_fb;
-  struct tme_fb_connection *conn_fb_other;
-  int rc;
-
-  /* recover our data structures: */
-  sunbw2 = conn->tme_connection_element->tme_element_private;
-  conn_fb = (struct tme_fb_connection *) conn;
-  conn_fb_other = (struct tme_fb_connection *) conn->tme_connection_other;
-
-  /* both sides must be framebuffer connections: */
-  assert(conn->tme_connection_type == TME_CONNECTION_FRAMEBUFFER);
-  assert(conn->tme_connection_other->tme_connection_type == TME_CONNECTION_FRAMEBUFFER);
-
-  /* lock our mutex: */
-  tme_mutex_lock(&sunbw2->tme_sunbw2_mutex);
-
-  /* once the connection is made, we know whether or not the other
-     side of the connection is supplying specific memory that it wants
-     us to use, or if we should allocate memory ourselves: */
-  if (conn_fb->tme_fb_connection_buffer == NULL) {
-    rc = tme_fb_xlat_alloc_src(conn_fb);
-    assert (rc == TME_OK);
-  }
-  sunbw2->tme_sunbw2_fb_memory = conn_fb->tme_fb_connection_buffer;
-
-  /* we're always set up to answer calls across the connection, so we
-     only have to do work when the connection has gone full, namely
-     taking the other side of the connection: */
-  if (state == TME_CONNECTION_FULL) {
-
-    /* save our connection: */
-    sunbw2->tme_sunbw2_fb_connection = conn_fb_other;
-  }
-
-  /* unlock our mutex: */
-  tme_mutex_unlock(&sunbw2->tme_sunbw2_mutex);
-
-  return (TME_OK);
-}
-
-/* this breaks a connection: */
-static int
-_tme_sunbw2_connection_break(struct tme_connection *conn, unsigned int state)
-{
-  abort();
-}
-
-/* this makes a new connection side for a sunbw2: */
-static int
-_tme_sunbw2_connections_new(struct tme_element *element,
-			     const char * const *args,
-			     struct tme_connection **_conns,
-			     char **_output)
-{
-  struct tme_sunbw2 *sunbw2;
-  struct tme_fb_connection *conn_fb;
-  struct tme_connection *conn;
-  int rc;
-
-  /* recover our data structure: */
-  sunbw2 = (struct tme_sunbw2 *) element->tme_element_private;
-
-  /* make the generic bus device connection side: */
-  rc = tme_bus_device_connections_new(element, args, _conns, _output);
-  if (rc != TME_OK) {
-    return (rc);
-  }
-
-  /* if we don't have a framebuffer connection, make one: */
-  if (sunbw2->tme_sunbw2_fb_connection == NULL) {
-
-    /* allocate the new framebuffer connection: */
-    conn_fb = tme_new0(struct tme_fb_connection, 1);
-    conn = &conn_fb->tme_fb_connection;
+    /* the onboard bwtwo doesn't have any CSR: */
+    sunfb->tme_sunfb_bus_handler_regs = NULL;
     
-    /* fill in the generic connection: */
-    conn->tme_connection_next = *_conns;
-    conn->tme_connection_type = TME_CONNECTION_FRAMEBUFFER;
-    conn->tme_connection_score = tme_fb_connection_score;
-    conn->tme_connection_make = _tme_sunbw2_connection_make;
-    conn->tme_connection_break = _tme_sunbw2_connection_break;
+    /* the sizes supported by a CSR-less bwtwo appear to depend on the
+       actual model; we assume the user knows what he is doing: */
+    sunfb->tme_sunfb_size = (TME_SUNFB_SIZE_NULL - 1);
+    break;
 
-    /* fill in the framebuffer connection: */
-    conn_fb->tme_fb_connection_mode_change = NULL;
-#ifdef TME_SUNBW2_DEBUG
-    conn_fb->tme_fb_connection_update = _tme_sunbw2_update_debug;
-#else  /* !TME_SUNBW2_DEBUG */ 
-    conn_fb->tme_fb_connection_update = NULL;
-#endif /* !TME_SUNBW2_DEBUG */ 
+  case TME_SUNBW2_TYPE_P4:
 
-    /* height and width: */
-    conn_fb->tme_fb_connection_width = tme_sun_fb_p4_size_width(sunbw2->tme_sunbw2_size);
-    conn_fb->tme_fb_connection_height = tme_sun_fb_p4_size_height(sunbw2->tme_sunbw2_size);
+    /* set our initial P4 register: */
+    sunfb->tme_sunfb_p4 = tme_htobe_u32(TME_SUNFB_P4_ID_BWTWO);
 
-    /* we are monochrome: */
-    conn_fb->tme_fb_connection_class = TME_FB_XLAT_CLASS_MONOCHROME;
-    conn_fb->tme_fb_connection_depth = 1;
-    conn_fb->tme_fb_connection_bits_per_pixel = 1;
+    /* set the P4 register bus cycle handler: */
+    sunfb->tme_sunfb_bus_handler_regs = tme_sunfb_bus_cycle_p4;
 
-    /* we skip no pixels at the start of the scanline: */
-    conn_fb->tme_fb_connection_skipx = 0;
+    /* we support the default P4 framebuffer sizes: */
+    sunfb->tme_sunfb_size = 0;
 
-    /* we pad to 32-bit boundaries: */
-    conn_fb->tme_fb_connection_scanline_pad = 32;
+    /* the framebuffer memory begins at a fixed offset after the P4 register: */
+    sunbw2->tme_sunbw2_bus_subregion_memory.tme_bus_subregion_address_first
+      = TME_SUNFB_P4_OFFSET_BITMAP;
 
-    /* we are big-endian: */
-    conn_fb->tme_fb_connection_order = TME_ENDIAN_BIG;
+    break;
 
-    /* we don't allocate memory until the connection is made, in case
-       the other side of the connection wants to provide us with a
-       specific memory region to use (maybe we're on a system with a
-       real bwtwo and we can write directly to its buffer): */
-    conn_fb->tme_fb_connection_buffer = NULL;
+  case TME_SUNBW2_TYPE_SBUS:
 
-    /* our pixels don't have subfields: */
-    conn_fb->tme_fb_connection_mask_g = 0;
-    conn_fb->tme_fb_connection_mask_r = 0;
-    conn_fb->tme_fb_connection_mask_b = 0;
+    /* set the S4 register bus cycle handler: */
+    sunfb->tme_sunfb_bus_handler_regs = tme_sunfb_bus_cycle_s4;
 
-    /* intensities are a single bit, linearly mapped, but inverted: */
-    conn_fb->tme_fb_connection_map_bits = 1;
-    conn_fb->tme_fb_connection_map_g = NULL;
-    conn_fb->tme_fb_connection_map_r = NULL;
-    conn_fb->tme_fb_connection_map_b = NULL;
-    conn_fb->tme_fb_connection_inverted = TRUE;
+    /* we support the default S4 framebuffer sizes: */
+    sunfb->tme_sunfb_size = 0;
 
-    /* return the connection side possibility: */
-    *_conns = conn;
+    /* we use the default S4 memory address: */
+    sunbw2->tme_sunbw2_bus_subregion_memory.tme_bus_subregion_address_first = 0;
+
+    break;
   }
 
-  /* done: */
-  return (TME_OK);
+  /* success: */
+  return (NULL);
 }
 
 /* the new sun bwtwo function: */
@@ -644,247 +332,41 @@ int
 tme_sun_bwtwo(struct tme_element *element, const char * const *args, char **_output)
 {
   struct tme_sunbw2 *sunbw2;
-  struct tme_bus_subregion *fb_subregion;
-  struct tme_bus_subregion *reg_subregion;
-  tme_uint32_t bw2_type;
-  tme_uint32_t bw2_size;
-  tme_bus_addr_t fb_size;
-  int arg_i;
-  int usage;
-
-  /* check our arguments: */
-  usage = 0;
-  bw2_type = TME_SUNBW2_TYPE_NULL;
-  bw2_size = TME_SUN_P4_SIZE_1152_900;
-  arg_i = 1;
-  for (;;) {
-
-    /* the framebuffer type: */
-    if (TME_ARG_IS(args[arg_i + 0], "type")) {
-      if (TME_ARG_IS(args[arg_i + 1], "multibus")) {
-	bw2_type = TME_SUNBW2_TYPE_MULTIBUS;
-      }
-      else if (TME_ARG_IS(args[arg_i + 1], "old-onboard")) {
-	bw2_type = TME_SUNBW2_TYPE_OLD_ONBOARD;
-      }
-      else if (TME_ARG_IS(args[arg_i + 1], "onboard")) {
-	bw2_type = TME_SUNBW2_TYPE_ONBOARD;
-      }
-      else if (TME_ARG_IS(args[arg_i + 1], "P4")) {
-	bw2_type = TME_SUNBW2_TYPE_P4;
-      }
-      else {
-	usage = TRUE;
-	break;
-      }
-      arg_i += 2;
-    }
-
-    /* the framebuffer size: */
-    else if (TME_ARG_IS(args[arg_i + 0], "size")) {
-      bw2_size = tme_sun_fb_p4_size(args[arg_i + 1]);
-      if (bw2_size == TME_SUN_P4_SIZE_NULL) {
-	usage = TRUE;
-	break;
-      }
-      arg_i += 2;
-    }
-
-    /* if we ran out of arguments: */
-    else if (args[arg_i] == NULL) {
-
-      break;
-    }
-
-    /* otherwise this is a bad argument: */
-    else {
-      tme_output_append_error(_output,
-			      "%s %s, ",
-			      args[arg_i],
-			      _("unexpected"));
-      usage = TRUE;
-      break;
-    }
-  }
-
-  /* dispatch on the bwtwo type to check that it and the size are
-     valid: */
-  switch (bw2_type) {
-
-    /* no bwtwo type was specified: */
-  case TME_SUNBW2_TYPE_NULL:
-    /* XXX TBD */
-    usage = TRUE;
-    break;
-
-    /* the original Multibus bwtwo and onboard bwtwo only support
-       1152x900 and 1024x1024: */
-  case TME_SUNBW2_TYPE_MULTIBUS:
-  case TME_SUNBW2_TYPE_OLD_ONBOARD:
-    if (bw2_size != TME_SUN_P4_SIZE_1152_900
-	&& bw2_size != TME_SUN_P4_SIZE_1024_1024) {
-      /* XXX TBD */
-      usage = TRUE;
-    }
-    break;
-
-    /* the sizes supported by a CSR-less bwtwo appear to depend on the 
-       actual model; we assume the user knows what he is doing: */
-  case TME_SUNBW2_TYPE_ONBOARD:
-    break;
-
-    /* we allow creating a P4 bwtwo with any of the P4 sizes, again
-       assuming that the user knows what he is doing: */
-  case TME_SUNBW2_TYPE_P4:
-    break;
-
-  default:
-    assert(FALSE);
-    break;
-  }
-
-  if (usage) {
-    tme_output_append_error(_output, 
-			    "%s %s type { multibus | old-onboard | onboard | P4 } [ size { 1600x1280 | 1152x900 | 1024x1024 | 1280x1024 | 1440x1440 | 640x480 } ]",
-			    _("usage:"),
-			    args[0]);
-    return (EINVAL);
-  }
+  int rc;
 
   /* start the sunbw2 structure: */
   sunbw2 = tme_new0(struct tme_sunbw2, 1);
-  sunbw2->tme_sunbw2_element = element;
-  tme_mutex_init(&sunbw2->tme_sunbw2_mutex);
-  tme_rwlock_init(&sunbw2->tme_sunbw2_rwlock);
+  sunbw2->tme_sunbw2_sunfb.tme_sunfb_element = element;
 
-  /* set the bwtwo type: */
-  sunbw2->tme_sunbw2_type = bw2_type;
+  /* initialize the sunfb structure: */
+  sunbw2->tme_sunbw2_sunfb.tme_sunfb_class = TME_FB_XLAT_CLASS_MONOCHROME;
+  sunbw2->tme_sunbw2_sunfb.tme_sunfb_depth = 1;
+  sunbw2->tme_sunbw2_sunfb.tme_sunfb_type_set = _tme_sunbw2_type_set;
 
-  /* set the bwtwo size: */
-  sunbw2->tme_sunbw2_size = bw2_size;
+  /* if the generic initialization fails: */
+  rc = tme_sunfb_new(&sunbw2->tme_sunbw2_sunfb, args, _output);
+  if (rc) {
 
-  /* assume the (relative) bus address of the first byte of displayed
-     framebuffer memory: */
-  sunbw2->tme_sunbw2_fb_address_first = 0;
-
-  /* assume that the number of bytes of framebuffer memory is the
-     minimum number of bytes required, rounded up to the nearest power
-     of two: */
-  fb_size = ((tme_sun_fb_p4_size_width(bw2_size)
-	      * tme_sun_fb_p4_size_height(bw2_size))
-	     / 8);
-  if ((fb_size & (fb_size - 1)) != 0) {
-    for (; (fb_size & (fb_size - 1)) != 0; fb_size &= (fb_size - 1));
-    fb_size <<= 1;
+    /* free the sunfb structure and return the error: */
+    tme_free(sunbw2);
+    return (rc);
   }
 
-  /* assume that we will attach to two bus subregions, and that the
-     framebuffer memory will be first: */
-  fb_subregion = &sunbw2->tme_sunbw2_device.tme_bus_device_subregions;
-  fb_subregion->tme_bus_subregion_next = &sunbw2->tme_sunbw2_subregion1;
-  sunbw2->tme_sunbw2_subregion1.tme_bus_subregion_next = NULL;
-
   /* dispatch on the bwtwo type: */
-  switch (bw2_type) {
+  switch (sunbw2->tme_sunbw2_type) {
+  default: break;
   case TME_SUNBW2_TYPE_MULTIBUS:
   case TME_SUNBW2_TYPE_OLD_ONBOARD:
 
     /* set our initial CSR: */
     sunbw2->tme_sunbw2_csr
       = tme_htobe_u16(TME_SUNBW2_CSR_ENABLE_VIDEO
-		      | (bw2_size == TME_SUN_P4_SIZE_1024_1024
+		      | (sunbw2->tme_sunbw2_sunfb.tme_sunfb_size == TME_SUNFB_SIZE_1024_1024
 			 ? TME_SUNBW2_CSR_JUMPER_HIRES
 			 : 0));
 
-    /* set our CSR address: */
-    sunbw2->tme_sunbw2_csr_address
-      = (bw2_type == TME_SUNBW2_TYPE_MULTIBUS
-	 ? TME_SUNBW2_REG_CSR_MULTIBUS
-	 : TME_SUNBW2_REG_CSR_OLD_ONBOARD);
-
-    /* our second bus subregion is for the CSR: */
-    reg_subregion = &sunbw2->tme_sunbw2_subregion1;
-    reg_subregion->tme_bus_subregion_address_first
-      = sunbw2->tme_sunbw2_csr_address;
-    reg_subregion->tme_bus_subregion_address_last
-      = (reg_subregion->tme_bus_subregion_address_first
-	 + TME_SUNBW2_SIZ_CSR_PAGE
-	 - 1);
-    break;
-
-  case TME_SUNBW2_TYPE_ONBOARD:
-
-    /* we attach to only one bus subregion: */
-    fb_subregion->tme_bus_subregion_next = NULL;
-    break;
-
-  case TME_SUNBW2_TYPE_P4:
-
-    /* set our initial P4 register: */
-    sunbw2->tme_sunbw2_p4
-      = tme_htobe_u16(TME_SUN_P4_ID_BWTWO
-		      | bw2_size
-		      | TME_SUN_P4_REG_ENABLE_VIDEO);
-
-    /* the framebuffer memory begins at a fixed offset after the P4 register: */
-    sunbw2->tme_sunbw2_fb_address_first = TME_SUN_P4_OFFSET_BWTWO;
-
-    /* we attach the P4 register first, and the framebuffer memory second: */
-    reg_subregion = &sunbw2->tme_sunbw2_device.tme_bus_device_subregions;
-    fb_subregion = &sunbw2->tme_sunbw2_subregion1;
-    reg_subregion->tme_bus_subregion_address_first = 0;
-    reg_subregion->tme_bus_subregion_address_last
-      = (reg_subregion->tme_bus_subregion_address_first
-	 + sizeof(sunbw2->tme_sunbw2_p4)
-	 - 1);
     break;
   }
-
-  /* set the (relative) bus address of the last byte of displayed
-     framebuffer memory: */
-  sunbw2->tme_sunbw2_fb_address_last_displayed
-    = (sunbw2->tme_sunbw2_fb_address_first
-       + ((tme_sun_fb_p4_size_width(bw2_size)
-	   * tme_sun_fb_p4_size_height(bw2_size))
-	  / 8)
-       - 1);
-
-  /* set the (relative) bus address of the last byte of framebuffer
-     memory: */
-  sunbw2->tme_sunbw2_fb_address_last
-    = (sunbw2->tme_sunbw2_fb_address_first
-       + fb_size
-       - 1);
-
-  /* finish the framebuffer memory subregion: */
-  fb_subregion->tme_bus_subregion_address_first
-    = sunbw2->tme_sunbw2_fb_address_first;
-  fb_subregion->tme_bus_subregion_address_last
-    = sunbw2->tme_sunbw2_fb_address_last;
-
-  /* assume that we don't need any pad (undisplayed) framebuffer memory: */
-  sunbw2->tme_sunbw2_pad_memory = NULL;
-  assert (sunbw2->tme_sunbw2_fb_address_last
-	  >= sunbw2->tme_sunbw2_fb_address_last_displayed);
-
-  /* if we need to, allocate pad (undisplayed) framebuffer memory: */
-  if (sunbw2->tme_sunbw2_fb_address_last
-      > sunbw2->tme_sunbw2_fb_address_last_displayed) {
-
-    /* allocate the pad memory: */
-    sunbw2->tme_sunbw2_pad_memory
-      = tme_new0(tme_uint8_t,
-		 (sunbw2->tme_sunbw2_fb_address_last
-		  - sunbw2->tme_sunbw2_fb_address_last_displayed));
-  }
-
-  /* initialize our simple bus device descriptor: */
-  sunbw2->tme_sunbw2_device.tme_bus_device_element = element;
-  sunbw2->tme_sunbw2_device.tme_bus_device_tlb_fill = _tme_sunbw2_tlb_fill;
-
-  /* fill the element: */
-  element->tme_element_private = sunbw2;
-  element->tme_element_connections_new = _tme_sunbw2_connections_new;
 
   return (TME_OK);
 }

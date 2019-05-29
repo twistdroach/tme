@@ -1,4 +1,4 @@
-/* $Id: scsi-device.h,v 1.4 2005/02/18 03:06:40 fredette Exp $ */
+/* $Id: scsi-device.h,v 1.8 2007/01/19 00:41:43 fredette Exp $ */
 
 /* tme/scsi/scsi-device.h - header file for generic SCSI device support: */
 
@@ -37,9 +37,10 @@
 #define _TME_SCSI_SCSI_DEVICE_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: scsi-device.h,v 1.4 2005/02/18 03:06:40 fredette Exp $");
+_TME_RCSID("$Id: scsi-device.h,v 1.8 2007/01/19 00:41:43 fredette Exp $");
 
 /* includes: */
+#include <tme/threads.h>
 #include <tme/generic/scsi.h>
 
 /* macros: */
@@ -69,6 +70,12 @@ void sym(scsi_device, control_old, control_new)	\
 #define TME_SCSI_DEVICE_DO_MSG(dev, code, sym)	\
 do {						\
   (dev)->tme_scsi_device_do_msg[code] = (sym);	\
+} while (/* CONSTCOND */ 0)
+
+/* this sets an extended message handler: */
+#define TME_SCSI_DEVICE_DO_MSG_EXT(dev, code, sym)\
+do {						\
+  (dev)->tme_scsi_device_do_msg_ext[code] = (sym);\
 } while (/* CONSTCOND */ 0)
 
 /* this makes a prototype for a CDB handler: */
@@ -159,8 +166,8 @@ struct tme_scsi_device {
   tme_uint8_t tme_scsi_device_cdb[16];
 
   /* the SCSI data buffer.  this buffer is big enough for a large
-     INQUIRY response: */
-  tme_uint8_t tme_scsi_device_data[128];
+     MODE SELECT parameter list: */
+  tme_uint8_t tme_scsi_device_data[256];
 
   /* the SCSI status byte: */
   tme_uint8_t tme_scsi_device_status;
@@ -183,6 +190,9 @@ struct tme_scsi_device {
   void (*tme_scsi_device_do_msg[129]) _TME_P((struct tme_scsi_device *,
 					      tme_scsi_control_t,
 					      tme_scsi_control_t));
+  void (*tme_scsi_device_do_msg_ext[256]) _TME_P((struct tme_scsi_device *,
+						  tme_scsi_control_t,
+						  tme_scsi_control_t));
 
   /* the SCSI CDB handlers.  there are 256 possible commands: */
   void (*tme_scsi_device_do_cdb[256]) _TME_P((struct tme_scsi_device *,
@@ -205,6 +215,8 @@ _TME_SCSI_DEVICE_PHASE_P(tme_scsi_device_target_f);
 _TME_SCSI_DEVICE_PHASE_P(tme_scsi_device_target_mf);
 _TME_SCSI_DEVICE_PHASE_P(tme_scsi_device_target_smf);
 _TME_SCSI_DEVICE_PHASE_P(tme_scsi_device_target_dsmf);
+_TME_SCSI_DEVICE_PHASE_P(tme_scsi_device_target_mc);
+void tme_scsi_device_check_condition _TME_P((struct tme_scsi_device *, tme_uint8_t, tme_uint16_t));
 int tme_scsi_device_address_lun_aware _TME_P((struct tme_scsi_device *));
 int tme_scsi_device_address_lun_unaware _TME_P((struct tme_scsi_device *));
 

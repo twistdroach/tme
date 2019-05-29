@@ -1,4 +1,4 @@
-/* $Id: fb.c,v 1.4 2005/05/09 01:54:47 fredette Exp $ */
+/* $Id: fb.c,v 1.5 2007/08/25 21:05:30 fredette Exp $ */
 
 /* generic/fb.c - generic framebuffer implementation support: */
 
@@ -34,13 +34,17 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: fb.c,v 1.4 2005/05/09 01:54:47 fredette Exp $");
+_TME_RCSID("$Id: fb.c,v 1.5 2007/08/25 21:05:30 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/fb.h>
 
 /* include the automatically-generated translation functions: */
 #include "fb-xlat-auto.c"
+
+/* macros: */
+#define TME_FB_COLORSET_DIRECT_COLOR	(1)
+#define TME_FB_COLORSET_PSEUDO_COLOR	(2)
 
 /* this returns the best translation function: */
 const struct tme_fb_xlat *
@@ -253,9 +257,15 @@ _tme_fb_xlat_colors_get_set(const struct tme_fb_connection *src,
   tme_uint32_t src_max_b;
   tme_uint32_t color_count;
   tme_uint32_t color_i;
+  tme_uint32_t color_j;
+  int compress_colors;
+  unsigned int dst_depth_g;
+  unsigned int dst_depth_r;
+  unsigned int dst_depth_b;
   struct tme_fb_color *colors;
   tme_uint32_t *pixels;
   tme_uint32_t invert_mask;
+  tme_uint32_t colorset;
 
   /* get how to decompose source pixels into subfields.  if source
      pixels have no subfields, act as if all of the subfields are the
@@ -317,6 +327,7 @@ _tme_fb_xlat_colors_get_set(const struct tme_fb_connection *src,
 
     /* we will allocate as many colors as we have source pixels: */
     color_count = src_mask + 1;
+    colorset = TME_FB_COLORSET_NONE;
   }
   
   /* otherwise, either we're halving, or source pixels are too big to
@@ -334,6 +345,7 @@ _tme_fb_xlat_colors_get_set(const struct tme_fb_connection *src,
 
     /* allocate colors for src_max_g intensities: */
     color_count = src_max_g + 1;
+    colorset = TME_FB_COLORSET_NONE;
     src_mask_g = TME_FB_XLAT_MAP_INDEX_MASK_MAX;
     src_map_g = NULL;
     src_mask_r = src_mask_g;
@@ -362,7 +374,8 @@ _tme_fb_xlat_colors_get_set(const struct tme_fb_connection *src,
 	  
       /* nothing to do */
       *_colors = NULL;
-      return (0);
+      dst->tme_fb_connection_map_pixel_count = 0;
+      return (TME_FB_COLORSET_NONE);
     }
 
     /* otherwise, the translation function will index map the
@@ -374,6 +387,7 @@ _tme_fb_xlat_colors_get_set(const struct tme_fb_connection *src,
 
     /* size the color array: */
     color_count = src_max_g + 1 + src_max_r + 1 + src_max_b + 1;
+    colorset = TME_FB_COLORSET_DIRECT_COLOR;
 
     /* if we're getting the needed colors: */
     if (get) {
@@ -397,7 +411,8 @@ _tme_fb_xlat_colors_get_set(const struct tme_fb_connection *src,
 
       /* return the needed colors: */
       *_colors = colors;
-      return (color_count);
+      dst->tme_fb_connection_map_pixel_count = color_count;
+      return (colorset);
     }
 
     /* set up the intensity index maps: */
@@ -446,6 +461,7 @@ _tme_fb_xlat_colors_get_set(const struct tme_fb_connection *src,
     src_max_r = TME_FB_XLAT_MAP_BASE_MASK(src_mask_r);
     src_max_b = TME_FB_XLAT_MAP_BASE_MASK(src_mask_b);
     color_count = (src_mask_g | src_mask_r | src_mask_b) + 1;
+    colorset = TME_FB_COLORSET_PSEUDO_COLOR;
   }
 
   /* if we get here, we're allocating colors from source pixel values
@@ -453,6 +469,51 @@ _tme_fb_xlat_colors_get_set(const struct tme_fb_connection *src,
 
   /* if we're getting the needed colors: */
   if (get) {
+
+    /* if the number of colors we need is clearly more than the
+       destination's depth can possibly handle, and the destination is
+       either monochrome or is color with no pixel subfields, asking
+       for this huge number of distinct colors will probably get us a
+       poorly representative subset.
+       
+       in general, we can't help this.  but in the specific case of
+       source pixels that directly map to intensity(s), we can remove
+       some of the less significant bits of the source pixel subfield
+       mask(s), so that we only ask to allocate as many distinct
+       colors as the destination's depth can handle: */
+    compress_colors
+      = ((color_count >> dst->tme_fb_connection_depth) > 0
+	 && (dst->tme_fb_connection_class == TME_FB_XLAT_CLASS_MONOCHROME
+	     || dst->tme_fb_connection_mask_g == 0)
+	 && src_map_g == NULL);
+    if (compress_colors) {
+
+      /* get the depth for each primary: */
+      if (src->tme_fb_connection_class == TME_FB_XLAT_CLASS_MONOCHROME) {
+	dst_depth_g = dst->tme_fb_connection_depth;
+	dst_depth_r = 0;
+	dst_depth_b = 0;
+      }
+      else {
+	dst_depth_r = dst->tme_fb_connection_depth;
+	dst_depth_g = (dst_depth_r + 2) / 3;
+	dst_depth_r -= dst_depth_g;
+	dst_depth_b = (dst_depth_r + 1) / 2;
+	dst_depth_r -= dst_depth_b;
+      }
+
+      /* remove some of the less significant bits in the subfield
+         masks and recalculate the source intensity maximums: */
+#define _TME_FB_XLAT_LIMIT_MASK(src_mask_i, src_max_i, dst_depth_i)		\
+  do {										\
+    src_mask_i ^= (src_mask_i & (src_mask_i >> dst_depth_i));			\
+    src_max_i = (src_mask_i ? TME_FB_XLAT_MAP_BASE_MASK(src_mask_i) : 1);	\
+  } while (/* CONSTCOND */ 0)
+      _TME_FB_XLAT_LIMIT_MASK(src_mask_g, src_max_g, dst_depth_g);
+      _TME_FB_XLAT_LIMIT_MASK(src_mask_r, src_max_r, dst_depth_r);
+      _TME_FB_XLAT_LIMIT_MASK(src_mask_b, src_max_b, dst_depth_b);
+#undef _TME_FB_XLAT_LIMIT_MASK
+    }
 
     /* make shift counts for the subfields and shift their trailing zeroes off: */
     for (src_shift_g = 0; (src_mask_g & 1) == 0; src_shift_g++, src_mask_g >>= 1);
@@ -471,6 +532,19 @@ _tme_fb_xlat_colors_get_set(const struct tme_fb_connection *src,
       value_g = (color_i >> src_shift_g) & src_mask_g;
       value_r = (color_i >> src_shift_r) & src_mask_r;
       value_b = (color_i >> src_shift_b) & src_mask_b;
+
+      /* we give a distinct pixel value for each distinct color we ask
+	 for, since we may ask for a lot of duplicates.  this isn't
+	 really a pixel value at all, anywhere - it only serves to
+	 group duplicate colors together in the color array: */
+      if (compress_colors) {
+	color_j = value_g;
+	color_j = (color_j * (src_mask_r + 1)) + value_r;
+	color_j = (color_j * (src_mask_b + 1)) + value_b;
+      }
+      else {
+	color_j = color_i;
+      }
 
       /* if the primaries are index mapped, turn the raw primary
 	 values into intensities: */
@@ -503,6 +577,7 @@ _tme_fb_xlat_colors_get_set(const struct tme_fb_connection *src,
       }
 
       /* allocate this color: */
+      colors[color_i].tme_fb_color_pixel = color_j;
       colors[color_i].tme_fb_color_value_g = value_g;
       colors[color_i].tme_fb_color_value_r = value_r;
       colors[color_i].tme_fb_color_value_b = value_b;
@@ -510,7 +585,8 @@ _tme_fb_xlat_colors_get_set(const struct tme_fb_connection *src,
 
     /* return the needed colors: */
     *_colors = colors;
-    return (color_count);
+    dst->tme_fb_connection_map_pixel_count = color_count;
+    return (colorset);
   }
 
   /* otherwise, take in the allocated colors: */

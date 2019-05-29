@@ -1,4 +1,4 @@
-/* $Id: mm58167.c,v 1.6 2003/10/25 17:07:58 fredette Exp $ */
+/* $Id: mm58167.c,v 1.7 2006/09/30 12:43:36 fredette Exp $ */
 
 /* ic/mm58167.c - implementation of National Semiconductor MM58167 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: mm58167.c,v 1.6 2003/10/25 17:07:58 fredette Exp $");
+_TME_RCSID("$Id: mm58167.c,v 1.7 2006/09/30 12:43:36 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -273,8 +273,8 @@ _tme_mm58167_tlb_fill(void *_mm58167, struct tme_bus_tlb *tlb,
   tme_bus_tlb_initialize(tlb);
 
   /* this TLB entry can cover the whole device: */
-  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first, 0);
-  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last, mm58167_address_last);
+  tlb->tme_bus_tlb_addr_first = 0;
+  tlb->tme_bus_tlb_addr_last = mm58167_address_last;
 
   /* allow reading and writing: */
   tlb->tme_bus_tlb_cycles_ok = TME_BUS_CYCLE_READ | TME_BUS_CYCLE_WRITE;

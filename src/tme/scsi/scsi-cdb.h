@@ -1,4 +1,4 @@
-/* $Id: scsi-cdb.h,v 1.2 2003/08/07 22:14:11 fredette Exp $ */
+/* $Id: scsi-cdb.h,v 1.3 2007/02/15 01:29:37 fredette Exp $ */
 
 /* tme/scsi/scsi-cdb.h - header file describing SCSI CDBs: */
 
@@ -37,7 +37,7 @@
 #define _TME_SCSI_SCSI_CDB_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: scsi-cdb.h,v 1.2 2003/08/07 22:14:11 fredette Exp $");
+_TME_RCSID("$Id: scsi-cdb.h,v 1.3 2007/02/15 01:29:37 fredette Exp $");
 
 /* includes: */
 #include <tme/scsi/scsi-device.h>
@@ -157,6 +157,30 @@ _TME_RCSID("$Id: scsi-cdb.h,v 1.2 2003/08/07 22:14:11 fredette Exp $");
 #define TME_SCSI_STATUS_INT_COND_MET	(0x14)
 #define TME_SCSI_STATUS_RSRV_CONFLICT	(0x18)
 
+/* extended sense keys: */
+#define TME_SCSI_SENSE_EXT_KEY_NO_SENSE		(0x0)
+#define TME_SCSI_SENSE_EXT_KEY_RECOVERED_ERROR	(0x1)
+#define TME_SCSI_SENSE_EXT_KEY_NOT_READY	(0x2)
+#define TME_SCSI_SENSE_EXT_KEY_MEDIUM_ERROR	(0x3)
+#define TME_SCSI_SENSE_EXT_KEY_HARDWARE_ERROR	(0x4)
+#define TME_SCSI_SENSE_EXT_KEY_ILLEGAL_REQUEST	(0x5)
+#define TME_SCSI_SENSE_EXT_KEY_UNIT_ATTENTION	(0x6)
+#define TME_SCSI_SENSE_EXT_KEY_DATA_PROTECT	(0x7)
+#define TME_SCSI_SENSE_EXT_KEY_BLANK_CHECK	(0x8)
+						/* 0x9 vendor specific */
+#define TME_SCSI_SENSE_EXT_KEY_COPY_ABORTED	(0xa)
+#define TME_SCSI_SENSE_EXT_KEY_ABORTED_COMMAND	(0xb)
+#define TME_SCSI_SENSE_EXT_KEY_EQUAL		(0xc)
+#define TME_SCSI_SENSE_EXT_KEY_VOLUME_OVERFLOW	(0xd)
+#define TME_SCSI_SENSE_EXT_KEY_MISCOMPARE	(0xe)
+
+/* extended sense ASC and ASCQ values: */
+/* NB: this is a partial list: */
+#define TME_SCSI_SENSE_EXT_ASC_ASCQ_NONE		(0x0000)
+#define TME_SCSI_SENSE_EXT_ASC_ASCQ_INVALID_FIELD_CDB	(0x2400)
+#define TME_SCSI_SENSE_EXT_ASC_ASCQ_PARAMETER_LIST_LENGTH_ERROR (0x1a00) 
+#define TME_SCSI_SENSE_EXT_ASC_ASCQ_PARAMETER_VALUE_INVALID	(0x2602)
+
 /* types: */
 
 /* SCSI inquiry data: */
@@ -183,11 +207,29 @@ struct tme_scsi_device_inquiry {
   tme_uint8_t tme_scsi_device_response_format;
 };
 
+/* a SCSI MODE SELECT and MODE SENSE block descriptor: */
+struct tme_scsi_device_mode_blocks {
+
+  /* the density code: */
+  tme_uint8_t tme_scsi_device_mode_blocks_density_code;
+
+  /* the number of blocks: */
+  tme_uint32_t tme_scsi_device_mode_blocks_number;
+
+  /* the length of the blocks: */
+  tme_uint32_t tme_scsi_device_mode_blocks_length;
+};
+
 /* prototypes: */
 _TME_SCSI_DEVICE_CDB_P(tme_scsi_device_cdb_illegal);
 _TME_SCSI_DEVICE_CDB_P(tme_scsi_device_cdb_tur);
 _TME_SCSI_DEVICE_CDB_P(tme_scsi_device_cdb_request_sense);
 
+void tme_scsi_device_mode_select_data _TME_P((struct tme_scsi_device *,
+					      int (*) _TME_P((struct tme_scsi_device *,
+							      _tme_const struct tme_scsi_device_mode_blocks *)),
+					      int (*) _TME_P((struct tme_scsi_device *,
+							      const tme_uint8_t *))));
 tme_uint8_t *tme_scsi_device_make_inquiry_data _TME_P((struct tme_scsi_device *,
 						       _tme_const struct tme_scsi_device_inquiry *));
 

@@ -6,6 +6,9 @@
 /* Define to the minimum alignment, in bytes, of int32_t. */
 #undef ALIGNOF_INT32_T
 
+/* Define to the minimum alignment, in bytes, of int64_t. */
+#undef ALIGNOF_INT64_T
+
 /* Define to the floating point format of a double. */
 #undef FLOAT_FORMAT_DOUBLE
 

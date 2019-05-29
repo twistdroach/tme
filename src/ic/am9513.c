@@ -1,4 +1,4 @@
-/* $Id: am9513.c,v 1.14 2004/04/30 11:51:29 fredette Exp $ */
+/* $Id: am9513.c,v 1.15 2006/09/30 12:43:36 fredette Exp $ */
 
 /* ic/am9513.c - implementation of Am9513 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: am9513.c,v 1.14 2004/04/30 11:51:29 fredette Exp $");
+_TME_RCSID("$Id: am9513.c,v 1.15 2006/09/30 12:43:36 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -275,8 +275,9 @@ _tme_am9513_callout(struct tme_am9513 *am9513)
   am9513->tme_am9513_callouts_running = TRUE;
 
   /* get our bus connection: */
-  conn_bus = TME_ATOMIC_READ(struct tme_bus_connection *,
-			     am9513->tme_am9513_device.tme_bus_device_connection);
+  conn_bus = tme_memory_atomic_pointer_read(struct tme_bus_connection *,
+					    am9513->tme_am9513_device.tme_bus_device_connection,
+					    &am9513->tme_am9513_device.tme_bus_device_connection_rwlock);
 
   /* loop forever: */
   for (again = TRUE; again;) {
@@ -964,8 +965,8 @@ _tme_am9513_tlb_fill(void *_am9513, struct tme_bus_tlb *tlb,
   tme_bus_tlb_initialize(tlb);
 
   /* this TLB entry can cover the whole device: */
-  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first, 0);
-  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last, am9513_address_last);
+  tlb->tme_bus_tlb_addr_first = 0;
+  tlb->tme_bus_tlb_addr_last = am9513_address_last;
 
   /* allow reading and writing: */
   tlb->tme_bus_tlb_cycles_ok = TME_BUS_CYCLE_READ | TME_BUS_CYCLE_WRITE;

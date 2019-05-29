@@ -1,4 +1,4 @@
-/* $Id: serial-kb.h,v 1.2 2003/09/01 14:33:15 fredette Exp $ */
+/* $Id: serial-kb.h,v 1.3 2006/09/30 12:35:01 fredette Exp $ */
 
 /* serial/serial-kb.h - implementation header file for serial keyboard
    emulation: */
@@ -38,12 +38,13 @@
 #define _SERIAL_SERIAL_KB_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: serial-kb.h,v 1.2 2003/09/01 14:33:15 fredette Exp $");
+_TME_RCSID("$Id: serial-kb.h,v 1.3 2006/09/30 12:35:01 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/keyboard.h>
 #include <tme/generic/serial.h>
 #include <tme/element.h>
+#include <tme/threads.h>
 
 /* macros: */
 

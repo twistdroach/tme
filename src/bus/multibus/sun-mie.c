@@ -1,4 +1,4 @@
-/* $Id: sun-mie.c,v 1.2 2005/02/18 02:50:44 fredette Exp $ */
+/* $Id: sun-mie.c,v 1.3 2006/09/30 12:43:31 fredette Exp $ */
 
 /* bus/multibus/sun_mie.c - implementation of the Sun Intel Ethernet Multibus emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun-mie.c,v 1.2 2005/02/18 02:50:44 fredette Exp $");
+_TME_RCSID("$Id: sun-mie.c,v 1.3 2006/09/30 12:43:31 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -581,7 +581,8 @@ _tme_sun_mie_bus_signals_add(struct tme_bus_connection *conn_bus,
 static int
 _tme_sun_mie_tlb_set_allocate(struct tme_bus_connection *conn_bus,
 			      unsigned int count, unsigned int sizeof_one, 
-			      TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb *) _tlbs)
+			      struct tme_bus_tlb * tme_shared *_tlbs,
+			      tme_rwlock_t *_tlbs_rwlock)
 {
   struct tme_bus_tlb *tlbs, *tlb;
   unsigned int tlb_i;
@@ -590,10 +591,10 @@ _tme_sun_mie_tlb_set_allocate(struct tme_bus_connection *conn_bus,
   tlbs = (struct tme_bus_tlb *) tme_malloc(count * sizeof_one);
   tlb = tlbs;
   for (tlb_i = 0; tlb_i < count; tlb_i++) {
-    tme_bus_tlb_invalidate(tlb);
+    tme_bus_tlb_construct(tlb);
     tlb = (struct tme_bus_tlb *) (((tme_uint8_t *) tlb) + sizeof_one);
   }
-  TME_ATOMIC_WRITE(struct tme_bus_tlb *, *_tlbs, tlbs);
+  tme_memory_atomic_pointer_write(struct tme_bus_tlb *, *_tlbs, tlbs, _tlbs_rwlock);
       
   /* done: */
   return (TME_OK);
@@ -639,8 +640,7 @@ _tme_sun_mie_tlb_fill(struct tme_bus_connection *conn_bus,
   /* if the new head pointer already has a TLB entry, and it doesn't
      happen to be the same one that we're filling now, invalidate it: */
   if (sun_mie->tme_sun_mie_tlbs[tlb_i] != NULL
-      && sun_mie->tme_sun_mie_tlbs[tlb_i] != TME_ATOMIC_READ(struct tme_bus_tlb *, 
-							     tlb->tme_bus_tlb_backing_reservation)) {
+      && sun_mie->tme_sun_mie_tlbs[tlb_i] != tlb->tme_bus_tlb_global) {
     tme_bus_tlb_invalidate(sun_mie->tme_sun_mie_tlbs[tlb_i]);
   }
 
@@ -648,8 +648,8 @@ _tme_sun_mie_tlb_fill(struct tme_bus_connection *conn_bus,
   tme_bus_tlb_initialize(tlb);
 
   /* this TLB entry covers this range: */
-  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first, address);
-  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last, address | (TME_SUN_MIE_PAGESIZE - 1));
+  tlb->tme_bus_tlb_addr_first = address;
+  tlb->tme_bus_tlb_addr_last = address | (TME_SUN_MIE_PAGESIZE - 1);
 
   /* allow reading and writing: */
   tlb->tme_bus_tlb_cycles_ok = TME_BUS_CYCLE_READ | TME_BUS_CYCLE_WRITE;
@@ -668,8 +668,7 @@ _tme_sun_mie_tlb_fill(struct tme_bus_connection *conn_bus,
 
   /* add this TLB entry to the active list: */
   sun_mie->tme_sun_mie_tlbs[tlb_i] =
-    TME_ATOMIC_READ(struct tme_bus_tlb *, 
-		    tlb->tme_bus_tlb_backing_reservation);
+    tlb->tme_bus_tlb_global;
 
   /* unlock our mutex: */
   tme_mutex_unlock(&sun_mie->tme_sun_mie_mutex);
@@ -700,10 +699,8 @@ _tme_sun_mie_tlb_fill_regs(struct tme_bus_connection *conn_bus,
 		    + TME_SUN_MIE_SIZ_PGMAP)) {
     
     /* this TLB entry covers this range: */
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first, TME_SUN_MIE_REG_PGMAP);
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last, (TME_SUN_MIE_REG_PGMAP
-								  + TME_SUN_MIE_SIZ_PGMAP
-								  - 1));
+    tlb->tme_bus_tlb_addr_first = TME_SUN_MIE_REG_PGMAP;
+    tlb->tme_bus_tlb_addr_last = (TME_SUN_MIE_REG_PGMAP + TME_SUN_MIE_SIZ_PGMAP - 1);
   }
 
   /* if this address falls in the PROM: */
@@ -713,10 +710,8 @@ _tme_sun_mie_tlb_fill_regs(struct tme_bus_connection *conn_bus,
 
     
     /* this TLB entry covers this range: */
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first, TME_SUN_MIE_REG_PROM);
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last, (TME_SUN_MIE_REG_PROM
-								  + TME_SUN_MIE_SIZ_PROM
-								  - 1));
+    tlb->tme_bus_tlb_addr_first = TME_SUN_MIE_REG_PROM;
+    tlb->tme_bus_tlb_addr_last = TME_SUN_MIE_REG_PROM + TME_SUN_MIE_SIZ_PROM - 1;
   }
 
   /* if this address falls in the CSR: */
@@ -726,10 +721,8 @@ _tme_sun_mie_tlb_fill_regs(struct tme_bus_connection *conn_bus,
 
     
     /* this TLB entry covers this range: */
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first, TME_SUN_MIE_REG_CSR);
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last, (TME_SUN_MIE_REG_CSR
-								  + TME_SUN_MIE_SIZ_CSR
-								  - 1));
+    tlb->tme_bus_tlb_addr_first = TME_SUN_MIE_REG_CSR;
+    tlb->tme_bus_tlb_addr_last = TME_SUN_MIE_REG_CSR + TME_SUN_MIE_SIZ_CSR - 1;
   }
 
   /* otherwise, this address must fall in the unused hole or in the
@@ -739,11 +732,8 @@ _tme_sun_mie_tlb_fill_regs(struct tme_bus_connection *conn_bus,
 			+ TME_SUN_MIE_SIZ_CSR));
 
     /* this TLB entry covers this range: */
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first, (TME_SUN_MIE_REG_CSR
-								   + TME_SUN_MIE_SIZ_CSR));
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last, (TME_SUN_MIE_REG_PE_ALO
-								  + TME_SUN_MIE_SIZ_PE_ALO
-								  - 1));
+    tlb->tme_bus_tlb_addr_first = (TME_SUN_MIE_REG_CSR + TME_SUN_MIE_SIZ_CSR);
+    tlb->tme_bus_tlb_addr_last = (TME_SUN_MIE_REG_PE_ALO + TME_SUN_MIE_SIZ_PE_ALO - 1);
   }
 
   /* all address ranges allow fast reading: */

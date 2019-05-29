@@ -1,4 +1,4 @@
-/* $Id: m68k-impl.h,v 1.16 2005/03/23 12:12:37 fredette Exp $ */
+/* $Id: m68k-impl.h,v 1.18 2007/03/29 01:36:10 fredette Exp $ */
 
 /* ic/m68k/m68k-impl.h - implementation header file for Motorola 68k emulation: */
 
@@ -37,7 +37,7 @@
 #define _IC_M68K_IMPL_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: m68k-impl.h,v 1.16 2005/03/23 12:12:37 fredette Exp $");
+_TME_RCSID("$Id: m68k-impl.h,v 1.18 2007/03/29 01:36:10 fredette Exp $");
 
 /* includes: */
 #include <tme/ic/m68k.h>
@@ -255,9 +255,18 @@ _TME_RCSID("$Id: m68k-impl.h,v 1.16 2005/03/23 12:12:37 fredette Exp $");
 
 /* given a linear address, this hashes it into a TLB entry: */
 #define _TME_M68K_TLB_HASH_SIZE (1024)
+#define TME_M68K_TLB_ADDRESS_BIAS(n)	((n) << 10)
+#define TME_M68K_TLB_ENTRY_SET(set, function_code, linear_address)	\
+  (((set)								\
+    + (((linear_address)						\
+	/ TME_M68K_TLB_ADDRESS_BIAS(1))					\
+       % _TME_M68K_TLB_HASH_SIZE))					\
+   + (0 && (function_code)))
 #define TME_M68K_TLB_ENTRY(ic, function_code, linear_address) \
-  (TME_ATOMIC_READ(struct tme_m68k_tlb *, (ic)->_tme_m68k_tlb_array) \
-    + ((linear_address >> 10) & (_TME_M68K_TLB_HASH_SIZE - 1)))
+  TME_M68K_TLB_ENTRY_SET(tme_memory_atomic_pointer_read(struct tme_m68k_tlb *,\
+							(ic)->_tme_m68k_tlb_array,\
+							&(ic)->_tme_m68k_tlbs_rwlock),\
+			 function_code, linear_address)
 
 /* macros for sequence control: */
 #define TME_M68K_SEQUENCE_START						\
@@ -450,9 +459,6 @@ struct tme_m68k {
   /* the CPU-dependent status register T bits mask: */
   tme_uint16_t _tme_m68k_sr_mask_t;
 
-  /* the instruction decoder root map: */
-  const struct _tme_m68k_decoder_root *_tme_m68k_decoder_root;
-
   /* the instruction burst count, and the remaining burst: */
   unsigned int _tme_m68k_instruction_burst;
   unsigned int _tme_m68k_instruction_burst_remaining;
@@ -462,25 +468,38 @@ struct tme_m68k {
   unsigned int _tme_m68k_ea_function_code;
 
   /* instruction fetch information: */
-  tme_uint16_t _tme_m68k_insn_opcode;
-  tme_uint16_t _tme_m68k_insn_specop;
-  
-  /* the instruction buffer: */
-  tme_uint8_t _tme_m68k_insn_buffer[TME_M68K_INSN_WORDS_MAX * sizeof(tme_uint32_t)];
-  unsigned int _tme_m68k_insn_buffer_off;
-  tme_uint16_t _tme_m68k_insn_buffer_fetch_total;
-  tme_uint16_t _tme_m68k_insn_buffer_fetch_sizes;
+  tme_uint16_t _tme_m68k_insn_fetch_buffer[TME_M68K_INSN_WORDS_MAX];
+#define _tme_m68k_insn_opcode _tme_m68k_insn_fetch_buffer[0]
+#define _tme_m68k_insn_specop _tme_m68k_insn_fetch_buffer[1]
+  struct tme_m68k_tlb *_tme_m68k_insn_fetch_fast_itlb;
+  const tme_shared tme_uint8_t *_tme_m68k_insn_fetch_fast_start;
+  const tme_shared tme_uint8_t *_tme_m68k_insn_fetch_fast_next;
+  const tme_shared tme_uint8_t *_tme_m68k_insn_fetch_fast_last;
+  unsigned int _tme_m68k_insn_fetch_slow_next;
+  unsigned int _tme_m68k_insn_fetch_slow_count_fast;
+  unsigned int _tme_m68k_insn_fetch_slow_count_total;
 
   /* the TLB entry set, and a separate instruction TLB entry set
      reserved for the executors: */
-  TME_ATOMIC(struct tme_m68k_tlb *, _tme_m68k_tlb_array);
-  TME_ATOMIC(struct tme_m68k_tlb *, _tme_m68k_itlb);
+  union {
+    struct tme_m68k_tlb * tme_shared _tme_m68k_tlb_array_u_m68k;
+    struct tme_bus_tlb * tme_shared _tme_m68k_tlb_array_u_bus;
+  } _tme_m68k_tlb_array_u;
+#define _tme_m68k_tlb_array _tme_m68k_tlb_array_u._tme_m68k_tlb_array_u_m68k
+#define _tme_m68k_tlb_array_bus _tme_m68k_tlb_array_u._tme_m68k_tlb_array_u_bus
+  union {
+    struct tme_m68k_tlb * tme_shared _tme_m68k_itlb_u_m68k;
+    struct tme_bus_tlb * tme_shared _tme_m68k_itlb_u_bus;
+  } _tme_m68k_itlb_u;
+#define _tme_m68k_itlb _tme_m68k_itlb_u._tme_m68k_itlb_u_m68k
+#define _tme_m68k_itlb_bus _tme_m68k_itlb_u._tme_m68k_itlb_u_bus
+  tme_rwlock_t _tme_m68k_tlbs_rwlock;
 
   /* exception handling information: */
   tme_uint32_t _tme_m68k_exceptions;
 
-  /* nonzero iff this CPU has a 16-bit bus: */
-  int _tme_m68k_bus_16bit;
+  /* this must be one iff this CPU has a 16-bit bus, else zero: */
+  tme_uint32_t _tme_m68k_bus_16bit;
 
   /* group 0 exception information: */
   void (*_tme_m68k_group0_hook) _TME_P((struct tme_m68k *));
@@ -540,6 +559,26 @@ struct tme_m68k {
 #endif /* _TME_M68K_STATS */
 };
 
+/* the read-modify-write cycle state: */
+struct tme_m68k_rmw {
+
+  /* the operand size: */
+  unsigned int tme_m68k_rmw_size;     
+
+  /* the address count, and up to two addresses: */
+  unsigned int tme_m68k_rmw_address_count;
+  tme_uint32_t tme_m68k_rmw_addresses[2];
+
+  /* if nonzero, the operand at the corresponding address has been
+     read with a slow bus cycle.  address zero is read into the memx
+     register, and address one is read into the memy register: */
+  unsigned int tme_m68k_rmw_slow_reads[2];
+
+  /* the TLB entries used by the addresses.  if two addresses are
+     sharing one TLB entry, that TLB entry is listed twice: */
+  struct tme_m68k_tlb *tme_m68k_rmw_tlbs[2];
+};
+
 /* globals: */
 extern const tme_uint16_t _tme_m68k_conditions[32];
 extern const _tme_m68k_xfer_memx _tme_m68k_read_memx[5];
@@ -560,6 +599,8 @@ void tme_m68k_change_sr _TME_P((struct tme_m68k *, tme_uint16_t));
 void tme_m68k_external_check _TME_P((struct tme_m68k *, tme_uint32_t));
 void tme_m68k_tlb_fill _TME_P((struct tme_m68k *, struct tme_m68k_tlb *, unsigned int, tme_uint32_t, unsigned int));
 void tme_m68k_do_reset _TME_P((struct tme_m68k *));
+void tme_m68k_callout_unlock _TME_P((struct tme_m68k *ic));
+void tme_m68k_callout_relock _TME_P((struct tme_m68k *ic));
 
 /* exception support: */
 void tme_m68k_exception _TME_P((struct tme_m68k *, tme_uint32_t));
@@ -578,18 +619,15 @@ void tme_m68k_opcodes_init_m68010 _TME_P((tme_uint32_t *));
 void tme_m68k_opcodes_init_m68020 _TME_P((tme_uint32_t *));
 
 /* read/modify/write cycle support: */
-struct tme_m68k_tlb *tme_m68k_rmw_start _TME_P((struct tme_m68k *));
-void tme_m68k_rmw_finish _TME_P((struct tme_m68k *, struct tme_m68k_tlb *));
+int tme_m68k_rmw_start _TME_P((struct tme_m68k *, struct tme_m68k_rmw *));
+void tme_m68k_rmw_finish _TME_P((struct tme_m68k *, struct tme_m68k_rmw *, int));
 
 /* group 0 fault support: */
-int tme_m68k_insn_buffer_xfer _TME_P((struct tme_m68k *, tme_uint8_t *, unsigned int, int));
 void tme_m68k_group0_hook_fast _TME_P((struct tme_m68k *));
-#define tme_m68k_insn_buffer_empty(ic, r, ra) \
-  tme_m68k_insn_buffer_xfer(ic, r, ra, 1)
-#define tme_m68k_insn_buffer_fill(ic, r, ra) \
-  tme_m68k_insn_buffer_xfer(ic, r, ra, 2)
-int tme_m68k_sequence_empty _TME_P((const struct tme_m68k *, tme_uint8_t *, unsigned int));
-int tme_m68k_sequence_fill _TME_P((struct tme_m68k *, const tme_uint8_t *, unsigned int));
+unsigned int tme_m68k_insn_buffer_empty _TME_P((const struct tme_m68k *, tme_uint8_t *, unsigned int));
+unsigned int tme_m68k_insn_buffer_fill _TME_P((struct tme_m68k *, const tme_uint8_t *, unsigned int));
+unsigned int tme_m68k_sequence_empty _TME_P((const struct tme_m68k *, tme_uint8_t *, unsigned int));
+unsigned int tme_m68k_sequence_fill _TME_P((struct tme_m68k *, const tme_uint8_t *, unsigned int));
 
 /* bitfield support: */
 unsigned int tme_m68k_bitfield_width _TME_P((struct tme_m68k *));

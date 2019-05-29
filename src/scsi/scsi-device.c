@@ -1,4 +1,4 @@
-/* $Id: scsi-device.c,v 1.4 2005/02/18 03:20:00 fredette Exp $ */
+/* $Id: scsi-device.c,v 1.7 2007/01/19 00:42:06 fredette Exp $ */
 
 /* scsi/scsi-device.c - implementation of generic SCSI device support: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: scsi-device.c,v 1.4 2005/02/18 03:20:00 fredette Exp $");
+_TME_RCSID("$Id: scsi-device.c,v 1.7 2007/01/19 00:42:06 fredette Exp $");
 
 /* includes: */
 #include <tme/scsi/scsi-device.h>
@@ -257,7 +257,7 @@ tme_scsi_device_target_phase(struct tme_scsi_device *scsi_device,
     /* if we can, dump up to 128 bytes of information: */
     if (info_type != NULL) {
       tme_log_start(&scsi_device->tme_scsi_device_element->tme_element_log_handle,
-		    1000, TME_OK) {
+		    2000, TME_OK) {
 	unsigned int byte_i, count;
 	count = TME_MIN(scsi_device->tme_scsi_device_dma.tme_scsi_dma_resid,
 			128);
@@ -383,7 +383,10 @@ _tme_scsi_device_cycle(struct tme_scsi_connection *conn_scsi,
 	     the total length of the message: */
 	  else if (count == 2) {
 	    scsi_device->tme_scsi_device_dma.tme_scsi_dma_resid
-	      = scsi_device->tme_scsi_device_msg[1];
+	      = ((scsi_device->tme_scsi_device_msg[1]
+		  == 0)
+		 ? 256
+		 : scsi_device->tme_scsi_device_msg[1]);
 	  }
 
 	  /* otherwise, we must have received all of the message: */
@@ -411,6 +414,19 @@ _tme_scsi_device_cycle(struct tme_scsi_connection *conn_scsi,
 	/* if we have received all of the message: */
 	if (scsi_device->tme_scsi_device_dma.tme_scsi_dma_resid == 0) {
 
+	  /* log the message: */
+	  tme_log_start(&scsi_device->tme_scsi_device_element->tme_element_log_handle,
+			1000, TME_OK) {
+	    unsigned int byte_i;
+	    tme_log_part(&scsi_device->tme_scsi_device_element->tme_element_log_handle,
+	                 _("MESSAGE_OUT:"));
+	    for (byte_i = 0; byte_i < count ; byte_i++) {
+	      tme_log_part(&scsi_device->tme_scsi_device_element->tme_element_log_handle,
+			   " 0x%02x",
+			   scsi_device->tme_scsi_device_msg[byte_i]);
+	    }
+	  } tme_log_finish(&scsi_device->tme_scsi_device_element->tme_element_log_handle);
+
 	  /* "Normally, the initiator negates ATN while REQ is true
 	     and ACK is false during the last REQ/ACK handshake of the
 	     MESSAGE OUT phase." */
@@ -422,9 +438,13 @@ _tme_scsi_device_cycle(struct tme_scsi_connection *conn_scsi,
 					  : TME_SCSI_PHASE_COMMAND));
 
 	  /* call out for the message: */
-	  (*scsi_device->tme_scsi_device_do_msg
-	   [TME_MIN(scsi_device->tme_scsi_device_msg[0],
-		    TME_SCSI_MSG_IDENTIFY)])
+	  (*((scsi_device->tme_scsi_device_msg[0]
+	      == TME_SCSI_MSG_EXTENDED)
+	     ? (scsi_device->tme_scsi_device_do_msg_ext
+		[scsi_device->tme_scsi_device_msg[2]])
+	     : (scsi_device->tme_scsi_device_do_msg
+		[TME_MIN(scsi_device->tme_scsi_device_msg[0],
+			 TME_SCSI_MSG_IDENTIFY)])))
 	    (scsi_device,
 	     control_old,
 	     control_new);
@@ -598,6 +618,82 @@ _TME_SCSI_DEVICE_PHASE_DECL(tme_scsi_device_target_dsmf)
   /* the next phase we enter will be the STATUS phase: */
   scsi_device->tme_scsi_device_phase
     = tme_scsi_device_target_smf;
+}
+
+/* when a device is the target, this runs a MESSAGE IN phase, followed
+   usually by a COMMAND phase (but possibly a MESSAGE OUT phase): */
+_TME_SCSI_DEVICE_PHASE_DECL(tme_scsi_device_target_mc)
+{
+  
+  /* enter either the MESSAGE OUT phase or the COMMAND phase: */
+  tme_scsi_device_target_phase(scsi_device,
+			       TME_SCSI_SIGNAL_BSY
+			       | ((control_new
+				   & TME_SCSI_SIGNAL_ATN)
+				  ? TME_SCSI_PHASE_MESSAGE_OUT
+				  : TME_SCSI_PHASE_COMMAND));
+
+#ifndef NDEBUG
+  /* both the MESSAGE OUT and COMMAND phases have specific
+     dispatchers: */
+  scsi_device->tme_scsi_device_phase = NULL;
+#endif /* !NDEBUG */
+}
+
+/* when a device is the target, this builds a simple extended sense
+   and returns an immediate CHECK CONDITION status to the initiator: */
+void
+tme_scsi_device_check_condition(struct tme_scsi_device *scsi_device,
+				tme_uint8_t sense_key,
+				tme_uint16_t sense_asc_ascq)
+{
+  struct tme_scsi_device_sense *sense;
+  int lun;
+
+  /* get the addressed LUN: */
+  lun = scsi_device->tme_scsi_device_addressed_lun;
+
+  /* this target must support extended sense: */
+  assert (!scsi_device->tme_scsi_device_sense_no_extended);
+
+  /* form the sense: */
+  sense = &scsi_device->tme_scsi_device_sense[lun];
+    
+  /* the error class and error code: */
+  sense->tme_scsi_device_sense_data[0]
+    = 0x70;
+
+  /* the sense key: */
+  sense->tme_scsi_device_sense_data[2]
+    = sense_key;
+
+  /* if there is no additional sense: */
+  if (sense_asc_ascq == TME_SCSI_SENSE_EXT_ASC_ASCQ_NONE) {
+
+    /* there is no additional sense length: */
+    sense->tme_scsi_device_sense_data[7] = 0x00;
+  }
+
+  /* otherwise, there is additional sense: */
+  else {
+
+    /* the additional sense length: */
+    sense->tme_scsi_device_sense_data[7]
+      = 0x06;
+
+    /* the additional sense code and additional sense code qualifier: */
+    sense->tme_scsi_device_sense_data[12] = (sense_asc_ascq >> 8);
+    sense->tme_scsi_device_sense_data[13] = sense_asc_ascq;
+  }
+
+  /* this sense is valid: */
+  sense->tme_scsi_device_sense_valid
+    = TRUE;
+
+  /* return the CHECK CONDITION status: */
+  tme_scsi_device_target_do_smf(scsi_device,
+				TME_SCSI_STATUS_CHECK_CONDITION,
+				TME_SCSI_MSG_CMD_COMPLETE);
 }
 
 /* this is the LUN addresser for LUN-aware devices: */
@@ -813,6 +909,9 @@ tme_scsi_device_new(struct tme_scsi_device *scsi_device,
   TME_SCSI_DEVICE_DO_MSG(scsi_device,
 			 TME_SCSI_MSG_IDENTIFY,
 			 tme_scsi_device_msg_identify);
+  TME_SCSI_DEVICE_DO_MSG_EXT(scsi_device,
+			     TME_SCSI_MSG_EXT_SDTR,
+			     tme_scsi_device_msg_target_reject);
 
   /* set the "Group 0 Common Commands for All Device Types": */
   TME_SCSI_DEVICE_DO_CDB(scsi_device,

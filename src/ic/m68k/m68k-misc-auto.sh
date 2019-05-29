@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# $Id: m68k-misc-auto.sh,v 1.10 2005/04/30 15:19:45 fredette Exp $
+# $Id: m68k-misc-auto.sh,v 1.11 2007/02/16 02:50:23 fredette Exp $
 
 # ic/m68k/m68k-misc-auto.sh - automatically generates C code 
 # for miscellaneous m68k emulation support:
@@ -128,7 +128,7 @@ if $header; then
     # 96-bit immediate:
     echo "#define TME_M68K_IREG_IMM32		(${ireg32_next})"
     echo "#define tme_m68k_ireg_imm32		tme_m68k_ireg_uint32(TME_M68K_IREG_IMM32)"
-    ireg32_next=`expr ${ireg32_next} + 1`
+    ireg32_next=`expr ${ireg32_next} + 3`
 
     # the effective address register:
     echo "#define TME_M68K_IREG_EA		(${ireg32_next})"
@@ -234,6 +234,29 @@ fi
 # emit the instruction word fetch macros:
 if $header; then
 
+    # emit the simple signed and unsigned fetch macros:
+    #
+    echo ""
+    echo "/* the simple signed and unsigned fetch macros: */"
+
+    # permute over size:
+    #
+    for size in 16 32; do
+
+	# permute for signed or unsigned:
+	#
+	for capsign in U S; do
+	    if test $capsign = U; then sign=u ; un=un ; else sign= ; un= ; fi
+
+	    echo "#define _TME_M68K_EXECUTE_FETCH_${capsign}${size}(v) \\"
+	    echo "  _TME_M68K_EXECUTE_FETCH_${size}(tme_${sign}int${size}_t, v)"
+	    if test ${size} = 16 && test ${capsign} = U; then
+		echo "#define _TME_M68K_EXECUTE_FETCH_${capsign}${size}_FIXED(v, field) \\"
+		echo "  _TME_M68K_EXECUTE_FETCH_${size}_FIXED(tme_${sign}int${size}_t, v, field)"
+	    fi
+	done
+    done
+
     echo ""
     echo "#endif /* _IC_M68K_MISC_H */"
 
@@ -247,193 +270,79 @@ if $header; then
 	echo ""
 	echo "/* these macros are for the ${executor} executor: */"
 
-	# permute for any-alignment vs. strict-alignment:
-	for alignment in any strict; do
+	# permute over size:
+	#
+	for size in 16 32; do
 
-	    # permute for the two different sizes we need to handle:
-	    for size in 16 32; do
+	    echo ""
+	    echo "/* this fetches a ${size}-bit value for the ${executor} executor: */"
+	    echo "#undef _TME_M68K_EXECUTE_FETCH_${size}"
+	    echo "#define _TME_M68K_EXECUTE_FETCH_${size}(type, v) \\"
 
-		# permute for big-endian vs. little-endian:
-		for endian in little big; do
+	    if test $executor = slow; then
 
-		    # permute for signed or unsigned:
-		    for capsign in U S; do
-			if test $capsign = U; then sign=u ; un=un ; else sign= ; un= ; fi
+		# this expression gives the current fetch offset in the instruction:
+		#
+		offset_fetch="ic->_tme_m68k_insn_fetch_slow_next"
 
-			# the slow executor has only one possible
-			# version of each macro, no matter what the
-			# endianness or alignment or atomic requirements
-			# of the host, since the tme_m68k_fetch${size}
-			# functions take care of all of that:
-			if test $executor = slow; then
-			    if test $endian = big && test $alignment = any; then
-				echo ""
-				echo "/* on all hosts, this fetches a ${size}-bit ${un}signed value for the slow executor: */"
-				echo "#undef _TME_M68K_EXECUTE_FETCH_${capsign}${size}"
-				echo "#define _TME_M68K_EXECUTE_FETCH_${capsign}${size}(v) \\"
-				echo "  /* we update the instruction buffer fetch total and sizes values \\"
-				echo "     before we do the actual fetch, because we may transfer a few \\"
-				echo "     bytes and then fault.  without this, those few bytes wouldn't get \\"
-				echo "     saved in the exception stack frame by tme_m68k_insn_buffer_xfer(), \\"
-				echo "     because it wouldn't know about the fetch.  later, when the \\"
-				echo "     instruction would be resumed, tme_m68k_fetch${size}() won't refetch \\"
-				echo "     them, because it knows they've already been fetched and thinks \\"
-				echo "     they're still in the instruction buffer: */ \\"
-				echo "  ic->_tme_m68k_insn_buffer_fetch_total += sizeof(tme_${sign}int${size}_t); \\"
-				if test ${size} = 16; then
-				    echo "  ic->_tme_m68k_insn_buffer_fetch_sizes <<= 1; \\"
-				else
-				    echo "  ic->_tme_m68k_insn_buffer_fetch_sizes = (ic->_tme_m68k_insn_buffer_fetch_sizes << 1) | 1; \\"
-				fi
-				echo "  (v) = (tme_${sign}int${size}_t) tme_m68k_fetch${size}(ic, linear_pc); \\"
-				echo "  linear_pc += sizeof(tme_${sign}int${size}_t)"
-			    fi
-			    continue
-			fi
+		echo "  /* macros for the ${executor} executor are simple, because \\"
+		echo "     tme_m68k_fetch${size}() takes care of all endianness, alignment, \\"
+		echo "     and atomic issues, and also stores the fetched value in the \\"
+		echo "     instruction fetch buffer (if a previous fetch before a fault \\"
+		echo "     didn't store all or part of it there already): */ \\"
+		echo "  (v) = (type) tme_m68k_fetch${size}(ic, linear_pc); \\"
+		echo "  linear_pc += sizeof(tme_uint${size}_t)"
+	    
+	    else
 
-			# assume we'll be universal:
-			macro_comment="ll hosts"
-			macro_test=
+		# this expression gives the current fetch offset in the instruction:
+		#
+		offset_fetch="(fetch_fast_next - ic->_tme_m68k_insn_fetch_fast_start)"
+		
+		echo "  /* use the raw fetch macro to fetch the value into the variable, \\"
+		echo "     and then save it in the instruction buffer.  the save doesn't \\"
+		echo "     need to be atomic; no one else can see the instruction buffer. \\"
+		echo "     however, the raw fetch macro has already advanced fetch_fast_next, \\"
+		echo "     so we need to compensate for that here: */ \\"
+		echo "  __TME_M68K_EXECUTE_FETCH_${size}(type, v); \\"
+		echo "  tme_memory_write${size}(((tme_uint${size}_t *) ((((tme_uint8_t *) &ic->_tme_m68k_insn_fetch_buffer[0]) - sizeof(tme_uint${size}_t)) + ${offset_fetch})), (tme_uint${size}_t) (v), sizeof(tme_uint16_t))"
 
-			# if this is a 16-bit fetch:
-			if test $size = 16; then
+		echo ""
+		echo "/* this does a raw fetch of a ${size}-bit value for the ${executor} executor: */"
+		echo "#undef __TME_M68K_EXECUTE_FETCH_${size}"
+		echo "#define __TME_M68K_EXECUTE_FETCH_${size}(type, v) \\"
+		echo "  /* if we can't do the fast read, we need to redispatch: */ \\"
+		echo "  /* NB: checks in tme_m68k_go_slow(), and proper setting of \\"
+		echo "     ic->_tme_m68k_insn_fetch_fast_last in _TME_M68K_EXECUTE_NAME(), \\"
+		echo "     allow  us to do a simple pointer comparison here, for \\"
+		echo "     any fetch size: */ \\"
+		echo "  if (__tme_predict_false(fetch_fast_next > ic->_tme_m68k_insn_fetch_fast_last)) \\"
+		echo "    goto _tme_m68k_fast_fetch_failed; \\"
+		echo "  (v) = ((type) \\"
+		echo "         tme_betoh_u${size}(tme_memory_bus_read${size}((const tme_shared tme_uint${size}_t *) fetch_fast_next, \\"
+		echo "                                             tlb->tme_m68k_tlb_bus_rwlock, \\"
+		echo "                                             sizeof(tme_uint16_t), \\"
+		echo "                                             sizeof(tme_uint32_t)))); \\"
+		echo "  fetch_fast_next += sizeof(tme_uint${size}_t)"
+	    fi
 
-			    # we don't need a strict alignment version, since
-			    # we're guaranteed to be reading from emulator
-			    # addresses that are 16-bit aligned - for the fast
-			    # executor, tme_m68k_go_slow guarantees that 
-			    # emulator_load is 16-bit aligned:
-			    if test $alignment = strict; then continue; fi
+	    # if this size doesn't get a fixed fetch macro, continue now:
+	    #
+	    if test ${size} != 16; then
+		continue
+	    fi
 
-			    # we also don't need a little-endian version, since
-			    # the fast macros we emit will always use tme_betoh_u16:
-			    if test $endian = little; then continue; fi
+	    echo ""
+	    echo "/* this fetches a ${size}-bit value at a fixed instruction position"
+	    echo "   for the ${executor} executor: */"
+	    echo "#undef _TME_M68K_EXECUTE_FETCH_${size}_FIXED"
+	    echo "#define _TME_M68K_EXECUTE_FETCH_${size}_FIXED(type, v, field) \\"
+	    echo "  assert(&((struct tme_m68k *) 0)->field \\"
+	    echo "         == (type *) (((tme_uint8_t *) &((struct tme_m68k *) 0)->_tme_m68k_insn_fetch_buffer[0]) + ${offset_fetch})); \\"
+	    echo -n "  "
+	    if test ${executor} = fast; then echo -n _ ; fi
+	    echo "_TME_M68K_EXECUTE_FETCH_${size}(type, v)"
 
-			# if this is a 32-bit fetch:
-			else
-
-			    # while the emulator address we'll be reading
-			    # from is 16-bit aligned as explained above,
-			    # we still need a strict-alignment version of
-			    # the 32-bit fetcher on hosts that require 32-bit
-			    # values to be more aligned than 16-bit values.
-			    #
-			    # on a host that does not have this further
-			    # requirement, we also don't need a little-endian
-			    # version, since the fast macros we emit will always
-			    # use tme_betoh_u32:
-			    macro_comment=" host with ${alignment} alignment"
-			    if test $alignment = strict; then
-				macro_comment=" ${endian}-endian${macro_comment}"
-				if test ${endian} = little; then macro_test="!"; fi
-				macro_test="(ALIGNOF_INT${size}_T > ALIGNOF_INT16_T) && ${macro_test}defined(WORDS_BIGENDIAN)"
-			    else
-				macro_test="ALIGNOF_INT${size}_T <= ALIGNOF_INT16_T"
-				if test ${endian} = little; then continue; fi
-			    fi
-			fi
-				
-			# open the macro:
-			echo ""
-			echo "/* on a${macro_comment}, "
-			echo "   this loads a ${size}-bit ${un}signed value for the ${executor} instruction executor: */"
-			if test "x${macro_test}" != x; then echo "#if ${macro_test}"; fi
-			echo "#undef _TME_M68K_EXECUTE_FETCH_${capsign}${size}"
-			echo "#define _TME_M68K_EXECUTE_FETCH_${capsign}${size}(v) \\"
-
-			# assume we'll be converting:
-			conv="tme_betoh_u${size}"
-
-			# prepare the buffer to read out of:
-			if test ${executor} = fast; then
-
-			    # if we're doing a 32-bit read and the
-			    # emulator address is not 32-bit aligned,
-			    # on a strict-alignment host we will have
-			    # to do a sequence of two 16-bit memory
-			    # reads:
-			    buffer="emulator_load"
-			    misaligned="((unsigned long) emulator_load) & (sizeof(tme_uint32_t) - 1)"
-			    update="emulator_load += sizeof(tme_${sign}int${size}_t)"
-
-			    # if we can't do the fast read, bail:
-			    echo "  if ((emulator_load + (sizeof(tme_uint${size}_t) - 1)) > emulator_load_last) \\"
-			    echo "    goto _tme_m68k_fast_fetch_failed; \\"
-			fi
-
-			single="(v) = (tme_${sign}int${size}_t) ${conv}(*((tme_uint${size}_t *) ${buffer}));"
-
-			# if this is a 16-bit read, the host can always 
-			# do a simple assignment.  
-			#
-		        # we need the rdlock if we're on an architecture
-			# where an aligned access may not be atomic:
-			if test $size = 16; then
-			    echo "  tme_memory_aligned_rdlock(tlb->tme_m68k_tlb_bus_rwlock); \\"
-			    echo "  ${single} \\"
-			    echo "  tme_memory_aligned_unlock(tlb->tme_m68k_tlb_bus_rwlock); \\"
-
-			# if this is a 32-bit read on an any-alignment host,
-			# do a simple assignment.
-			#
-			# we need the rdlock if this is an aligned access and
-			# we're on an architecture where an aligned access may
-			# not be atomic, or if this is an unaligned access and
-			# we're on an architecture where an unaligned access
-			# may not be atomic:
-			elif test $alignment = any; then
-			    echo "  if (${misaligned}) { \\"
-			    echo "    tme_memory_unaligned_rdlock(tlb->tme_m68k_tlb_bus_rwlock); \\"
-			    echo "    ${single} \\"
-			    echo "    tme_memory_unaligned_unlock(tlb->tme_m68k_tlb_bus_rwlock); \\"
-			    echo "  } \\"
-			    echo "  else { \\"
-			    echo "    tme_memory_aligned_rdlock(tlb->tme_m68k_tlb_bus_rwlock); \\"
-			    echo "    ${single} \\"
-			    echo "    tme_memory_aligned_unlock(tlb->tme_m68k_tlb_bus_rwlock); \\"
-			    echo "  } \\"
-
-			# otherwise, this is a 32-bit read on a strict-alignment
-			# host.  
-			#
-			# if doing a sequence access is not costlier than deciding 
-			# whether to do a sequence or aligned access and then doing
-			# the chosen access, or if the buffer is misaligned, 
-			# acquire the rdlock for a sequence and do the sequence
-			# of reads, else acquire the rdlock for an aligned access
-			# and do the single read:
-			else
-			    echo "  if (TME_SEQUENCE_ACCESS_NOT_COSTLIER || ${misaligned}) { \\";
-			    if test $endian = little; then
-				word_lo=0 ; word_hi=1 ; 
-			    else
-				word_lo=1 ; word_hi=0 ; conv=
-			    fi
-			    echo "    tme_memory_sequence_rdlock(tlb->tme_m68k_bus_tlb_rwlock); \\"
-			    echo "    (v) = (tme_${sign}int${size}_t) \\"
-			    echo "      ${conv}((((tme_uint32_t) ((tme_uint16_t *) ${buffer})[${word_hi}]) << 16) | \\"
-			    echo "              ((tme_uint32_t) ((tme_uint16_t *) ${buffer})[${word_lo}])); \\"
-			    echo "    tme_memory_sequence_unlock(tlb->tme_m68k_bus_tlb_rwlock); \\"
-			    echo "  } else { \\"
-			    echo "    tme_memory_aligned_rdlock(tlb->tme_m68k_tlb_bus_rwlock); \\"
-			    echo "    ${single} \\"
-			    echo "    tme_memory_aligned_unlock(tlb->tme_m68k_tlb_bus_rwlock); \\"
-			    echo "  } \\"
-			fi
-
-			# remember if we did a 16-bit or 32-bit fetch, and update:
-			if test ${size} = 16; then
-			    echo "  insn_fetch_sizes <<= 1; \\"
-			else
-			    echo "  insn_fetch_sizes = (insn_fetch_sizes << 1) | 1; \\"
-			fi
-			echo "  ${update}"
-
-			# close the conditional:
-			if test "x${macro_test}" != x; then echo "#endif /* ${macro_test} */"; fi
-		    done
-		done
-	    done
 	done
 
 	echo ""

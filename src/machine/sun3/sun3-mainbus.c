@@ -1,4 +1,4 @@
-/* $Id: sun3-mainbus.c,v 1.4 2005/05/11 00:14:30 fredette Exp $ */
+/* $Id: sun3-mainbus.c,v 1.6 2007/08/24 01:15:19 fredette Exp $ */
 
 /* machine/sun3/sun3-mainbus.c - implementation of Sun 3 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun3-mainbus.c,v 1.4 2005/05/11 00:14:30 fredette Exp $");
+_TME_RCSID("$Id: sun3-mainbus.c,v 1.6 2007/08/24 01:15:19 fredette Exp $");
 
 /* includes: */
 #include "sun3-impl.h"
@@ -163,7 +163,36 @@ _tme_sun3_bus_signal(struct tme_bus_connection *conn_bus_raiser, unsigned int si
 
   /* reset: */
   else if (signal == TME_BUS_SIGNAL_RESET) {
-    /* XXX reset is just ignored for now: */
+
+    /* if this reset signal is coming from the m68k: */
+    if (conn_bus_raiser->tme_bus_connection.tme_connection_other
+	== &sun3->tme_sun3_m68k->tme_m68k_bus_connection.tme_bus_connection) {
+
+      /* XXX FIXME - note that the do_reset code is lazy and only
+	 sends reset negation edges out to the busses.  we are also
+	 lazy (and also worried that sending out assertion edges might
+	 break things), so we only send out reset negation edges too: */
+      if (signal_asserted) {
+	return (TME_OK);
+      }
+
+      /* propagate this reset edge to all busses: */
+      (*sun3->tme_sun3_obio->tme_bus_signal)
+	(sun3->tme_sun3_obio,
+	 TME_BUS_SIGNAL_RESET
+	 | TME_BUS_SIGNAL_LEVEL_NEGATED
+	 | TME_BUS_SIGNAL_EDGE);
+      (*sun3->tme_sun3_obmem->tme_bus_signal)
+	(sun3->tme_sun3_obmem,
+	 TME_BUS_SIGNAL_RESET
+	 | TME_BUS_SIGNAL_LEVEL_NEGATED
+	 | TME_BUS_SIGNAL_EDGE);
+      (*sun3->tme_sun3_vmebus->tme_bus_signal)
+	(sun3->tme_sun3_vmebus,
+	 TME_BUS_SIGNAL_RESET
+	 | TME_BUS_SIGNAL_LEVEL_NEGATED
+	 | TME_BUS_SIGNAL_EDGE);
+    }
   }
 
   /* an interrupt signal: */
@@ -355,7 +384,7 @@ _tme_sun3_command(struct tme_element *element, const char * const * args, char *
        | TME_BUS_SIGNAL_LEVEL_NEGATED
        | TME_BUS_SIGNAL_EDGE);
     (*sun3->tme_sun3_vmebus->tme_bus_signal)
-      (sun3->tme_sun3_obmem,
+      (sun3->tme_sun3_vmebus,
        TME_BUS_SIGNAL_RESET
        | TME_BUS_SIGNAL_LEVEL_NEGATED
        | TME_BUS_SIGNAL_EDGE);

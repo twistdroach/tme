@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# $Id: ieee754-precision.sh,v 1.1 2005/02/17 12:17:57 fredette Exp $
+# $Id: ieee754-precision.sh,v 1.2 2007/08/26 14:02:04 fredette Exp $
 
 # ic/ieee754/ieee754-precision.sh - emits information about IEEE 754 types
 # in a form usable by scripts that automatically generate code:
@@ -118,19 +118,19 @@ esac
 # to avoid integer overflow warnings, make sure that the exponent
 # mask is always unsigned:
 #
-echo ${prefix}'mask_exp="((tme_uint32_t) ${mask_exp})" ;'
+echo ${prefix}'mask_exp="((tme_uint32_t) ${'${prefix}'mask_exp})" ;'
 
 # a mask for the sign bit can be derived from the exponent mask:
 #
-echo ${prefix}'mask_sign="(${mask_exp} + _TME_FIELD_MASK_FACTOR(${mask_exp}))" ; '
+echo ${prefix}'mask_sign="(${'${prefix}'mask_exp} + _TME_FIELD_MASK_FACTOR(${'${prefix}'mask_exp}))" ; '
 
 # the maximum biased exponent can be derived from the exponent mask:
 #
-echo ${prefix}'exp_biased_max="(${mask_exp} / _TME_FIELD_MASK_FACTOR(${mask_exp}))" ; '
+echo ${prefix}'exp_biased_max="(${'${prefix}'mask_exp} / _TME_FIELD_MASK_FACTOR(${'${prefix}'mask_exp}))" ; '
 
 # the exponent bias can be derived from the maximum biased exponent:
 #
-echo ${prefix}'exp_bias="(${exp_biased_max} >> 1)" ; '
+echo ${prefix}'exp_bias="(${'${prefix}'exp_biased_max} >> 1)" ; '
 
 # make a capitalized version of the precision name:
 #

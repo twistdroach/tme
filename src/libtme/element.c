@@ -1,4 +1,4 @@
-/* $Id: element.c,v 1.1 2003/05/16 21:48:12 fredette Exp $ */
+/* $Id: element.c,v 1.2 2006/09/30 12:34:21 fredette Exp $ */
 
 /* libtme/element.c - element management: */
 
@@ -34,12 +34,13 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: element.c,v 1.1 2003/05/16 21:48:12 fredette Exp $");
+_TME_RCSID("$Id: element.c,v 1.2 2006/09/30 12:34:21 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <errno.h>
 
 /* this connects two elements together: */
 int

@@ -1,4 +1,4 @@
-/* $Id: keyboard.c,v 1.6 2003/10/16 02:48:18 fredette Exp $ */
+/* $Id: keyboard.c,v 1.8 2007/02/15 02:12:44 fredette Exp $ */
 
 /* generic/keyboard.c - generic keyboard implementation support: */
 
@@ -34,13 +34,14 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: keyboard.c,v 1.6 2003/10/16 02:48:18 fredette Exp $");
+_TME_RCSID("$Id: keyboard.c,v 1.8 2007/02/15 02:12:44 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/keyboard.h>
 #include <tme/hash.h>
 #include <tme/misc.h>
 #include <stdlib.h>
+#include <errno.h>
 
 /* macros: */
 
@@ -621,7 +622,7 @@ _tme_keysym_state_get(struct tme_keyboard_buffer_int *buffer,
   keysym
     = ((struct tme_keysym_state *)
        tme_hash_lookup(buffer->tme_keyboard_buffer_int_keysyms_state,
-		       (tme_hash_data_t) _keysym));
+		       tme_keyboard_hash_data_from_keyval(_keysym)));
 
   /* if the state doesn't exist, allocate it: */
   if (keysym == NULL) {
@@ -639,7 +640,7 @@ _tme_keysym_state_get(struct tme_keyboard_buffer_int *buffer,
 
     /* insert this state into the hash: */
     tme_hash_insert(buffer->tme_keyboard_buffer_int_keysyms_state,
-		    (tme_hash_data_t) _keysym,
+		    tme_keyboard_hash_data_from_keyval(_keysym),
 		    (tme_hash_data_t) keysym);
   }
 
@@ -881,7 +882,8 @@ tme_keyboard_buffer_in_macro(struct tme_keyboard_buffer *_buffer,
     /* look up this keysym in the branch set for this node: */
     macro_next
       = ((struct tme_keyboard_macro *)
-	 tme_hash_lookup(macro->tme_keyboard_macro_branches, (tme_hash_data_t) keysym));
+	 tme_hash_lookup(macro->tme_keyboard_macro_branches,
+			 tme_keyboard_hash_data_from_keyval(keysym)));
 
     /* if this keysym is a new branch, create a new macros tree node: */
     if (macro_next == NULL) {
@@ -889,7 +891,7 @@ tme_keyboard_buffer_in_macro(struct tme_keyboard_buffer *_buffer,
       macro_next->tme_keyboard_macro_parent = macro;
       macro_next->tme_keyboard_macro_keysym = keysym;
       tme_hash_insert(macro->tme_keyboard_macro_branches, 
-		      (tme_hash_data_t) keysym,
+		      tme_keyboard_hash_data_from_keyval(keysym),
 		      (tme_hash_data_t) macro_next);
     }
 
@@ -952,7 +954,7 @@ tme_keyboard_buffer_out_map(struct tme_keyboard_buffer *_buffer,
   keycode
     = ((struct tme_keycode_state *)
        tme_hash_lookup(buffer->tme_keyboard_buffer_int_out0_keycodes,
-		       (tme_hash_data_t) map->tme_keyboard_map_keycode));
+		       tme_keyboard_hash_data_from_keyval(map->tme_keyboard_map_keycode)));
 
   /* if this keycode is new, allocate, initialize and add a structure
      for it: */
@@ -971,7 +973,7 @@ tme_keyboard_buffer_out_map(struct tme_keyboard_buffer *_buffer,
 
     /* add the keycode structure: */
     tme_hash_insert(buffer->tme_keyboard_buffer_int_out0_keycodes,
-		    (tme_hash_data_t) map->tme_keyboard_map_keycode,
+		    tme_keyboard_hash_data_from_keyval(map->tme_keyboard_map_keycode),
 		    (tme_hash_data_t) keycode);
   }
 
@@ -1080,7 +1082,7 @@ tme_keyboard_buffer_out_mode(struct tme_keyboard_buffer *_buffer,
     keycode
       = ((struct tme_keycode_state *)
 	 tme_hash_lookup(buffer->tme_keyboard_buffer_int_out0_keycodes,
-			 (tme_hash_data_t) _keycode));
+			 tme_keyboard_hash_data_from_keyval(_keycode)));
     if (keycode == NULL) {
       return (ENOENT);
     }
@@ -2248,7 +2250,7 @@ _tme_keyboard_buffer_in2(struct tme_keyboard_buffer_int *buffer,
 	  || (child
 	      = ((struct tme_keyboard_macro *)
 		 tme_hash_lookup(macro->tme_keyboard_macro_branches,
-				 (tme_hash_data_t) _keysym))) == NULL) {
+				 tme_keyboard_hash_data_from_keyval(_keysym)))) == NULL) {
 	_macro = &macro->tme_keyboard_macro_active_next;
 	continue;
       }
@@ -2532,7 +2534,7 @@ _tme_keyboard_buffer_in0(struct tme_keyboard_buffer_int *buffer,
   keysym
     = ((struct tme_keysym_state *)
        tme_hash_lookup(buffer->tme_keyboard_buffer_int_keysyms_state,
-		       (tme_hash_data_t) event->tme_keyboard_event_keyval));
+		       tme_keyboard_hash_data_from_keyval(event->tme_keyboard_event_keyval)));
 
 
   /* if input stage zero has modifier information: */
@@ -2686,7 +2688,7 @@ _tme_keyboard_buffer_in0(struct tme_keyboard_buffer_int *buffer,
     other_keysym
       = ((struct tme_keysym_state *)
 	 tme_hash_lookup(buffer->tme_keyboard_buffer_int_in0_keycodes,
-			 (tme_hash_data_t) event->tme_keyboard_event_keycode));
+			 tme_keyboard_hash_data_from_keyval(event->tme_keyboard_event_keycode)));
 
     /* if this keycode is already pressed by another keysym in this
        stage, release the other keysym first: */
@@ -2713,12 +2715,12 @@ _tme_keyboard_buffer_in0(struct tme_keyboard_buffer_int *buffer,
        else forget that this keycode is pressed: */
     if (event->tme_keyboard_event_type == TME_KEYBOARD_EVENT_PRESS) {
       tme_hash_insert(buffer->tme_keyboard_buffer_int_in0_keycodes,
-		      (tme_hash_data_t) event->tme_keyboard_event_keycode,
+		      tme_keyboard_hash_data_from_keyval(event->tme_keyboard_event_keycode),
 		      (tme_hash_data_t) keysym);
     }
     else {
       tme_hash_remove(buffer->tme_keyboard_buffer_int_in0_keycodes,
-		      (tme_hash_data_t) event->tme_keyboard_event_keycode);
+		      tme_keyboard_hash_data_from_keyval(event->tme_keyboard_event_keycode));
     }
   }
 

@@ -1,4 +1,4 @@
-/* $Id: ieee754-misc.c,v 1.2 2005/05/14 22:18:37 fredette Exp $ */
+/* $Id: ieee754-misc.c,v 1.3 2006/11/16 01:05:56 fredette Exp $ */
 
 /* ic/ieee754/ieee754-misc.c - IEEE 754 miscellaneous: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: ieee754-misc.c,v 1.2 2005/05/14 22:18:37 fredette Exp $");
+_TME_RCSID("$Id: ieee754-misc.c,v 1.3 2006/11/16 01:05:56 fredette Exp $");
 
 /* includes: */
 #include <tme/ic/ieee754.h>
@@ -494,6 +494,190 @@ tme_ieee754_unlock_softfloat(void)
   exceptions = tme_ieee754_global_exceptions;
   tme_mutex_unlock(&tme_ieee754_global_mutex);
   return (exceptions);
+}
+
+/* for processors that manage a fundamentally single-precision
+   floating-point register file, but that allow size-aligned sets of
+   registers to combine into double- and quad-precision registers,
+   this manages the register set and converts register contents
+   between formats: */
+void
+tme_ieee754_fpreg_format(struct tme_float *fpregs,
+			 unsigned int *fpreg_sizes,
+			 unsigned int fpreg_number,
+			 unsigned int fpreg_size_new)
+{
+  unsigned int flags;
+  unsigned int fpreg_size_old;
+  unsigned int format_new_ieee754;
+  const unsigned int formats_ieee754[] =
+  { 0,
+    TME_FLOAT_FORMAT_IEEE754_SINGLE,
+    TME_FLOAT_FORMAT_IEEE754_DOUBLE,
+    0,
+    TME_FLOAT_FORMAT_IEEE754_QUAD };
+  unsigned int fpreg_i;
+  unsigned int fpreg_j;
+  unsigned int single_word_i;
+  unsigned int single_word_i_mask;
+  tme_uint32_t value_single_buffer;
+  const union tme_value64 *value_double;
+  union tme_value64 value_double_buffer;
+  const struct tme_float_ieee754_quad *value_quad;
+  struct tme_float_ieee754_quad value_quad_buffer;
+  tme_uint32_t single_words[sizeof(struct tme_float_ieee754_quad) / sizeof(tme_uint32_t)];
+
+  /* remove the flags from the size: */
+  flags = (fpreg_size_new & (TME_IEEE754_FPREG_FORMAT_BUILTIN | TME_IEEE754_FPREG_FORMAT_ENDIAN_BIG));
+  fpreg_size_new ^= flags;
+
+  /* the size of the new IEEE754 format must be a power of two: */
+  assert (fpreg_size_new > 0
+	  && fpreg_size_new < TME_ARRAY_ELS(single_words)
+	  && (fpreg_size_new & (fpreg_size_new - 1)) == 0);
+
+  /* the register number must be aligned: */
+  assert ((fpreg_number & (fpreg_size_new - 1)) == 0);
+
+  /* if this register is not already the right size: */
+  fpreg_size_old = fpreg_sizes[fpreg_number];
+  if (__tme_predict_false(fpreg_size_old != fpreg_size_new)) {
+
+    /* convert all of the registers that contain any part of this
+       register's value into single-precision format: */
+    fpreg_j = TME_MAX(fpreg_size_old, fpreg_size_new);
+    fpreg_i = fpreg_number & (0 - fpreg_j);
+    fpreg_j += fpreg_i;
+    do {
+      
+      /* get the current size of this register and its
+	 single-precision words: */
+      fpreg_size_old = fpreg_sizes[fpreg_i];
+      switch (fpreg_size_old) {
+	
+      default: assert(FALSE);
+
+	/* a single-precision register: */
+      case (sizeof(tme_uint32_t) / sizeof(tme_uint32_t)):
+	single_words[0] = *tme_ieee754_single_value_get(&fpregs[fpreg_i], &value_single_buffer);
+	break;
+
+	/* a double-precision register: */
+      case (sizeof(union tme_value64) / sizeof(tme_uint32_t)):
+	value_double = tme_ieee754_double_value_get(&fpregs[fpreg_i], &value_double_buffer);
+	single_words[0] = value_double->tme_value64_uint32_lo;
+	single_words[1] = value_double->tme_value64_uint32_hi;
+	break;
+
+	/* a quad-precision register: */
+      case (sizeof(struct tme_float_ieee754_quad) / sizeof(tme_uint32_t)):
+	value_quad = tme_ieee754_quad_value_get(&fpregs[fpreg_i], &value_quad_buffer);
+	single_words[0] = value_quad->tme_float_ieee754_quad_lo.tme_value64_uint32_lo;
+	single_words[1] = value_quad->tme_float_ieee754_quad_lo.tme_value64_uint32_hi;
+	single_words[2] = value_quad->tme_float_ieee754_quad_hi.tme_value64_uint32_lo;
+	single_words[3] = value_quad->tme_float_ieee754_quad_hi.tme_value64_uint32_hi;
+	break;
+      }
+
+      /* if this floating-point register file is organized in
+	 little-endian fashion, the least significant single-precision
+	 word goes with the first register, else the most significant
+	 single-precision word goes with the first register: */
+      single_word_i_mask
+	= (((flags & TME_IEEE754_FPREG_FORMAT_ENDIAN_BIG) == 0)
+	   ? 0
+	   : (fpreg_size_old - 1));
+
+      /* make all of the covered floating-point registers single
+         precision: */
+      single_word_i = 0;
+      do {
+	fpregs[fpreg_i].tme_float_format = TME_FLOAT_FORMAT_IEEE754_SINGLE;
+	fpregs[fpreg_i].tme_float_value_ieee754_single = single_words[single_word_i ^ single_word_i_mask];
+	fpreg_sizes[fpreg_i] = sizeof(tme_uint32_t) / sizeof(tme_uint32_t);
+	single_word_i++;
+	fpreg_i++;
+      } while (--fpreg_size_old > 0);
+    } while (fpreg_i < fpreg_j);
+
+    /* if the desired format isn't single-precision: */
+    if (fpreg_size_new != (sizeof(tme_uint32_t) / sizeof(tme_uint32_t))) {
+
+      /* collect the single-precision words from the covered
+	 floating-point registers, and mark all of them as now
+	 belonging to this larger register: */
+      fpreg_i = fpreg_number;
+      fpreg_j = fpreg_i + fpreg_size_new;
+      do {
+	single_words[fpreg_i - fpreg_number]
+	  = *tme_ieee754_single_value_get(&fpregs[fpreg_i], &value_single_buffer);
+	fpreg_sizes[fpreg_i] = fpreg_size_new;
+	fpreg_i++;
+      } while (fpreg_i < fpreg_j);
+      
+      /* if this floating-point register file is organized in
+	 little-endian fashion, the first single-precision register
+	 provides the least significant word, else the first
+	 single-precision register provides the most significant word: */
+      single_word_i_mask
+	= (((flags & TME_IEEE754_FPREG_FORMAT_ENDIAN_BIG) == 0)
+	   ? 0
+	   : (fpreg_size_new - 1));
+
+      switch (fpreg_size_new) {
+	
+      default: assert(FALSE);
+
+	/* a double-precision register: */
+      case (sizeof(union tme_value64) / sizeof(tme_uint32_t)):
+	fpregs[fpreg_number].tme_float_format = TME_FLOAT_FORMAT_IEEE754_DOUBLE;
+	fpregs[fpreg_number].tme_float_value_ieee754_double.tme_value64_uint32_lo
+	  = single_words[0 ^ single_word_i_mask];
+	fpregs[fpreg_number].tme_float_value_ieee754_double.tme_value64_uint32_hi
+	  = single_words[1 ^ single_word_i_mask];
+	break;
+
+	/* a quad-precision register: */
+      case (sizeof(struct tme_float_ieee754_quad) / sizeof(tme_uint32_t)):
+	fpregs[fpreg_number].tme_float_format = TME_FLOAT_FORMAT_IEEE754_QUAD;
+	fpregs[fpreg_number].tme_float_value_ieee754_quad.tme_float_ieee754_quad_lo.tme_value64_uint32_lo
+	  = single_words[0 ^ single_word_i_mask];
+	fpregs[fpreg_number].tme_float_value_ieee754_quad.tme_float_ieee754_quad_lo.tme_value64_uint32_hi
+	  = single_words[1 ^ single_word_i_mask];
+	fpregs[fpreg_number].tme_float_value_ieee754_quad.tme_float_ieee754_quad_hi.tme_value64_uint32_lo
+	  = single_words[2 ^ single_word_i_mask];
+	fpregs[fpreg_number].tme_float_value_ieee754_quad.tme_float_ieee754_quad_hi.tme_value64_uint32_hi
+	  = single_words[3 ^ single_word_i_mask];
+	break;
+      }
+    }
+  }
+
+  /* if the register must be in the exact IEEE754 format (as opposed
+     to the best-match, but different, builtin type), and it isn't in
+     that format: */
+  format_new_ieee754 = formats_ieee754[fpreg_size_new];
+  if (__tme_predict_false((flags & TME_IEEE754_FPREG_FORMAT_BUILTIN) == 0
+			  && fpregs[fpreg_number].tme_float_format != format_new_ieee754)) {
+
+    /* convert from the builtin type to the IEEE754 format: */
+    switch (format_new_ieee754) {
+    default: assert(FALSE);
+    case TME_FLOAT_FORMAT_IEEE754_SINGLE:
+      fpregs[fpreg_number].tme_float_value_ieee754_single
+	= *tme_ieee754_single_value_get(&fpregs[fpreg_number], &value_single_buffer);
+      break;
+    case TME_FLOAT_FORMAT_IEEE754_DOUBLE:
+      fpregs[fpreg_number].tme_float_value_ieee754_double
+	= *tme_ieee754_double_value_get(&fpregs[fpreg_number], &value_double_buffer);
+      break;
+    case TME_FLOAT_FORMAT_IEEE754_QUAD:
+      fpregs[fpreg_number].tme_float_value_ieee754_quad
+	= *tme_ieee754_quad_value_get(&fpregs[fpreg_number], &value_quad_buffer);
+      break;
+    }
+    fpregs[fpreg_number].tme_float_format = format_new_ieee754;
+  }
 }
 
 #include "ieee754-misc-auto.c"

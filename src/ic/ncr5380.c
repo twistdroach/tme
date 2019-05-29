@@ -1,4 +1,4 @@
-/* $Id: ncr5380.c,v 1.1 2005/02/17 12:19:17 fredette Exp $ */
+/* $Id: ncr5380.c,v 1.5 2007/02/12 23:41:26 fredette Exp $ */
 
 /* ic/ncr5380.c - implementation of NCR 5380 emulation: */
 
@@ -34,7 +34,9 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: ncr5380.c,v 1.1 2005/02/17 12:19:17 fredette Exp $");
+_TME_RCSID("$Id: ncr5380.c,v 1.5 2007/02/12 23:41:26 fredette Exp $");
+
+/* XXX FIXME - TLB usage here is not thread-safe: */
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -184,7 +186,8 @@ struct tme_ncr5380 {
   int tme_ncr5380_dma_running;
 
   /* our DMA TLB set: */
-  TME_ATOMIC(struct tme_bus_tlb *, tme_ncr5380_dma_tlb);
+  struct tme_bus_tlb * tme_shared tme_ncr5380_dma_tlb;
+  tme_rwlock_t tme_ncr5380_dma_tlb_rwlock;
 
   /* our DMA pseudoaddress, prefetch, and residual: */
   tme_bus_addr_t tme_ncr5380_dma_address;
@@ -207,7 +210,7 @@ static const tme_bus_lane_t tme_ncr5380_router[TME_BUS_ROUTER_SIZE(TME_BUS8_LOG2
 };
 
 #ifdef TME_NCR5380_DEBUG
-void
+static void
 _tme_ncr5380_reg_put(struct tme_ncr5380 *ncr5380,
 		     int reg,
 		     tme_uint8_t val_new)
@@ -246,7 +249,7 @@ _tme_ncr5380_reg_put(struct tme_ncr5380 *ncr5380,
 }
 #define TME_NCR5380_REG_PUT _tme_ncr5380_reg_put
 #else  /* !TME_NCR5380_DEBUG */
-#define TME_NCR5380_REG_PUT(n, r, v) ((n)->tme_ncr5380_regs[(reg)] = (val_new))
+#define TME_NCR5380_REG_PUT(n, r, v) ((n)->tme_ncr5380_regs[(r)] = (v))
 #endif /* !TME_NCR5380_DEBUG */
 
 /* this resets the NCR 5380: */
@@ -530,13 +533,16 @@ _tme_ncr5380_bus_tlb_fill(struct tme_ncr5380 *ncr5380,
   int rc;
 
   /* copy our volatile TLB entry into the local storage: */
-  *tlb = *TME_ATOMIC_READ(struct tme_bus_tlb *, ncr5380->tme_ncr5380_dma_tlb);
+  *tlb = *tme_memory_atomic_pointer_read(struct tme_bus_tlb *,
+					 ncr5380->tme_ncr5380_dma_tlb,
+					 &ncr5380->tme_ncr5380_dma_tlb_rwlock);
   rc = TME_OK;
 
-  /* if the TLB entry covers this address and allows the needed
-     access, return success: */
-  if (address >= TME_ATOMIC_READ(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first)
-      && address <= TME_ATOMIC_READ(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last)
+  /* if the TLB entry is valid, covers this address and allows the
+     needed access, return success: */
+  if (tme_bus_tlb_is_valid(tlb)
+      && address >= tlb->tme_bus_tlb_addr_first
+      && address <= tlb->tme_bus_tlb_addr_last
       && (((cycle_type == TME_BUS_CYCLE_READ
 	    ? tlb->tme_bus_tlb_emulator_off_read
 	    : tlb->tme_bus_tlb_emulator_off_write) != TME_EMULATOR_OFF_UNDEF)
@@ -545,11 +551,15 @@ _tme_ncr5380_bus_tlb_fill(struct tme_ncr5380 *ncr5380,
   }
   
   /* reserve the backing TLB entry: */
-  tme_bus_tlb_reserve(TME_ATOMIC_READ(struct tme_bus_tlb *, ncr5380->tme_ncr5380_dma_tlb), tlb);
+  tlb->tme_bus_tlb_global
+    = tme_memory_atomic_pointer_read(struct tme_bus_tlb *,
+				     ncr5380->tme_ncr5380_dma_tlb,
+				     &ncr5380->tme_ncr5380_dma_tlb_rwlock);
 
   /* get our bus connection: */
-  conn_bus = TME_ATOMIC_READ(struct tme_bus_connection *,
-			     ncr5380->tme_ncr5380_device.tme_bus_device_connection);
+  conn_bus = tme_memory_atomic_pointer_read(struct tme_bus_connection *,
+					    ncr5380->tme_ncr5380_device.tme_bus_device_connection,
+					    &ncr5380->tme_ncr5380_device.tme_bus_device_connection_rwlock);
 
   /* unlock the mutex: */
   tme_mutex_unlock(&ncr5380->tme_ncr5380_mutex);
@@ -681,7 +691,7 @@ _tme_ncr5380_callout(struct tme_ncr5380 *ncr5380, int new_callouts)
 
     /* NB that these callouts are in a deliberate order.  if our
        internal DMA buffer needs to be flushed, that has priority over
-       calling out the terminal DMA address, since flusing the
+       calling out the terminal DMA address, since flushing the
        internal DMA buffer affects the terminal DMA address.
        similarly, if we need to call out the terminal DMA address,
        that takes priority over calling out an interrupt, since we
@@ -751,8 +761,9 @@ _tme_ncr5380_callout(struct tme_ncr5380 *ncr5380, int new_callouts)
 	address = ncr5380->tme_ncr5380_dma_address;
 
 	/* get our bus connection: */
-	conn_bus = TME_ATOMIC_READ(struct tme_bus_connection *,
-				   ncr5380->tme_ncr5380_device.tme_bus_device_connection);
+	conn_bus = tme_memory_atomic_pointer_read(struct tme_bus_connection *,
+						  ncr5380->tme_ncr5380_device.tme_bus_device_connection,
+						  &ncr5380->tme_ncr5380_device.tme_bus_device_connection_rwlock);
 
 	/* unlock the mutex: */
 	tme_mutex_unlock(&ncr5380->tme_ncr5380_mutex);
@@ -797,8 +808,9 @@ _tme_ncr5380_callout(struct tme_ncr5380 *ncr5380, int new_callouts)
       else {
 
 	/* get our bus connection: */
-	conn_bus = TME_ATOMIC_READ(struct tme_bus_connection *,
-				   ncr5380->tme_ncr5380_device.tme_bus_device_connection);
+	conn_bus = tme_memory_atomic_pointer_read(struct tme_bus_connection *,
+						  ncr5380->tme_ncr5380_device.tme_bus_device_connection,
+						  &ncr5380->tme_ncr5380_device.tme_bus_device_connection_rwlock);
 
 	/* unlock our mutex: */
 	tme_mutex_unlock(&ncr5380->tme_ncr5380_mutex);
@@ -914,7 +926,7 @@ _tme_ncr5380_callout(struct tme_ncr5380 *ncr5380, int new_callouts)
 	  /* XXX parity? */
 	  scsi_dma = &scsi_dma_buffer;
 	  scsi_dma_buffer.tme_scsi_dma_flags = TME_SCSI_DMA_8BIT;
-	  scsi_dma_buffer.tme_scsi_dma_resid = (TME_ATOMIC_READ(tme_bus_addr_t, tlb.tme_bus_tlb_addr_last) - address) + 1;
+	  scsi_dma_buffer.tme_scsi_dma_resid = (tlb.tme_bus_tlb_addr_last - address) + 1;
 	  scsi_dma_buffer.tme_scsi_dma_sync_offset = 0;
 	  scsi_dma_buffer.tme_scsi_dma_sync_period = 0;
 
@@ -930,7 +942,8 @@ _tme_ncr5380_callout(struct tme_ncr5380 *ncr5380, int new_callouts)
 	    if (tlb.tme_bus_tlb_emulator_off_read != TME_EMULATOR_OFF_UNDEF) {
 
 	      /* read from the fast reading address: */
-	      scsi_dma_buffer.tme_scsi_dma_out = tlb.tme_bus_tlb_emulator_off_read + address;
+	      /* XXX FIXME - this breaks volatile: */
+	      scsi_dma_buffer.tme_scsi_dma_out = (const tme_uint8_t *) tlb.tme_bus_tlb_emulator_off_read + address;
 	    }
 
 	    /* otherwise, this TLB entry doesn't support fast reading: */
@@ -950,6 +963,7 @@ _tme_ncr5380_callout(struct tme_ncr5380 *ncr5380, int new_callouts)
 
 	      /* read from the internal DMA buffer: */
 	      scsi_dma_buffer.tme_scsi_dma_out = &ncr5380->tme_ncr5380_int_dma;
+	      scsi_dma_buffer.tme_scsi_dma_resid = sizeof(ncr5380->tme_ncr5380_int_dma);
 	    }
 	  }
 
@@ -965,7 +979,8 @@ _tme_ncr5380_callout(struct tme_ncr5380 *ncr5380, int new_callouts)
 	    if (tlb.tme_bus_tlb_emulator_off_write != TME_EMULATOR_OFF_UNDEF) {
 
 	      /* write to the fast writing address: */
-	      scsi_dma_buffer.tme_scsi_dma_in = tlb.tme_bus_tlb_emulator_off_write + address;
+	      /* XXX FIXME - this breaks volatile: */
+	      scsi_dma_buffer.tme_scsi_dma_in = (tme_uint8_t *) tlb.tme_bus_tlb_emulator_off_write + address;
 	    }
 
 	    /* otherwise, this TLB entry doesn't support fast writing: */
@@ -973,6 +988,7 @@ _tme_ncr5380_callout(struct tme_ncr5380 *ncr5380, int new_callouts)
 
 	      /* write to the internal DMA buffer: */
 	      scsi_dma_buffer.tme_scsi_dma_in = &ncr5380->tme_ncr5380_int_dma;
+	      scsi_dma_buffer.tme_scsi_dma_resid = sizeof(ncr5380->tme_ncr5380_int_dma);
 	    }
 	  }
 	}
@@ -1184,7 +1200,7 @@ _tme_ncr5380_signal(void *_ncr5380,
 
   /* take out the signal level: */
   level = signal & TME_BUS_SIGNAL_LEVEL_MASK;
-  signal ^= level;
+  signal = TME_BUS_SIGNAL_WHICH(signal);
 
   /* dispatch on the generic bus signals: */
   switch (signal) {
@@ -1421,12 +1437,8 @@ _tme_ncr5380_tlb_fill(void *_ncr5380,
   if (cycles & TME_BUS_CYCLE_READ) {
     
     /* this TLB entry covers this register only: */
-    TME_ATOMIC_WRITE(tme_bus_addr_t,
-		     tlb->tme_bus_tlb_addr_first,
-		     address);
-    TME_ATOMIC_WRITE(tme_bus_addr_t,
-		     tlb->tme_bus_tlb_addr_last,
-		     address);
+    tlb->tme_bus_tlb_addr_first = address;
+    tlb->tme_bus_tlb_addr_last = address;
 
     /* allow only reading: */
     tlb->tme_bus_tlb_cycles_ok = TME_BUS_CYCLE_READ;
@@ -1436,12 +1448,8 @@ _tme_ncr5380_tlb_fill(void *_ncr5380,
   else {
 
     /* this TLB entry covers all registers: */
-    TME_ATOMIC_WRITE(tme_bus_addr_t,
-		     tlb->tme_bus_tlb_addr_first,
-		     0);
-    TME_ATOMIC_WRITE(tme_bus_addr_t,
-		     tlb->tme_bus_tlb_addr_last,
-		     TME_NCR5380_SIZ_REGS - 1);
+    tlb->tme_bus_tlb_addr_first = 0;
+    tlb->tme_bus_tlb_addr_last = TME_NCR5380_SIZ_REGS - 1;
 
     /* allow only writing: */
     tlb->tme_bus_tlb_cycles_ok = TME_BUS_CYCLE_WRITE;
@@ -1475,20 +1483,22 @@ _tme_ncr5380_connection_make_bus(struct tme_connection *conn,
      set yet, allocate it: */
   if (rc == TME_OK
       && state == TME_CONNECTION_FULL
-      && TME_ATOMIC_READ(struct tme_bus_tlb *,
-			 ncr5380->tme_ncr5380_dma_tlb) == NULL) {
+      && tme_memory_atomic_pointer_read(struct tme_bus_tlb *,
+					ncr5380->tme_ncr5380_dma_tlb,
+					&ncr5380->tme_ncr5380_dma_tlb_rwlock) == NULL) {
 
     /* get our bus connection: */
-    conn_bus
-      = TME_ATOMIC_READ(struct tme_bus_connection *,
-			ncr5380->tme_ncr5380_device.tme_bus_device_connection);
+    conn_bus = tme_memory_atomic_pointer_read(struct tme_bus_connection *,
+					      ncr5380->tme_ncr5380_device.tme_bus_device_connection,
+					      &ncr5380->tme_ncr5380_device.tme_bus_device_connection_rwlock);
 
     /* allocate the TLB set: */
     rc = ((*conn_bus->tme_bus_tlb_set_allocate)
 	  (conn_bus,
 	   1, 
 	   sizeof(struct tme_bus_tlb),
-	   TME_ATOMIC_POINTER(&ncr5380->tme_ncr5380_dma_tlb)));
+	   &ncr5380->tme_ncr5380_dma_tlb,
+	   &ncr5380->tme_ncr5380_dma_tlb_rwlock));
     assert (rc == TME_OK);
   }
 

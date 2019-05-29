@@ -1,4 +1,4 @@
-# $Id: SUN3-CARRERA,v 1.5 2005/05/10 11:15:26 fredette Exp $
+# $Id: SUN3-CARRERA,v 1.6 2007/08/24 01:18:05 fredette Exp $
 
 ## SUN3-CARRERA - example tmesh commands to create a Sun3 "Carrera" VME
 ## machine:
@@ -30,7 +30,7 @@ mainbus0 intreg	at obio0 addr 0x0A0000
 #obie0 csr at obio0 addr 0x0c0000 ipl 3
 #obie0 memory at mainbus0
 #ie0 at obie0: tme/ic/i82586
-#bpf1 at ie0: tme/host/bsd/bpf delay 10000
+#bpf1 at ie0: tme/host/bsd/bpf
 
 ## the Sun type-3 keyboard and mouse:
 ##

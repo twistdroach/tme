@@ -1,6 +1,6 @@
 #! /usr/local/bin/perl -w
 
-# $Id: m68k-opmap-make.pl,v 1.9 2005/05/14 19:15:37 fredette Exp $
+# $Id: m68k-opmap-make.pl,v 1.10 2007/08/25 21:16:05 fredette Exp $
 
 # m68k-opmap-make.pl - compiles the complete decoding of all legal
 # first-instruction-word values into the opcode map used by the C
@@ -191,7 +191,8 @@ for ($line = 1; defined($_ = <STDIN>); $line++) {
 		# this function to a special function "movenonmemtomem":
 		if ($map_eax_size[$pattern] eq "U") {
 		    die "$PROG: pattern ".sprintf("%b", $pattern)." ($map_func[$pattern]) uses the eay path\n"
-			if ($map_func[$pattern] !~ /^(move)(\d+)$/);
+			if ($map_func[$pattern] !~ /^(move)(\d+)$/
+			    && $map_func[$pattern] !~ /^(move_srp[id])(\d+)$/);
 		    $map_func[$pattern] = $1."nonmemtomem".$2;
 		    $map_eax_size[$pattern] = $map_eay_size[$pattern];
 		    $map_eax_cycles[$pattern] = $map_eay_cycles[$pattern];
@@ -256,8 +257,8 @@ for ($line = 1; defined($_ = <STDIN>); $line++) {
 			  'TME_M68K_OPCODE_EA_Y',
 			  'TME_M68K_OPCODE_SPECOP');
 		}
-		elsif ($func =~ /^movenonmemtomem(\d+)$/) {
-		    $func = "move${1}";
+		elsif ($func =~ /^(move.*)nonmemtomem(\d+)$/) {
+		    $func = "${1}${2}";
 		    push (@params,
 			  'TME_M68K_OPCODE_EA_Y');
 		}

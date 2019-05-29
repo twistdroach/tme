@@ -1,4 +1,4 @@
-/* $Id: common.h,v 1.11 2005/05/14 22:23:48 fredette Exp $ */
+/* $Id: common.h,v 1.13 2007/01/18 02:15:49 fredette Exp $ */
 
 /* tme/common.h - header file for common things: */
 
@@ -64,7 +64,7 @@
 /* RCS IDs: */
 #ifdef notyet
 #define _TME_RCSID(x) static const char _tme_rcsid[] = x
-_TME_RCSID("$Id: common.h,v 1.11 2005/05/14 22:23:48 fredette Exp $");
+_TME_RCSID("$Id: common.h,v 1.13 2007/01/18 02:15:49 fredette Exp $");
 #else  /* !_TME_IMPL */
 #define _TME_RCSID(x)
 #endif /* !_TME_IMPL */
@@ -123,8 +123,16 @@ _TME_RCSID("$Id: common.h,v 1.11 2005/05/14 22:23:48 fredette Exp $");
 #endif /* TME_AUDIT_CASTS */
 
 /* branch prediction: */
+#if defined(__GNUC__) && ((__GNUC__ == 2 && __GNUC_MINOR__ >= 96) || (__GNUC__ >= 3))
+#define __tme_predict_true(e)	(__builtin_expect(((e) != 0), 1))
+#define __tme_predict_false(e)	(__builtin_expect(((e) != 0), 0))
+#endif /* __GNUC__ >= 2.96 */
+#ifndef __tme_predict_true
 #define __tme_predict_true(e)	(e)
+#endif  /* !__tme_predict_true */
+#ifndef __tme_predict_false
 #define __tme_predict_false(e)	(e)
+#endif /* !__tme_predict_false */
 
 /* memory allocation: */
 #define tme_new(t, x)		((t *) tme_malloc(sizeof(t) * (x)))
@@ -146,17 +154,16 @@ _TME_RCSID("$Id: common.h,v 1.11 2005/05/14 22:23:48 fredette Exp $");
 
 /* bitfields: */
 #define _TME_FIELD_EXTRACTU(t, v, s, l) ((((t) (v)) >> (s)) & (_TME_BIT(t, l) - 1))
-#define _TME_FIELD_EXTRACTS(t, v, s, l) (_TME_FIELD_EXTRACTU(t, v, s, l) - (((v) & _TME_BIT(t, (s) + (l) - 1)) ? _TME_BIT(t, l) : 0))
 #define TME_FIELD_EXTRACTU(v, s, l) _TME_FIELD_EXTRACTU(unsigned int, v, s, l)
-#define TME_FIELD_EXTRACTS(v, s, l) _TME_FIELD_EXTRACTS(signed int, v, s, l)
-#define TME_FIELD_EXTRACTS32(v, s, l) _TME_FIELD_EXTRACTS(tme_int32_t, v, s, l)
 #define _TME_FIELD_DEPOSIT(t, v, s, l, x) ((v) = (((v) & ~((_TME_BIT(t, l) - 1) << (s))) | ((x) << (s))))
 #define TME_FIELD_DEPOSIT8(v, s, l, x) _TME_FIELD_DEPOSIT(tme_uint8_t, v, s, l, x)
 #define TME_FIELD_DEPOSIT16(v, s, l, x) _TME_FIELD_DEPOSIT(tme_uint16_t, v, s, l, x)
 #define TME_FIELD_DEPOSIT32(v, s, l, x) _TME_FIELD_DEPOSIT(tme_uint32_t, v, s, l, x)
 #define _TME_FIELD_MASK_FACTOR(m) (((m) | ((m) << 1)) ^ ((m) << 1))
 #define TME_FIELD_MASK_EXTRACTU(v, m) (((v) & (m)) / _TME_FIELD_MASK_FACTOR(m))
-#define TME_FIELD_MASK_DEPOSITU(v, m, x) ((v) = (((v) & ~(m)) | ((x) * _TME_FIELD_MASK_FACTOR(m))))
+#define TME_FIELD_MASK_DEPOSITU(v, m, x) ((v) = (((v) & ~(m)) | (((x) * _TME_FIELD_MASK_FACTOR(m)) & (m))))
+#define _TME_FIELD_MASK_MSBIT(m) (((m) | ((m) >> 1)) ^ ((m) >> 1))
+#define TME_FIELD_MASK_EXTRACTS(v, m)  ((TME_FIELD_MASK_EXTRACTU(v, m) ^ _TME_FIELD_MASK_MSBIT(m)) + (0 - _TME_FIELD_MASK_MSBIT(m)))
 
 /* byteswapping: */
 #ifndef _TME_WORDS_BIGENDIAN
@@ -215,6 +222,7 @@ tme_bswap_u32(tme_uint32_t x)
 /* XXX when exactly did this feature appear? */
 #if defined(__GNUC__) && (__GNUC__ >= 2) && (_TME_SIZEOF_INT == 4)
 #define TME_HAVE_INT64_T
+#define _TME_ALIGNOF_INT64_T _TME_ALIGNOF_INT32_T
 typedef signed long long int tme_int64_t;
 typedef unsigned long long int tme_uint64_t;
 #endif /* __GNUC__ && __GNUC__ >= 2 */

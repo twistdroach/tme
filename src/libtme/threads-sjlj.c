@@ -1,4 +1,4 @@
-/* $Id: threads-sjlj.c,v 1.12 2005/02/17 13:23:35 fredette Exp $ */
+/* $Id: threads-sjlj.c,v 1.15 2007/08/25 23:12:31 fredette Exp $ */
 
 /* libtme/threads-sjlj.c - implementation of setjmp/longjmp threads: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: threads-sjlj.c,v 1.12 2005/02/17 13:23:35 fredette Exp $");
+_TME_RCSID("$Id: threads-sjlj.c,v 1.15 2007/08/25 23:12:31 fredette Exp $");
 
 /* includes: */
 #include <tme/threads.h>
@@ -106,7 +106,11 @@ struct tme_sjlj_thread {
   struct tme_sjlj_thread *timeout_next;
   struct tme_sjlj_thread **timeout_prev;
 #ifdef HAVE_GTK
-  gint tme_sjlj_thread_timeout_tag;
+  /* the current timeout thread handle: */
+  struct tme_sjlj_thread **tme_sjlj_thread_timeout_handle;
+
+  /* space for a small number of immediate timeout thread handles: */
+  struct tme_sjlj_thread *tme_sjlj_thread_timeout_handles[3];
 #endif /* HAVE_GTK */
 };
 
@@ -143,8 +147,13 @@ static fd_set tme_sjlj_main_fdset_read;
 static fd_set tme_sjlj_main_fdset_write;
 static fd_set tme_sjlj_main_fdset_except;
 
-/* for each file descriptor, any thread blocked on it: */
-static struct tme_sjlj_thread *tme_sjlj_fd_thread[FD_SETSIZE];
+/* for each file descriptor, any threads blocked on it: */
+static struct {
+  GdkInputCondition tme_sjlj_fd_thread_conditions;
+  struct tme_sjlj_thread *tme_sjlj_fd_thread_read;
+  struct tme_sjlj_thread *tme_sjlj_fd_thread_write;
+  struct tme_sjlj_thread *tme_sjlj_fd_thread_except;
+} tme_sjlj_fd_thread[FD_SETSIZE];
 
 /* what, if any, thread timeout caused this dispatch: */
 static struct tme_sjlj_thread *tme_sjlj_thread_dispatched_timeout;
@@ -190,7 +199,10 @@ tme_sjlj_threads_init(void)
   FD_ZERO(&tme_sjlj_main_fdset_write);
   FD_ZERO(&tme_sjlj_main_fdset_except);
   for (fd = 0; fd < FD_SETSIZE; fd++) {
-    tme_sjlj_fd_thread[fd] = NULL;
+    tme_sjlj_fd_thread[fd].tme_sjlj_fd_thread_conditions = 0;
+    tme_sjlj_fd_thread[fd].tme_sjlj_fd_thread_read = NULL;
+    tme_sjlj_fd_thread[fd].tme_sjlj_fd_thread_write = NULL;
+    tme_sjlj_fd_thread[fd].tme_sjlj_fd_thread_except = NULL;
   }
 
   /* initialize the thread-blocked structure: */
@@ -300,13 +312,42 @@ _tme_sjlj_change_state(struct tme_sjlj_thread *thread, int state)
 
 /* this dispatches a thread whose timeout has expired: */
 static gint
-tme_sjlj_dispatch_timeout(gpointer _thread)
+tme_sjlj_dispatch_timeout(gpointer _data)
 {
   struct tme_sjlj_thread *thread;
   int rc;
 
-  /* recover the thread: */
-  thread = (struct tme_sjlj_thread *) _thread;
+#ifdef HAVE_GTK
+  struct tme_sjlj_thread **timeout_handle;
+
+  /* if we're using GTK, the data is a handle to the thread: */
+  timeout_handle = (struct tme_sjlj_thread **) _data;
+  if (tme_sjlj_using_gtk) {
+
+    /* recover the thread: */
+    thread = *timeout_handle;
+
+    /* if this isn't the current timeout for the thread: */
+    if (timeout_handle != thread->tme_sjlj_thread_timeout_handle) {
+
+      /* we have been waiting for this old timeout to dispatch so we
+	 can finally remove it: */
+      *timeout_handle = NULL;
+      if ((timeout_handle
+	   < &thread->tme_sjlj_thread_timeout_handles[0])
+	  || (timeout_handle
+	      > &thread->tme_sjlj_thread_timeout_handles[TME_ARRAY_ELS(thread->tme_sjlj_thread_timeout_handles) - 1])) {
+	tme_free(timeout_handle);
+      }
+      return (FALSE);
+    }
+  }
+  else
+
+#endif /* !HAVE_GTK */
+
+    /* otherwise, the data is just the thread: */
+    thread = (struct tme_sjlj_thread *) _data;
 
   /* set the timed-out thread indication: */
   assert(tme_sjlj_thread_dispatched_timeout == NULL);
@@ -321,27 +362,48 @@ tme_sjlj_dispatch_timeout(gpointer _thread)
   /* clear the timed-out thread indication: */
   tme_sjlj_thread_dispatched_timeout = NULL;
 
+#ifdef HAVE_GTK
+  /* if we are using GTK and not reusing this timeout, free it: */
+  if (tme_sjlj_using_gtk && !rc) {
+    *timeout_handle = NULL;
+    if ((timeout_handle
+	 < &thread->tme_sjlj_thread_timeout_handles[0])
+	|| (timeout_handle
+	    > &thread->tme_sjlj_thread_timeout_handles[TME_ARRAY_ELS(thread->tme_sjlj_thread_timeout_handles) - 1])) {
+      tme_free(timeout_handle);
+    }
+  }
+#endif /* HAVE_GTK */
+
   return (rc);
 }
 
 /* this dispatches a thread whose fd condition has been met: */
 static void
-tme_sjlj_dispatch_fd(gpointer junk0, gint fd, GdkInputCondition junk1)
+tme_sjlj_dispatch_fd(gpointer junk0, gint fd, GdkInputCondition fd_conditions)
 {
   struct tme_sjlj_thread *thread;
 
-  /* recover the thread: */
-  thread = tme_sjlj_fd_thread[fd];
-  if (thread == NULL) {
-    return;
-  }
-
   /* nothing else should appear to be dispatching: */
   assert(tme_sjlj_thread_dispatched_timeout == NULL);
-
-  /* dispatch this thread: */
   assert(tme_sjlj_threads_dispatching == NULL);
-  _tme_sjlj_change_state(thread, TME_SJLJ_THREAD_STATE_DISPATCHING);
+
+  /* loop over all set conditions: */
+  for (fd_conditions &= tme_sjlj_fd_thread[fd].tme_sjlj_fd_thread_conditions;
+       fd_conditions != 0;
+       fd_conditions &= (fd_conditions - 1)) {
+
+    /* move the thread for this condition to the dispatching list: */
+    thread = ((fd_conditions & GDK_INPUT_READ)
+	      ? tme_sjlj_fd_thread[fd].tme_sjlj_fd_thread_read
+	      : (fd_conditions & GDK_INPUT_WRITE)
+	      ? tme_sjlj_fd_thread[fd].tme_sjlj_fd_thread_write
+	      : tme_sjlj_fd_thread[fd].tme_sjlj_fd_thread_except);
+    assert (thread != NULL);
+    _tme_sjlj_change_state(thread, TME_SJLJ_THREAD_STATE_DISPATCHING);
+  }
+
+  /* do the dispatch: */
   tme_sjlj_dispatch(1);
   assert(tme_sjlj_threads_dispatching == NULL);
 }
@@ -462,6 +524,7 @@ tme_sjlj_threads_run(void)
   fd_set fdset_read_out;
   fd_set fdset_write_out;
   fd_set fdset_except_out;
+  GdkInputCondition fd_conditions;
   struct timeval now, *timeout, timeout_buffer;
   int rc;
   
@@ -561,63 +624,72 @@ tme_sjlj_threads_run(void)
       }
     }
 
-    /* if we have file descriptors to select on, do a select: */
+    /* if we have file descriptors to select on: */
     if (tme_sjlj_main_max_fd >= 0) {
 
       /* make the fd sets: */
       fdset_read_out = tme_sjlj_main_fdset_read;
       fdset_write_out = tme_sjlj_main_fdset_write;
       fdset_except_out = tme_sjlj_main_fdset_except;
+    }
 
-      /* make the select timeout: */
+    /* make the select timeout: */
 
-      /* if there are runnable threads, make this a poll: */
-      if (tme_sjlj_threads_runnable != NULL) {
-	timeout_buffer.tv_sec = 0;
-	timeout_buffer.tv_usec = 0;
-	timeout = &timeout_buffer;
+    /* if there are runnable threads, make this a poll: */
+    if (tme_sjlj_threads_runnable != NULL) {
+      timeout_buffer.tv_sec = 0;
+      timeout_buffer.tv_usec = 0;
+      timeout = &timeout_buffer;
+    }
+
+    /* otherwise, if there are threads with timeouts, timeout when
+       the next thread's timeout will expire: */
+    else if (tme_sjlj_threads_timeout != NULL) {
+      timeout_buffer = tme_sjlj_threads_timeout->tme_sjlj_thread_timeout;
+      if (timeout_buffer.tv_usec < now.tv_usec) {
+	timeout_buffer.tv_sec--;
+	timeout_buffer.tv_usec += 1000000;
       }
+      timeout_buffer.tv_sec -= now.tv_sec;
+      timeout_buffer.tv_usec -= now.tv_usec;
+      timeout = &timeout_buffer;
+    }
 
-      /* otherwise, if there are threads with timeouts, timeout when
-	 the next thread's timeout will expire: */
-      else if (tme_sjlj_threads_timeout != NULL) {
-	timeout_buffer = tme_sjlj_threads_timeout->tme_sjlj_thread_timeout;
-	if (timeout_buffer.tv_usec < now.tv_usec) {
-	  timeout_buffer.tv_sec--;
-	  timeout_buffer.tv_usec += 1000000;
+    /* otherwise, block until a file descriptor is ready: */
+    else {
+      assert(tme_sjlj_main_max_fd >= 0);
+      timeout = NULL;
+    }
+
+    /* do the select: */
+    rc = select(tme_sjlj_main_max_fd + 1,
+		&fdset_read_out,
+		&fdset_write_out,
+		&fdset_except_out,
+		timeout);
+
+    /* if some fds are ready, dispatch them: */
+    if (rc > 0) {	
+      for (fd = tme_sjlj_main_max_fd; fd >= 0; fd--) {
+	fd_conditions = 0;
+	if (FD_ISSET(fd, &fdset_read_out)) {
+	  fd_conditions |= GDK_INPUT_READ;
 	}
-	timeout_buffer.tv_sec -= now.tv_sec;
-	timeout_buffer.tv_usec -= now.tv_usec;
-	timeout = &timeout_buffer;
-      }
+	if (FD_ISSET(fd, &fdset_write_out)) {
+	  fd_conditions |= GDK_INPUT_WRITE;
+	}
+	if (FD_ISSET(fd, &fdset_except_out)) {
+	  fd_conditions |= GDK_INPUT_EXCEPTION;
+	}
+	if (fd_conditions != 0) {
 
-      /* otherwise, block forever: */
-      else {
-	timeout = NULL;
-      }
+	  /* dispatch this file descriptor: */
+	  tme_sjlj_dispatch_fd(NULL, fd, fd_conditions);
 
-      /* do the select: */
-      rc = select(tme_sjlj_main_max_fd + 1,
-		  &fdset_read_out,
-		  &fdset_write_out,
-		  &fdset_except_out,
-		  timeout);
-
-      /* if some fds are ready, dispatch them: */
-      if (rc > 0) {	
-	for (fd = tme_sjlj_main_max_fd; fd >= 0; fd--) {
-	  if (FD_ISSET(fd, &fdset_read_out)
-	      || FD_ISSET(fd, &fdset_write_out)
-	      || FD_ISSET(fd, &fdset_except_out)) {
-	    
-	    /* dispatch this file descriptor: */
-	    tme_sjlj_dispatch_fd(NULL, fd, 0);
-
-	    /* stop if there are no more file descriptors left in the
-	       sets: */
-	    if (--rc == 0) {
-	      break;
-	    }
+	  /* stop if there are no more file descriptors left in the
+	     sets: */
+	  if (--rc == 0) {
+	    break;
 	  }
 	}
       }
@@ -635,6 +707,9 @@ void
 tme_sjlj_thread_create(tme_thread_t func, void *func_private)
 {
   struct tme_sjlj_thread *thread;
+#ifdef HAVE_GTK
+  unsigned int i;
+#endif /* HAVE_GTK */
 
   /* allocate a new thread and put it on the all-threads list: */
   thread = tme_new(struct tme_sjlj_thread, 1);
@@ -653,6 +728,13 @@ tme_sjlj_thread_create(tme_thread_t func, void *func_private)
   thread->tme_sjlj_thread_sleep.tv_sec = 0;
   thread->tme_sjlj_thread_sleep.tv_usec = 0;
   thread->timeout_prev = NULL;
+#ifdef HAVE_GTK
+  thread->tme_sjlj_thread_timeout_handle = NULL;
+  i = TME_ARRAY_ELS(thread->tme_sjlj_thread_timeout_handles);
+  do {
+    thread->tme_sjlj_thread_timeout_handles[--i] = NULL;
+  } while (i > 0);
+#endif /* HAVE_GTK */
 
   /* make this thread runnable: */
   thread->tme_sjlj_thread_state = TME_SJLJ_THREAD_STATE_BLOCKED;
@@ -675,6 +757,21 @@ tme_sjlj_cond_wait_yield(tme_cond_t *cond, tme_mutex_t *mutex)
 
   /* yield: */
   tme_thread_yield();
+}
+
+/* this makes a thread sleep on a condition: */
+void
+tme_sjlj_cond_sleep_yield(tme_cond_t *cond, tme_mutex_t *mutex, const struct timeval *sleep)
+{
+
+  /* unlock the mutex: */
+  tme_mutex_unlock(mutex);
+
+  /* remember that this thread is waiting on this condition: */
+  tme_sjlj_thread_blocked.tme_sjlj_thread_cond = cond;
+
+  /* sleep and yield: */
+  tme_sjlj_sleep_yield(sleep->tv_sec, sleep->tv_usec);
 }
 
 /* this notifies one or more threads waiting on a condition: */
@@ -720,6 +817,8 @@ tme_sjlj_yield(void)
   GdkInputCondition fd_condition_new;
 #ifdef HAVE_GTK
   unsigned long usec_part;
+  struct tme_sjlj_thread **timeout_handle;
+  unsigned int timeout_handle_count;
 #endif /* HAVE_GTK */
   int longjmp_value;
 
@@ -794,12 +893,8 @@ do {							\
     /* if the conditions have changed: */
     if (fd_condition_new != fd_condition_old) {
 
-      /* if there were old conditions, remove this fd: */
-      if (fd_condition_old != 0) {
-
-	/* there is now no thread blocking on this fd: */
-	assert(tme_sjlj_fd_thread[fd] == thread);
-	tme_sjlj_fd_thread[fd] = NULL;
+      /* if there is any blocking on this file descriptor, remove it: */
+      if (tme_sjlj_fd_thread[fd].tme_sjlj_fd_thread_conditions != 0) {
 
 #ifdef HAVE_GTK
 	if (tme_sjlj_using_gtk) {
@@ -821,7 +916,7 @@ do {							\
 	    FD_CLR(fd, &tme_sjlj_main_fdset_except);
 	    if (fd == tme_sjlj_main_max_fd) {
 	      for (; --tme_sjlj_main_max_fd > 0; ) {
-		if (tme_sjlj_fd_thread[tme_sjlj_main_max_fd] != NULL) {
+		if (tme_sjlj_fd_thread[tme_sjlj_main_max_fd].tme_sjlj_fd_thread_conditions != 0) {
 		  break;
 		}
 	      }
@@ -829,12 +924,35 @@ do {							\
 	  }
       }
 
-      /* if there are new conditions, add this fd: */
-      if (fd_condition_new != 0) {
+      /* update the blocking by this thread on this file descriptor: */
+      assert ((tme_sjlj_fd_thread[fd].tme_sjlj_fd_thread_conditions
+	       & fd_condition_old)
+	      == fd_condition_old);
+      tme_sjlj_fd_thread[fd].tme_sjlj_fd_thread_conditions
+	= ((tme_sjlj_fd_thread[fd].tme_sjlj_fd_thread_conditions
+	    & ~fd_condition_old)
+	   | fd_condition_new);
+#define UPDATE_FD_THREAD(fd_thread, condition)		\
+do {							\
+  if (fd_condition_old & condition) {			\
+    assert(tme_sjlj_fd_thread[fd].fd_thread == thread);	\
+    tme_sjlj_fd_thread[fd].fd_thread = NULL;		\
+  }							\
+  if (fd_condition_new & condition) {			\
+    assert(tme_sjlj_fd_thread[fd].fd_thread == NULL);	\
+    tme_sjlj_fd_thread[fd].fd_thread = thread;		\
+  }							\
+} while	(/* CONSTCOND */ 0)
+      UPDATE_FD_THREAD(tme_sjlj_fd_thread_read, GDK_INPUT_READ);
+      UPDATE_FD_THREAD(tme_sjlj_fd_thread_write, GDK_INPUT_WRITE);
+      UPDATE_FD_THREAD(tme_sjlj_fd_thread_except, GDK_INPUT_EXCEPTION);
+#undef UPDATE_FD_THREAD    
 
-	/* this thread is now blocking on this fd: */
-	assert(tme_sjlj_fd_thread[fd] == NULL);
-	tme_sjlj_fd_thread[fd] = thread;
+      /* get the conditions for all threads for this fd: */
+      fd_condition_new = tme_sjlj_fd_thread[fd].tme_sjlj_fd_thread_conditions;
+
+      /* if there is any blocking on this file descriptor, add it: */
+      if (fd_condition_new != 0) {
 
 #ifdef HAVE_GTK
 	if (tme_sjlj_using_gtk) {
@@ -873,17 +991,19 @@ do {							\
       || tme_sjlj_thread_blocked.tme_sjlj_thread_sleep.tv_usec != 0) {
 
 #ifdef HAVE_GTK
-    /* GTK timeouts only offer a resolution of one millisecond, so
-       always convert the timeout into a whole number of milliseconds,
-       rounding any fraction up to one: */
+    /* GTK timeouts only offer a resolution of one millisecond, and
+       can expire up to one millisecond early, so always round the
+       timeout up to a whole millisecond and add one: */
     if (tme_sjlj_using_gtk) {
       usec_part
 	= (tme_sjlj_thread_blocked.tme_sjlj_thread_sleep.tv_usec
-	   % 1000);
-      if (usec_part) {
-	tme_sjlj_thread_blocked.tme_sjlj_thread_sleep.tv_usec
-	  += (1000 - usec_part);
+	   + 1999);
+      usec_part -= (usec_part % 1000);
+      if (usec_part >= 1000000) {
+	tme_sjlj_thread_blocked.tme_sjlj_thread_sleep.tv_sec++;
+	usec_part -= 1000000;
       }
+      tme_sjlj_thread_blocked.tme_sjlj_thread_sleep.tv_usec = usec_part;
     }
 #endif /* HAVE_GTK */
 
@@ -916,11 +1036,6 @@ do {							\
 	if (thread == tme_sjlj_thread_dispatched_timeout) {
 	  longjmp_value = TME_SJLJ_DISPATCHER_FALSE;
 	}
-
-	/* otherwise, it should be safe to remove this timeout: */
-	else {
-	  gtk_timeout_remove(thread->tme_sjlj_thread_timeout_tag);
-	}
       }
       else
 #endif /* HAVE_GTK */
@@ -946,7 +1061,21 @@ do {							\
 	|| tme_sjlj_thread_blocked.tme_sjlj_thread_sleep.tv_usec != 0) {
 #ifdef HAVE_GTK
       if (tme_sjlj_using_gtk) {
-	thread->tme_sjlj_thread_timeout_tag =
+
+	/* find an unused GTK timeout handle, or allocate a new one: */
+	timeout_handle = &thread->tme_sjlj_thread_timeout_handles[0];
+	timeout_handle_count = TME_ARRAY_ELS(thread->tme_sjlj_thread_timeout_handles);
+	do {
+	  if (*timeout_handle == NULL) {
+	    break;
+	  }
+	  timeout_handle++;
+	} while (--timeout_handle_count > 0);
+	if (timeout_handle_count == 0) {
+	  timeout_handle = tme_new(struct tme_sjlj_thread *, 1);
+	}
+	*timeout_handle = thread;
+	thread->tme_sjlj_thread_timeout_handle = timeout_handle;
 
 	  /* XXX we have to call g_timeout_add_full here, because
 	     there are no gtk_timeout_add_ functions that allow you to
@@ -960,7 +1089,7 @@ do {							\
 			      + (tme_sjlj_thread_blocked.tme_sjlj_thread_sleep.tv_usec
 				 / 1000)),
 			     tme_sjlj_dispatch_timeout,
-			     thread,
+			     timeout_handle,
 			     NULL);
       }
       else

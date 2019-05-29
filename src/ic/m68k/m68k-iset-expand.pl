@@ -1,6 +1,6 @@
 #! /usr/local/bin/perl -w
 
-# $Id: m68k-iset-expand.pl,v 1.4 2003/06/27 20:42:31 fredette Exp $
+# $Id: m68k-iset-expand.pl,v 1.5 2007/08/25 21:14:29 fredette Exp $
 
 # m68k-inst-expand.pl - expands the m68k instruction templates into
 # full instruction word patterns and their decodings:
@@ -381,6 +381,26 @@ for($line = 1; defined($_ = <STDIN>); $line++) {
 	    next;
 	}
 
+	# EXCEPTION: a move of an address register to a predecrement
+	# or postincrement EA with that same address register, must
+	# store the original value of the address register.  since the
+	# predecrement and postincrement code in the executer updates
+	# the address register before the move has happened, we wrap
+	# the normal move function in another that gives an op1
+	# argument that is the original value of the address register:
+	if ($func =~ /^move_srp[di]\.S/) {
+	    $func = 'move.S';
+	}
+	if ($func eq 'move.S'
+	    && substr($pattern, (15 - 5), 6) eq '001'.substr($pattern, (15 - 11), 3)) {
+	    if (substr($pattern, (15 - 8), 3) eq '100') {
+		$func = 'move_srpd.S';
+	    }
+	    elsif (substr($pattern, (15 - 8), 3) eq '011') {
+		$func = 'move_srpi.S';
+	    }
+	}
+	    
 	# the function name:
 	if ($func =~ /^(.*)\.([sS])$/) {
 	    die "stdin:$line: $func with no size field?\n"

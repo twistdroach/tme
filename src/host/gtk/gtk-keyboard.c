@@ -1,4 +1,4 @@
-/* $Id: gtk-keyboard.c,v 1.8 2005/05/14 18:04:22 fredette Exp $ */
+/* $Id: gtk-keyboard.c,v 1.10 2007/02/15 02:15:41 fredette Exp $ */
 
 /* host/gtk/gtk-keyboard.c - GTK keyboard support: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: gtk-keyboard.c,v 1.8 2005/05/14 18:04:22 fredette Exp $");
+_TME_RCSID("$Id: gtk-keyboard.c,v 1.10 2007/02/15 02:15:41 fredette Exp $");
 
 /* includes: */
 #include "gtk-display.h"
@@ -190,7 +190,7 @@ _tme_gtk_keyboard_x11_new(struct tme_gtk_display *display)
 	     remove it if it's different from this keycode: */
 	  if (tme_hash_lookup(display->tme_gtk_display_keyboard_keysym_to_keycode,
 			      (tme_hash_data_t) keysym)
-	      != (tme_hash_data_t) keycode) {
+	      != tme_keyboard_hash_data_from_keyval((tme_uint32_t) keycode)) {
 	    tme_hash_remove(display->tme_gtk_display_keyboard_keysym_to_keycode,
 			    (tme_hash_data_t) keysym);
 	  }
@@ -255,7 +255,7 @@ _tme_gtk_keyboard_x11_new(struct tme_gtk_display *display)
 			(tme_hash_data_t) gtk_keysym);
 	tme_hash_insert(display->tme_gtk_display_keyboard_keysym_to_keycode,
 			(tme_hash_data_t) keysym,
-			(tme_hash_data_t) keycode);
+			tme_keyboard_hash_data_from_keyval((tme_uint32_t) keycode));
       }
     }
   }
@@ -342,9 +342,8 @@ _tme_gtk_keyboard_key_event(GtkWidget *widget,
 
   /* get any keycode associated with this keysym: */
   tme_event.tme_keyboard_event_keycode
-    = ((tme_keyboard_keyval_t)
-       tme_hash_lookup(display->tme_gtk_display_keyboard_keysym_to_keycode,
-		       (tme_hash_data_t) tme_event.tme_keyboard_event_keyval));
+    = tme_keyboard_hash_data_to_keyval(tme_hash_lookup(display->tme_gtk_display_keyboard_keysym_to_keycode,
+						       tme_keyboard_hash_data_from_keyval(tme_event.tme_keyboard_event_keyval)));
 
   /* remember if the keyboard buffer was empty: */
   was_empty
@@ -381,6 +380,7 @@ _tme_gtk_keyboard_lookup(struct tme_keyboard_connection *conn_keyboard,
   struct tme_gtk_keysym *keysym;
   struct tme_gtk_keysym_bad **_keysym_bad, *keysym_bad;
   char *string;
+  const char *string_other;
   guint _keysym;
 
   /* recover our data structure: */
@@ -467,23 +467,27 @@ _tme_gtk_keyboard_lookup(struct tme_keyboard_connection *conn_keyboard,
     keysym->tme_gtk_keysym_keysym
       = gdk_keyval_from_name(string);
     
-    /* if GDK doesn't know a keysym for this name, else find an
-       unused keysym: */
-    if (keysym->tme_gtk_keysym_keysym
-	== GDK_VoidSymbol) {
+    /* if GDK doesn't know a keysym for this name, or if the string
+       for this keysym isn't the same name, find an unused keysym: */
+    if (keysym->tme_gtk_keysym_keysym == GDK_VoidSymbol
+	|| (string_other = gdk_keyval_name(keysym->tme_gtk_keysym_keysym)) == NULL
+	|| strcmp(string, string_other)) {
       
       /* loop until we have an unused keysym that isn't also
 	 TME_KEYBOARD_KEYVAL_UNDEF, or until we have exhausted the
 	 GDK keysym space: */
-      for (_keysym = 0;; ) {
+      for (_keysym = display->tme_gtk_display_keyboard_keysym_alloc_next;;) {
+	if ((_keysym + 1) == 0) {
+	  abort();
+	}
 	if (_keysym != TME_KEYBOARD_KEYVAL_UNDEF
+	    && _keysym != GDK_VoidSymbol
 	    && gdk_keyval_name(_keysym) == NULL) {
 	  break;
 	}
-	if (++_keysym == 0) {
-	  abort();
-	}
+	_keysym++;
       }
+      display->tme_gtk_display_keyboard_keysym_alloc_next = _keysym + 1;
       
       /* use this new keysym: */
       keysym->tme_gtk_keysym_keysym

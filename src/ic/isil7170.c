@@ -1,4 +1,4 @@
-/* $Id: isil7170.c,v 1.3 2005/05/10 00:37:43 fredette Exp $ */
+/* $Id: isil7170.c,v 1.4 2006/09/30 12:43:36 fredette Exp $ */
 
 /* ic/isil7170.c - implementation of Intersil 7170 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: isil7170.c,v 1.3 2005/05/10 00:37:43 fredette Exp $");
+_TME_RCSID("$Id: isil7170.c,v 1.4 2006/09/30 12:43:36 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -222,8 +222,9 @@ _tme_isil7170_callout(struct tme_isil7170 *isil7170)
   isil7170->tme_isil7170_callouts_running = TRUE;
 
   /* get our bus connection: */
-  conn_bus = TME_ATOMIC_READ(struct tme_bus_connection *,
-			     isil7170->tme_isil7170_device.tme_bus_device_connection);
+  conn_bus = tme_memory_atomic_pointer_read(struct tme_bus_connection *,
+					    isil7170->tme_isil7170_device.tme_bus_device_connection,
+					    &isil7170->tme_isil7170_device.tme_bus_device_connection_rwlock);
 
   /* loop forever: */
   for (again = TRUE; again;) {
@@ -655,8 +656,8 @@ _tme_isil7170_tlb_fill(void *_isil7170, struct tme_bus_tlb *tlb,
   tme_bus_tlb_initialize(tlb);
 
   /* this TLB entry can cover the whole device: */
-  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first, 0);
-  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last, isil7170_address_last);
+  tlb->tme_bus_tlb_addr_first = 0;
+  tlb->tme_bus_tlb_addr_last = isil7170_address_last;
 
   /* allow reading and writing: */
   tlb->tme_bus_tlb_cycles_ok = TME_BUS_CYCLE_READ | TME_BUS_CYCLE_WRITE;

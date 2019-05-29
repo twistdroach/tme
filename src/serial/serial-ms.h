@@ -1,4 +1,4 @@
-/* $Id: serial-ms.h,v 1.2 2003/08/05 03:37:39 fredette Exp $ */
+/* $Id: serial-ms.h,v 1.3 2006/09/30 12:35:01 fredette Exp $ */
 
 /* serial/serial-ms.h - implementation header file for serial mouse
    emulation: */
@@ -38,12 +38,13 @@
 #define _SERIAL_SERIAL_MS_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: serial-ms.h,v 1.2 2003/08/05 03:37:39 fredette Exp $");
+_TME_RCSID("$Id: serial-ms.h,v 1.3 2006/09/30 12:35:01 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/mouse.h>
 #include <tme/generic/serial.h>
 #include <tme/element.h>
+#include <tme/threads.h>
 
 /* macros: */
 

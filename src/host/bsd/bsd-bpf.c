@@ -1,4 +1,4 @@
-/* $Id: bsd-bpf.c,v 1.6 2004/05/17 11:57:01 fredette Exp $ */
+/* $Id: bsd-bpf.c,v 1.9 2007/02/21 01:24:50 fredette Exp $ */
 
 /* host/bsd/bsd-bpf.c - BSD Berkeley Packet Filter Ethernet support: */
 
@@ -34,11 +34,12 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: bsd-bpf.c,v 1.6 2004/05/17 11:57:01 fredette Exp $");
+_TME_RCSID("$Id: bsd-bpf.c,v 1.9 2007/02/21 01:24:50 fredette Exp $");
 
 /* includes: */
 #include "bsd-impl.h"
 #include <tme/generic/ethernet.h>
+#include <tme/threads.h>
 #include <tme/misc.h>
 #include <stdio.h>
 #include <string.h>
@@ -74,6 +75,12 @@ _TME_RCSID("$Id: bsd-bpf.c,v 1.6 2004/05/17 11:57:01 fredette Exp $");
 #include <net/bpf.h>
 
 /* macros: */
+
+/* ARP and RARP opcodes: */
+#define TME_NET_ARP_OPCODE_REQUEST	(0x0001)
+#define TME_NET_ARP_OPCODE_REPLY	(0x0002)
+#define TME_NET_ARP_OPCODE_REV_REQUEST	(0x0003)
+#define TME_NET_ARP_OPCODE_REV_REPLY	(0x0004)
 
 /* the callout flags: */
 #define TME_BSD_BPF_CALLOUT_CHECK	(0)
@@ -127,6 +134,22 @@ struct tme_bsd_bpf {
 
   /* when nonzero, the packet delay is sleeping: */
   int tme_bsd_bpf_delay_sleeping;
+};
+
+/* a crude ARP header: */
+struct tme_net_arp_header {
+  tme_uint8_t tme_net_arp_header_hardware[2];
+  tme_uint8_t tme_net_arp_header_protocol[2];
+  tme_uint8_t tme_net_arp_header_hardware_length;
+  tme_uint8_t tme_net_arp_header_protocol_length;
+  tme_uint8_t tme_net_arp_header_opcode[2];
+};
+
+/* a crude partial IPv4 header: */
+struct tme_net_ipv4_header {
+  tme_uint8_t tme_net_ipv4_header_v_hl;
+  tme_uint8_t tme_net_ipv4_header_tos;
+  tme_uint8_t tme_net_ipv4_header_length[2];
 };
 
 /* the accept and reject packet insns: */
@@ -293,6 +316,7 @@ _tme_bsd_bpf_callout(struct tme_bsd_bpf *bpf, int new_callouts)
   int callouts, later_callouts;
   unsigned int ctrl;
   int rc;
+  int status;
   tme_ethernet_fid_t frame_id;
   struct tme_ethernet_frame_chunk frame_chunk_buffer;
   tme_uint8_t frame[TME_ETHERNET_FRAME_MAX];
@@ -379,8 +403,14 @@ _tme_bsd_bpf_callout(struct tme_bsd_bpf *bpf, int new_callouts)
       /* if the read was successful: */
       if (rc > 0) {
 
+	/* check the size of the frame: */
+	assert(rc <= sizeof(frame));
+
 	/* do the write: */
-	tme_thread_write(bpf->tme_bsd_bpf_fd, frame, rc);
+	status = tme_thread_write(bpf->tme_bsd_bpf_fd, frame, rc);
+
+	/* writes must succeed: */
+	assert (status == rc);
 
 	/* mark that we need to loop to callout to read more frames: */
 	bpf->tme_bsd_bpf_callout_flags |= TME_BSD_BPF_CALLOUT_READ;
@@ -609,6 +639,11 @@ _tme_bsd_bpf_read(struct tme_ethernet_connection *conn_eth,
   struct tme_bsd_bpf *bpf;
   struct bpf_hdr the_bpf_header;
   struct tme_ethernet_frame_chunk frame_chunk_buffer;
+  size_t buffer_offset_next;
+  const struct tme_ethernet_header *ethernet_header;
+  const struct tme_net_arp_header *arp_header;
+  const struct tme_net_ipv4_header *ipv4_header;
+  tme_uint16_t ethertype;
   unsigned int count;
   int rc;
 
@@ -629,10 +664,13 @@ _tme_bsd_bpf_read(struct tme_ethernet_connection *conn_eth,
     if ((bpf->tme_bsd_bpf_buffer_offset
 	 + sizeof(the_bpf_header))
 	> bpf->tme_bsd_bpf_buffer_end) {
-      tme_log(&bpf->tme_bsd_bpf_element->tme_element_log_handle, 1, TME_OK,
-	      (&bpf->tme_bsd_bpf_element->tme_element_log_handle,
-	       _("flushed garbage BPF header bytes")));
-      bpf->tme_bsd_bpf_buffer_end = 0;
+      if (bpf->tme_bsd_bpf_buffer_offset
+	  != bpf->tme_bsd_bpf_buffer_end) {
+	tme_log(&bpf->tme_bsd_bpf_element->tme_element_log_handle, 1, TME_OK,
+		(&bpf->tme_bsd_bpf_element->tme_element_log_handle,
+		 _("flushed garbage BPF header bytes")));
+	bpf->tme_bsd_bpf_buffer_offset = bpf->tme_bsd_bpf_buffer_end;
+      }
       break;
     }
 
@@ -641,6 +679,15 @@ _tme_bsd_bpf_read(struct tme_ethernet_connection *conn_eth,
 	   bpf->tme_bsd_bpf_buffer
 	   + bpf->tme_bsd_bpf_buffer_offset,
 	   sizeof(the_bpf_header));
+    buffer_offset_next
+      = (((bpf->tme_bsd_bpf_buffer_offset
+	   + the_bpf_header.bh_hdrlen
+	   + the_bpf_header.bh_datalen)
+	  == bpf->tme_bsd_bpf_buffer_end)
+	 ? bpf->tme_bsd_bpf_buffer_end
+	 : (bpf->tme_bsd_bpf_buffer_offset
+	    + BPF_WORDALIGN(the_bpf_header.bh_hdrlen
+			    + the_bpf_header.bh_datalen)));
     bpf->tme_bsd_bpf_buffer_offset += the_bpf_header.bh_hdrlen;
 
     /* if we're missing some part of the packet: */
@@ -650,7 +697,7 @@ _tme_bsd_bpf_read(struct tme_ethernet_connection *conn_eth,
       tme_log(&bpf->tme_bsd_bpf_element->tme_element_log_handle, 1, TME_OK,
 	      (&bpf->tme_bsd_bpf_element->tme_element_log_handle,
 	       _("flushed truncated BPF packet")));
-      bpf->tme_bsd_bpf_buffer_offset += the_bpf_header.bh_datalen;
+      bpf->tme_bsd_bpf_buffer_offset = buffer_offset_next;
       continue;
     }
 
@@ -659,7 +706,7 @@ _tme_bsd_bpf_read(struct tme_ethernet_connection *conn_eth,
       tme_log(&bpf->tme_bsd_bpf_element->tme_element_log_handle, 1, TME_OK,
 	      (&bpf->tme_bsd_bpf_element->tme_element_log_handle,
 	       _("flushed short BPF packet")));
-      bpf->tme_bsd_bpf_buffer_offset += the_bpf_header.bh_datalen;
+      bpf->tme_bsd_bpf_buffer_offset = buffer_offset_next;
       continue;
     }
 
@@ -721,6 +768,81 @@ _tme_bsd_bpf_read(struct tme_ethernet_connection *conn_eth,
     frame_chunk_buffer.tme_ethernet_frame_chunk_bytes_count
       = the_bpf_header.bh_datalen;
 
+    /* some network interfaces haven't removed the CRC yet when they
+       pass a packet to BPF.  packets in a tme ethernet connection
+       never have CRCs, so here we attempt to detect them and strip
+       them off.
+
+       unfortunately there's no general way to do this.  there's a
+       chance that the last four bytes of an actual packet just
+       happen to be the Ethernet CRC of all of the previous bytes in
+       the packet, so we can't just strip off what looks like a
+       valid CRC, plus the CRC calculation itself isn't cheap.
+
+       the only way to do this well seems to be to look at the
+       protocol.  if we can determine what the correct minimum size
+       of the packet should be based on the protocol, and the size
+       we got is four bytes more than that, assume that the last four
+       bytes are a CRC and strip it off: */
+
+    /* assume that we won't be able to figure out the correct minimum
+       size of the packet: */
+    count = 0;
+
+    /* get the Ethernet header and packet type: */
+    ethernet_header = (struct tme_ethernet_header *) (bpf->tme_bsd_bpf_buffer + bpf->tme_bsd_bpf_buffer_offset);
+    ethertype = ethernet_header->tme_ethernet_header_type[0];
+    ethertype = (ethertype << 8) + ethernet_header->tme_ethernet_header_type[1];
+
+    /* dispatch on the packet type: */
+    switch (ethertype) {
+
+      /* an ARP or RARP packet: */
+    case TME_ETHERNET_TYPE_ARP:
+    case TME_ETHERNET_TYPE_RARP:
+      arp_header = (struct tme_net_arp_header *) (ethernet_header + 1);
+      switch ((((tme_uint16_t) arp_header->tme_net_arp_header_opcode[0]) << 8)
+	      + arp_header->tme_net_arp_header_opcode[1]) {
+      case TME_NET_ARP_OPCODE_REQUEST:
+      case TME_NET_ARP_OPCODE_REPLY:
+      case TME_NET_ARP_OPCODE_REV_REQUEST:
+      case TME_NET_ARP_OPCODE_REV_REPLY:
+	count = (TME_ETHERNET_HEADER_SIZE
+		 + sizeof(struct tme_net_arp_header)
+		 + (2 * arp_header->tme_net_arp_header_hardware_length)
+		 + (2 * arp_header->tme_net_arp_header_protocol_length));
+      default:
+	break;
+      }
+      break;
+
+      /* an IPv4 packet: */
+    case TME_ETHERNET_TYPE_IPV4:
+      ipv4_header = (struct tme_net_ipv4_header *) (ethernet_header + 1);
+      count = ipv4_header->tme_net_ipv4_header_length[0];
+      count = (count << 8) + ipv4_header->tme_net_ipv4_header_length[1];
+      count += TME_ETHERNET_HEADER_SIZE;
+      break;
+
+    default:
+      break;
+    }
+
+    /* if we were able to figure out the correct minimum size of the
+       packet, and the packet from BPF is exactly that minimum size
+       plus the CRC size, set the length of the packet to be the
+       correct minimum size.  NB that we can't let the packet become
+       smaller than (TME_ETHERNET_FRAME_MIN - TME_ETHERNET_CRC_SIZE): */
+    if (count != 0) {
+      count = TME_MAX(count,
+		      (TME_ETHERNET_FRAME_MIN
+		       - TME_ETHERNET_CRC_SIZE));
+      if (frame_chunk_buffer.tme_ethernet_frame_chunk_bytes_count
+	  == (count + TME_ETHERNET_CRC_SIZE)) {
+	frame_chunk_buffer.tme_ethernet_frame_chunk_bytes_count = count;
+      }
+    }
+
     /* copy out the frame: */
     count = tme_ethernet_chunks_copy(frame_chunks, &frame_chunk_buffer);
 
@@ -735,7 +857,7 @@ _tme_bsd_bpf_read(struct tme_ethernet_connection *conn_eth,
     else {
 
       /* update the buffer pointer: */
-      bpf->tme_bsd_bpf_buffer_offset += the_bpf_header.bh_datalen;
+      bpf->tme_bsd_bpf_buffer_offset = buffer_offset_next;
     }
 
     /* success: */

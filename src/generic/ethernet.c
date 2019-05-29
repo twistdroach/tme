@@ -1,4 +1,4 @@
-/* $Id: ethernet.c,v 1.2 2005/05/09 01:53:43 fredette Exp $ */
+/* $Id: ethernet.c,v 1.4 2006/11/15 22:17:30 fredette Exp $ */
 
 /* generic/ethernet.c - generic ethernet implementation support: */
 
@@ -34,11 +34,12 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: ethernet.c,v 1.2 2005/05/09 01:53:43 fredette Exp $");
+_TME_RCSID("$Id: ethernet.c,v 1.4 2006/11/15 22:17:30 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/ethernet.h>
 #include <stdlib.h>
+#include <errno.h>
 
 /* the Ethernet broadcast address: */
 const tme_uint8_t tme_ethernet_addr_broadcast[TME_ETHERNET_ADDR_SIZE] = {
@@ -122,10 +123,10 @@ tme_ethernet_addr_parse(const char *addr_string, tme_uint8_t *addr_bytes)
 
 /* this copies frame chunks: */
 unsigned int
-tme_ethernet_chunks_copy(struct tme_ethernet_frame_chunk *chunks_dst,
+tme_ethernet_chunks_copy(const struct tme_ethernet_frame_chunk *chunks_dst,
 			 const struct tme_ethernet_frame_chunk *chunks_src)
 {
-  struct tme_ethernet_frame_chunk *chunk_dst;
+  const struct tme_ethernet_frame_chunk *chunk_dst;
   const struct tme_ethernet_frame_chunk *chunk_src;
   tme_uint8_t *chunk_bytes_dst;
   const tme_uint8_t *chunk_bytes_src;
@@ -187,4 +188,29 @@ tme_ethernet_chunks_copy(struct tme_ethernet_frame_chunk *chunks_dst,
 
   /* done: */
   return (frame_size_total);
+}
+
+/* this calculates a little-endian Ethernet CRC.  this was cribbed
+   from NetBSD's src/sys/net/if_ethersubr.c: */
+tme_uint32_t
+tme_ethernet_crc32_el(const tme_uint8_t *buf, unsigned int len)
+{
+  static const tme_uint32_t crctab[] = {
+    0x00000000, 0x1db71064, 0x3b6e20c8, 0x26d930ac,
+    0x76dc4190, 0x6b6b51f4, 0x4db26158, 0x5005713c,
+    0xedb88320, 0xf00f9344, 0xd6d6a3e8, 0xcb61b38c,
+    0x9b64c2b0, 0x86d3d2d4, 0xa00ae278, 0xbdbdf21c
+  };
+  tme_uint32_t crc;
+  unsigned int i;
+
+  crc = ((tme_uint32_t) 0) - 1;	/* initial value */
+
+  for (i = 0; i < len; i++) {
+    crc ^= buf[i];
+    crc = (crc >> 4) ^ crctab[crc & 0xf];
+    crc = (crc >> 4) ^ crctab[crc & 0xf];
+  }
+
+  return (crc);
 }

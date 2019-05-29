@@ -6,7 +6,7 @@ AUTOMAKE_OPTIONS = 1.4 gnu
 INCLUDES = -I$(top_srcdir) -I$(srcdir) -I. -D_TME_IMPL
 
 SUBDIRS = @TME_IC_SUBDIRS@
-DIST_SUBDIRS = m68k ieee754
+DIST_SUBDIRS = m68k ieee754 sparc
 
 pkglib_LTLIBRARIES = @TME_ICS@
 EXTRA_LTLIBRARIES = tme_ic_am9513.la \
@@ -14,6 +14,12 @@ EXTRA_LTLIBRARIES = tme_ic_am9513.la \
 	tme_ic_i825x6.la \
 	tme_ic_isil7170.la \
 	tme_ic_ncr5380.la \
+	tme_ic_ncr53c9x.la \
+	tme_ic_mk48txx.la \
+	tme_ic_nec765.la \
+	tme_ic_am7930.la \
+	tme_ic_am7990.la \
+	tme_ic_lsi64854.la \
 	tme_ic_mm58167.la
 
 tme_ic_am9513_la_SOURCES = am9513.c
@@ -44,6 +50,36 @@ tme_ic_isil7170_la_LIBADD = $(top_builddir)/libtme/libtme.la \
 tme_ic_ncr5380_la_SOURCES = ncr5380.c
 tme_ic_ncr5380_la_LDFLAGS = -rpath $(pkglibdir) -module -version-info 0:0:0
 tme_ic_ncr5380_la_LIBADD = $(top_builddir)/libtme/libtme.la \
+	$(top_builddir)/generic/libtme-generic.la
+
+tme_ic_ncr53c9x_la_SOURCES = ncr53c9x.c
+tme_ic_ncr53c9x_la_LDFLAGS = -rpath $(pkglibdir) -module -version-info 0:0:0
+tme_ic_ncr53c9x_la_LIBADD = $(top_builddir)/libtme/libtme.la \
+	$(top_builddir)/generic/libtme-generic.la
+
+tme_ic_mk48txx_la_SOURCES = mk48txx.c
+tme_ic_mk48txx_la_LDFLAGS = -rpath $(pkglibdir) -module -version-info 0:0:0
+tme_ic_mk48txx_la_LIBADD = $(top_builddir)/libtme/libtme.la \
+	$(top_builddir)/generic/libtme-generic.la
+
+tme_ic_nec765_la_SOURCES = nec765.c
+tme_ic_nec765_la_LDFLAGS = -rpath $(pkglibdir) -module -version-info 0:0:0
+tme_ic_nec765_la_LIBADD = $(top_builddir)/libtme/libtme.la \
+	$(top_builddir)/generic/libtme-generic.la
+
+tme_ic_am7930_la_SOURCES = am7930.c
+tme_ic_am7930_la_LDFLAGS = -rpath $(pkglibdir) -module -version-info 0:0:0
+tme_ic_am7930_la_LIBADD = $(top_builddir)/libtme/libtme.la \
+	$(top_builddir)/generic/libtme-generic.la
+
+tme_ic_am7990_la_SOURCES = am7990.c
+tme_ic_am7990_la_LDFLAGS = -rpath $(pkglibdir) -module -version-info 0:0:0
+tme_ic_am7990_la_LIBADD = $(top_builddir)/libtme/libtme.la \
+	$(top_builddir)/generic/libtme-generic.la
+
+tme_ic_lsi64854_la_SOURCES = lsi64854.c
+tme_ic_lsi64854_la_LDFLAGS = -rpath $(pkglibdir) -module -version-info 0:0:0
+tme_ic_lsi64854_la_LIBADD = $(top_builddir)/libtme/libtme.la \
 	$(top_builddir)/generic/libtme-generic.la
 
 include $(top_srcdir)/modules

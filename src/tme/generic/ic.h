@@ -1,4 +1,4 @@
-/* $Id: ic.h,v 1.3 2003/07/29 18:11:24 fredette Exp $ */
+/* $Id: ic.h,v 1.4 2006/11/15 23:02:51 fredette Exp $ */
 
 /* tme/generic/ic/ic-impl.h - header file for generic IC support: */
 
@@ -37,7 +37,7 @@
 #define _TME_GENERIC_IC_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: ic.h,v 1.3 2003/07/29 18:11:24 fredette Exp $");
+_TME_RCSID("$Id: ic.h,v 1.4 2006/11/15 23:02:51 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus.h>
@@ -45,7 +45,7 @@ _TME_RCSID("$Id: ic.h,v 1.3 2003/07/29 18:11:24 fredette Exp $");
 /* macros: */
 
 /* the maximum size, in bytes, of an IC's register file: */
-#define TME_IC_REGS_SIZE	(128 * sizeof(tme_uint32_t))
+#define TME_IC_REGS_SIZE	(512 * sizeof(tme_uint32_t))
 
 /* in many cases it can be useful to think of an IC's register file as
    addressable memory on a bus, with a given port size and endianness.
@@ -157,8 +157,8 @@ struct tme_ic {
   /* the IC's addressable register file: */
   union {
 #ifdef TME_HAVE_INT64_T
-    tme_uint64_t	tme_ic_iregs_uint64s[TME_IC_REGS_SIZE >> 4];
-    tme_int64_t		tme_ic_iregs_int64s[TME_IC_REGS_SIZE >> 4];
+    tme_uint64_t	tme_ic_iregs_uint64s[TME_IC_REGS_SIZE >> 3];
+    tme_int64_t		tme_ic_iregs_int64s[TME_IC_REGS_SIZE >> 3];
 #endif /* TME_HAVE_INT64_T */
     tme_uint32_t	tme_ic_iregs_uint32s[TME_IC_REGS_SIZE >> 2];
     tme_int32_t		tme_ic_iregs_int32s[TME_IC_REGS_SIZE >> 2];

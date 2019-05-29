@@ -1,4 +1,4 @@
-/* $Id: sun2-impl.h,v 1.8 2005/02/17 12:37:25 fredette Exp $ */
+/* $Id: sun2-impl.h,v 1.9 2006/09/30 12:43:38 fredette Exp $ */
 
 /* machine/sun2/sun2-impl.h - implementation header file for Sun 2 emulation: */
 
@@ -37,7 +37,7 @@
 #define _MACHINE_SUN2_IMPL_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun2-impl.h,v 1.8 2005/02/17 12:37:25 fredette Exp $");
+_TME_RCSID("$Id: sun2-impl.h,v 1.9 2006/09/30 12:43:38 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus.h>
@@ -169,7 +169,8 @@ int _tme_sun2_bus_tlb_fill _TME_P((struct tme_bus_connection *, struct tme_bus_t
 				   tme_uint32_t, unsigned int));
 int _tme_sun2_mmu_tlb_set_allocate _TME_P((struct tme_bus_connection *,
 					   unsigned int, unsigned int, 
-					   TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb *)));
+					   struct tme_bus_tlb * tme_shared *,
+					   tme_rwlock_t *));
 int _tme_sun2_mmu_pte_get _TME_P((struct tme_sun2 *, tme_uint32_t, tme_uint32_t *));
 int _tme_sun2_mmu_pte_set _TME_P((struct tme_sun2 *, tme_uint32_t, tme_uint32_t));
 void _tme_sun2_mmu_context_system_set _TME_P((struct tme_sun2 *));

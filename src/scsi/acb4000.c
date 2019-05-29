@@ -1,4 +1,4 @@
-/* $Id: acb4000.c,v 1.4 2003/10/16 02:34:28 fredette Exp $ */
+/* $Id: acb4000.c,v 1.5 2006/09/30 12:34:21 fredette Exp $ */
 
 /* scsi/acb4000.c - ACB4000 SCSI disk emulation: */
 
@@ -34,10 +34,11 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: acb4000.c,v 1.4 2003/10/16 02:34:28 fredette Exp $");
+_TME_RCSID("$Id: acb4000.c,v 1.5 2006/09/30 12:34:21 fredette Exp $");
 
 /* includes: */
 #include <tme/scsi/scsi-disk.h>
+#include <errno.h>
 
 /* macros: */
 

@@ -1,4 +1,4 @@
-/* $Id: posix-tape.c,v 1.6 2003/10/16 02:48:23 fredette Exp $ */
+/* $Id: posix-tape.c,v 1.7 2006/09/30 12:35:01 fredette Exp $ */
 
 /* host/posix/posix-tape.c - implementation of tapes on a POSIX system: */
 
@@ -34,10 +34,11 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: posix-tape.c,v 1.6 2003/10/16 02:48:23 fredette Exp $");
+_TME_RCSID("$Id: posix-tape.c,v 1.7 2006/09/30 12:35:01 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/tape.h>
+#include <tme/threads.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <strings.h>

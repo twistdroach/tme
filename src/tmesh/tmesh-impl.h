@@ -1,4 +1,4 @@
-/* $Id: tmesh-impl.h,v 1.2 2003/07/29 18:32:31 fredette Exp $ */
+/* $Id: tmesh-impl.h,v 1.3 2006/11/15 23:11:56 fredette Exp $ */
 
 /* tmesh/tmesh-impl.h - private header file for the tmesh implementation: */
 
@@ -37,7 +37,7 @@
 #define _TMESH_IMPL_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: tmesh-impl.h,v 1.2 2003/07/29 18:32:31 fredette Exp $");
+_TME_RCSID("$Id: tmesh-impl.h,v 1.3 2006/11/15 23:11:56 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -59,6 +59,7 @@ _TME_RCSID("$Id: tmesh-impl.h,v 1.2 2003/07/29 18:32:31 fredette Exp $");
 #define TMESH_COMMAND_MV	(9)
 #define TMESH_COMMAND_COMMAND	(10)
 #define TMESH_COMMAND_LOG	(11)
+#define TMESH_COMMAND_ALIAS	(12)
 
 /* directory entry types: */
 #define TMESH_FS_DIRENT_DIR	(0)

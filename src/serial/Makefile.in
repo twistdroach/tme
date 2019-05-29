@@ -198,6 +198,7 @@ INCLUDES = -I$(top_srcdir) -I$(srcdir) -I. -D_TME_IMPL
 pkglib_LTLIBRARIES = tme_serial_kb.la
 
 tme_serial_kb_la_SOURCES = \
+	serial-sink.c \
 	serial-kb.h \
 	serial-kb.c \
 	kb-sun.c \
@@ -217,8 +218,8 @@ LTLIBRARIES = $(pkglib_LTLIBRARIES)
 
 tme_serial_kb_la_DEPENDENCIES = $(top_builddir)/libtme/libtme.la \
 	$(top_builddir)/generic/libtme-generic.la
-am_tme_serial_kb_la_OBJECTS = serial-kb.lo kb-sun.lo serial-ms.lo \
-	ms-mssystems.lo
+am_tme_serial_kb_la_OBJECTS = serial-sink.lo serial-kb.lo kb-sun.lo \
+	serial-ms.lo ms-mssystems.lo
 tme_serial_kb_la_OBJECTS = $(am_tme_serial_kb_la_OBJECTS)
 
 DEFAULT_INCLUDES =  -I. -I$(srcdir) -I$(top_builddir)
@@ -226,7 +227,8 @@ depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
 @AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/kb-sun.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/ms-mssystems.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/serial-kb.Plo ./$(DEPDIR)/serial-ms.Plo
+@AMDEP_TRUE@	./$(DEPDIR)/serial-kb.Plo ./$(DEPDIR)/serial-ms.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/serial-sink.Plo
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) \
@@ -288,6 +290,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ms-mssystems.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/serial-kb.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/serial-ms.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/serial-sink.Plo@am__quote@
 
 distclean-depend:
 	-rm -rf ./$(DEPDIR)

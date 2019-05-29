@@ -1,4 +1,4 @@
-/* $Id: bus-device.h,v 1.7 2004/04/30 12:11:36 fredette Exp $ */
+/* $Id: bus-device.h,v 1.8 2006/09/30 12:43:39 fredette Exp $ */
 
 /* tme/generic/bus-device.h - header file for generic bus device support: */
 
@@ -37,7 +37,7 @@
 #define _TME_GENERIC_BUS_DEVICE_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: bus-device.h,v 1.7 2004/04/30 12:11:36 fredette Exp $");
+_TME_RCSID("$Id: bus-device.h,v 1.8 2006/09/30 12:43:39 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -54,7 +54,8 @@ struct tme_bus_device {
   struct tme_element *tme_bus_device_element;
 
   /* this device's bus connection: */
-  TME_ATOMIC(struct tme_bus_connection *, tme_bus_device_connection);
+  struct tme_bus_connection * tme_shared tme_bus_device_connection;
+  tme_rwlock_t tme_bus_device_connection_rwlock;
 
   /* the subregions for this device.  for some backwards compatibility
      for older sources, we define tme_bus_device_address_last: */

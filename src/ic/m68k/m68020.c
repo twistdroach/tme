@@ -1,4 +1,4 @@
-/* $Id: m68020.c,v 1.6 2005/04/30 15:14:37 fredette Exp $ */
+/* $Id: m68020.c,v 1.7 2007/02/16 01:40:56 fredette Exp $ */
 
 /* ic/m68k/m68020.c - implementation of Motorola 68020 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: m68020.c,v 1.6 2005/04/30 15:14:37 fredette Exp $");
+_TME_RCSID("$Id: m68020.c,v 1.7 2007/02/16 01:40:56 fredette Exp $");
 
 /* includes: */
 #include "m68k-impl.h"
@@ -594,7 +594,7 @@ do {						\
 
   /* get out the sequence: */
   raw_used = tme_m68k_sequence_fill(ic, raw, raw_avail);
-  FORMAT_ERROR_IF(raw_used < 0);
+  FORMAT_ERROR_IF(raw_used <= 0);
   raw += raw_used;
   raw_avail -= raw_used;
   
@@ -605,7 +605,7 @@ do {						\
     
     /* get out the instruction buffer: */
     raw_used = tme_m68k_insn_buffer_fill(ic, raw, raw_avail);
-    FORMAT_ERROR_IF(raw_used < 0);
+    FORMAT_ERROR_IF(raw_used <= 0);
     raw += raw_used;
     raw_avail -= raw_used;
     

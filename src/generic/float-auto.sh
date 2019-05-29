@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# $Id: float-auto.sh,v 1.1 2005/02/17 12:17:00 fredette Exp $
+# $Id: float-auto.sh,v 1.2 2007/08/24 00:55:33 fredette Exp $
 
 # generic/float-auto.sh - automatically generates C code for floating
 # point conversion functions:
@@ -52,7 +52,7 @@ EOF
 if $header; then :; else
     cat <<EOF
 #include <tme/common.h>
-_TME_RCSID("\$Id: float-auto.sh,v 1.1 2005/02/17 12:17:00 fredette Exp $");
+_TME_RCSID("\$Id: float-auto.sh,v 1.2 2007/08/24 00:55:33 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/float.h>
@@ -76,6 +76,133 @@ for _builtin_type in float double long_double; do
 	echo ; echo "#ifdef _TME_HAVE_${_BUILTIN_TYPE}" ;;
     *) ;;
     esac
+
+    # if we're generating a header:
+    #
+    if $header; then
+	cat <<EOF
+
+/* if possible, this returns a positive or negative infinity
+   ${builtin_type}, otherwise, this returns the ${builtin_type} value
+   closest to that infinity: */
+${builtin_type} tme_float_infinity_${_builtin_type} _TME_P((int));
+
+/* if possible, this returns a negative zero ${builtin_type}.
+   otherwise, this returns the negative ${builtin_type} value closest
+   to zero: */
+${builtin_type} tme_float_negative_zero_${_builtin_type} _TME_P((void));
+EOF
+    else
+	cat <<EOF
+
+/* if possible, this returns a positive or negative infinity
+   ${builtin_type}, otherwise, this returns the ${builtin_type} value
+   closest to that infinity: */
+${builtin_type}
+tme_float_infinity_${_builtin_type}(int negative)
+{
+  static int inf_set_${_builtin_type};
+  static ${builtin_type} inf_${_builtin_type}[2];
+  ${builtin_type} inf_test;
+  int negative_i;
+
+  /* make sure that negative can index the inf_${_builtin_type} array: */
+  negative = !!negative;
+
+  /* if the ${builtin_type} infinities have already been set: */
+  if (__tme_predict_true(inf_set_${_builtin_type})) {
+    return (inf_${_builtin_type}[negative]);
+  }
+
+  /* the ${builtin_type} infinities will be set now: */
+  inf_set_${_builtin_type} = TRUE;
+
+  /* set the positive and negative infinities: */
+  for (negative_i = 0; negative_i < 2; negative_i++) {
+
+    /* start with the limit maximum positive value or limit minimum
+       negative value.  double this value until either it doesn't
+       change or it isn't closer to the desired infinity, and then
+       use the previous value: */
+    inf_test = FLOAT_MAX_${_BUILTIN_TYPE};
+    if (negative_i) {
+      inf_test = -inf_test;
+    }
+    do {
+      memcpy((char *) &inf_${_builtin_type}[negative_i], (char *) &inf_test, sizeof(inf_test));
+      inf_test *= 2;
+    } while (memcmp((char *) &inf_${_builtin_type}[negative_i], (char *) &inf_test, sizeof(inf_test)) != 0
+             && (negative_i
+                 ? inf_test < inf_${_builtin_type}[negative_i]
+                 : inf_test > inf_${_builtin_type}[negative_i]));
+
+    /* try to generate the actual infinity by dividing one or negative
+       one by zero.  if this value is closer to the desired infinity,
+       use it: */
+    inf_test = (negative_i ? -1.0 : 1.0) / 0.0;
+    if (negative_i
+        ? inf_test < inf_${_builtin_type}[negative_i]
+        : inf_test > inf_${_builtin_type}[negative_i]) {
+      inf_${_builtin_type}[negative_i] = inf_test;
+    }
+  }
+
+  /* return the desired infinity: */
+  return (inf_${_builtin_type}[negative]);
+}
+
+/* if possible, this returns a negative zero ${builtin_type}.
+   otherwise, this returns the negative ${builtin_type} value closest
+   to zero: */
+${builtin_type}
+tme_float_negative_zero_${_builtin_type}(void)
+{
+  static int nzero_set_${_builtin_type};
+  static ${builtin_type} nzero_${_builtin_type};
+  ${builtin_type} constant_pzero;
+  ${builtin_type} constant_nzero;
+  ${builtin_type} nzero_test;
+
+  /* if the ${builtin_type} negative zero has already been set: */
+  if (__tme_predict_true(nzero_set_${_builtin_type})) {
+    return (nzero_${_builtin_type});
+  }
+
+  /* the ${builtin_type} negative zero will be set now: */
+  nzero_set_${_builtin_type} = TRUE;
+
+  /* make a +0.0 and a -0.0, that we can do bit-for-bit comparisons with.
+     NB that sizeof(${builtin_type}) may cover more bits than are actually 
+     used by a ${builtin_type}: */
+  memset((char *) &constant_pzero, 0, sizeof(constant_pzero));
+  memset((char *) &constant_nzero, 0, sizeof(constant_nzero));
+  constant_pzero = +0.0;
+  constant_nzero = -0.0;
+
+  /* if -0.0 * -0.0 is bit-for-bit different from -0.0 and is
+     bit-for-bit identical to +0.0, use -0.0: */
+  memset((char *) &nzero_test, 0, sizeof(nzero_test));
+  nzero_test = constant_nzero * constant_nzero;
+  if (memcmp((char *) &constant_nzero, (char *) &nzero_test, sizeof(nzero_test)) != 0
+      && memcmp((char *) &constant_pzero, (char *) &nzero_test, sizeof(nzero_test)) == 0) {
+    return (nzero_${_builtin_type} = constant_nzero);
+  }
+
+  /* otherwise, start with the limit maximum negative value (which is
+     zero minus the limit minimum positive value).  halve this value
+     until either it doesn't change or it becomes positive zero, and
+     then use the previous value: */
+  nzero_test = 0 - FLOAT_MIN_${_BUILTIN_TYPE};
+  do {
+    memcpy((char *) &nzero_${_builtin_type}, (char *) &nzero_test, sizeof(nzero_test));
+    nzero_test = nzero_test / 2;
+  } while (memcmp((char *) &nzero_${_builtin_type}, (char *) &nzero_test, sizeof(nzero_test)) != 0
+	   && memcmp((char *) &constant_pzero, (char *) &nzero_test, sizeof(nzero_test)) != 0);
+  return (nzero_${_builtin_type});
+}
+EOF
+    fi
+
 
     # permute over the radices:
     #
@@ -219,20 +346,20 @@ tme_float_radix${radix}_mantissa_exponent_${_builtin_type}(${builtin_type} value
   tme_uint32_t exponent_bit;
   int negate;
 
+  /* start with an exponent of zero: */
+  exponent = 0;
+
+  /* if the value is positive or negative zero, return the value: */
+  if (value == 0.0
+      || -value == 0.0) {
+    *_exponent = exponent;
+    return (value);
+  }
+
   /* take the magnitude of the value, but remember if it was negative: */
   negate = (value < 0);
   if (negate) {
     value = 0 - value;
-  }
-
-  /* start with an exponent of zero: */
-  exponent = 0;
-
-  /* if the value is zero, return zero: */
-  /* XXX FIXME this returns positive zero for a negative zero argument: */
-  if (value == 0) {
-    *_exponent = exponent;
-    return (0);
   }
 
   /* while the value is less than one: */
@@ -254,9 +381,9 @@ tme_float_radix${radix}_mantissa_exponent_${_builtin_type}(${builtin_type} value
     }
   }
 
-  /* while the value is greater than ${radix}: */
+  /* while the value is greater than or equal to ${radix}: */
   exponent_bit = TME_ARRAY_ELS(_tme_float_radix${radix}_exponent_bits_${_builtin_type}_pos) - 1;
-  for (; value > ${radix}; ) {
+  for (; value >= ${radix}; ) {
 
     /* if value is greater than or equal to ${radix}^(2^exponent_bit),
        divide value by ${radix}^(2^exponent_bit), and add 2^exponent_bit

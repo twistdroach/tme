@@ -1,4 +1,4 @@
-/* $Id: gtk-mouse.c,v 1.1 2003/07/31 01:41:48 fredette Exp $ */
+/* $Id: gtk-mouse.c,v 1.3 2007/03/03 15:33:22 fredette Exp $ */
 
 /* host/gtk/gtk-mouse.c - GTK mouse support: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: gtk-mouse.c,v 1.1 2003/07/31 01:41:48 fredette Exp $");
+_TME_RCSID("$Id: gtk-mouse.c,v 1.3 2007/03/03 15:33:22 fredette Exp $");
 
 /* includes: */
 #include "gtk-display.h"
@@ -49,18 +49,18 @@ _TME_RCSID("$Id: gtk-mouse.c,v 1.1 2003/07/31 01:41:48 fredette Exp $");
 /* globals: */
 
 /* our invisible cursor: */
-static const unsigned char _tme_gtk_mouse_cursor_source[(TME_GTK_MOUSE_CURSOR_WIDTH
-							 * TME_GTK_MOUSE_CURSOR_HEIGHT
-							 / 8)] = 
+static const gchar _tme_gtk_mouse_cursor_source[(TME_GTK_MOUSE_CURSOR_WIDTH
+						 * TME_GTK_MOUSE_CURSOR_HEIGHT
+						 / 8)] = 
 {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
-static const unsigned char _tme_gtk_mouse_cursor_mask[(TME_GTK_MOUSE_CURSOR_WIDTH
-						       * TME_GTK_MOUSE_CURSOR_HEIGHT
-						       / 8)] = 
+static const gchar _tme_gtk_mouse_cursor_mask[(TME_GTK_MOUSE_CURSOR_WIDTH
+					       * TME_GTK_MOUSE_CURSOR_HEIGHT
+					       / 8)] = 
 {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -118,8 +118,8 @@ _tme_gtk_mouse_mouse_event(GtkWidget *widget,
 {
   struct tme_gtk_display *display;
   struct tme_mouse_event tme_event;
-  guint x;
-  guint y;
+  gint x;
+  gint y;
   guint state, button;
   unsigned int buttons;
   int was_empty;
@@ -168,6 +168,20 @@ _tme_gtk_mouse_mouse_event(GtkWidget *widget,
 
     /* warp the pointer back to center: */
     _tme_gtk_mouse_warp_pointer(screen);
+  }
+
+  /* otherwise, if this is a double- or triple-click: */
+  else if (gdk_event_raw->type == GDK_2BUTTON_PRESS
+	   || gdk_event_raw->type == GDK_3BUTTON_PRESS) {
+
+    /* we ignore double- and triple-click events, since normal button
+       press and release events are always generated also: */
+      
+    /* unlock the mutex: */
+    tme_mutex_unlock(&display->tme_gtk_display_mutex);
+
+    /* stop propagating this event: */
+    return (TRUE);
   }
 
   /* otherwise, this must be a button press or a release: */

@@ -1,4 +1,4 @@
-dnl $Id: acinclude.m4,v 1.8 2005/05/14 22:07:04 fredette Exp $
+dnl $Id: acinclude.m4,v 1.9 2007/08/24 00:42:59 fredette Exp $
 
 dnl acinclude.m4 - additional tme autoconf macros:
 
@@ -62,7 +62,7 @@ main()
     switch(fork()) {
     case -1: exit(1);
     case 0: value = *((_type *) &try_align_buffer[try_align]); 
-      fprintf(stderr, "%d\n", (int) value); exit(0);
+      fprintf(stderr, "%d\n", (int) (value / 2)); exit(0);
     default: break;
     }
     wait(&status);
@@ -107,9 +107,11 @@ main()
   unsigned int shift, max_shift;
   FILE *f=fopen("conftestval", "w");
   if (!f) exit(1);
-  center = 3 << ((sizeof(center) * 4) - 1);
+  center = 3;
+  center <<= ((sizeof(center) * 4) - 1);
   max_shift = 2047;
-  for (shift = (sizeof(center) * 8);
+  sscanf("0", "%d", &shift);
+  for (shift += (sizeof(center) * 8);
        shift < 2048;
        shift <<= 1) {
     right = (center >> shift);

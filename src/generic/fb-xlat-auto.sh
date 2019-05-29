@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# $Id: fb-xlat-auto.sh,v 1.9 2005/05/14 19:02:20 fredette Exp $
+# $Id: fb-xlat-auto.sh,v 1.11 2007/03/29 01:02:43 fredette Exp $
 
 # generic/fb-xlat-auto.sh - automatically generates C code 
 # for many framebuffer translation functions:
@@ -198,7 +198,7 @@ cat <<EOF
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-_TME_RCSID("\$Id: fb-xlat-auto.sh,v 1.9 2005/05/14 19:02:20 fredette Exp $");
+_TME_RCSID("\$Id: fb-xlat-auto.sh,v 1.11 2007/03/29 01:02:43 fredette Exp $");
 
 /* the central feature of these translation functions is the "bit
    FIFO", a first-in, first-out stream of bits.  source bit FIFOs are
@@ -511,6 +511,9 @@ do {								\\
     else {							\\
       next |= (fifo << bits);					\\
       fifo >>= (32 - bits);					\\
+    }								\\
+    if (SHIFTMAX_INT32_T < 32 && bits == 0) {			\\
+      fifo = 0;							\\
     }								\\
     bits += (shift);						\\
 								\\
@@ -2061,7 +2064,7 @@ for src_key in ${src_all}; do
 		    echo "${indent0}         time, we map the green intensity directly into a pixel.  we may have"
 		    echo "${indent0}         to scale the intensity to be in the lookup range: */"
 		    echo "${indent0}      if (src_mask_i > ${src_mask_i_max}) {"
-		    echo "${indent0}        value_g /= TME_FB_XLAT_MAP_LINEAR_SCALE(src_mask_i, ${src_mask_i_max});"
+		    echo "${indent0}        value_g /= TME_FB_XLAT_MAP_LINEAR_SCALE(${src_mask_i}, TME_FB_XLAT_MAP_INDEX_MASK_MAX);"
 		    echo "${indent0}      }"
 		    echo "${indent0}      pixel = dst->tme_fb_connection_map_pixel[value_g];"
 		    ;;
@@ -2071,7 +2074,7 @@ for src_key in ${src_all}; do
 		    echo "${indent0}         to be in the lookup range: */"
 		    echo "${indent0}      if (src->tme_fb_connection_class == TME_FB_XLAT_CLASS_MONOCHROME) {"
 		    echo "${indent0}        if (src_mask_i > ${src_mask_i_max}) {"
-		    echo "${indent0}          value_g /= TME_FB_XLAT_MAP_LINEAR_SCALE(src_mask_i, ${src_mask_i_max});"
+		    echo "${indent0}          value_g /= TME_FB_XLAT_MAP_LINEAR_SCALE(${src_mask_i}, TME_FB_XLAT_MAP_INDEX_MASK_MAX);"
 		    echo "${indent0}        }"
 		    echo "${indent0}        pixel = dst->tme_fb_connection_map_pixel[value_g];"
 		    echo "${indent0}      }"
@@ -2092,9 +2095,9 @@ for src_key in ${src_all}; do
 		    echo ""
 		    echo "${indent1}        /* we may have to scale the intensities to be in the lookup range: */"
 		    echo "${indent1}        if (src_mask_i > ${src_mask_i_max}) {"
-		    echo "${indent1}          value_g /= TME_FB_XLAT_MAP_LINEAR_SCALE(src_mask_i, ${src_mask_i_max});"
-		    echo "${indent1}          value_r /= TME_FB_XLAT_MAP_LINEAR_SCALE(src_mask_i, ${src_mask_i_max});"
-		    echo "${indent1}          value_b /= TME_FB_XLAT_MAP_LINEAR_SCALE(src_mask_i, ${src_mask_i_max});"
+		    echo "${indent1}          value_g /= TME_FB_XLAT_MAP_LINEAR_SCALE(${src_mask_i}, TME_FB_XLAT_MAP_INDEX_MASK_MAX);"
+		    echo "${indent1}          value_r /= TME_FB_XLAT_MAP_LINEAR_SCALE(${src_mask_i}, TME_FB_XLAT_MAP_INDEX_MASK_MAX);"
+		    echo "${indent1}          value_b /= TME_FB_XLAT_MAP_LINEAR_SCALE(${src_mask_i}, TME_FB_XLAT_MAP_INDEX_MASK_MAX);"
 		    echo "${indent1}        }"
 		    echo ""
 		    echo "${indent1}        /* form the pixel: */"

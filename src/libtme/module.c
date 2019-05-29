@@ -1,4 +1,4 @@
-/* $Id: module.c,v 1.6 2005/01/26 12:59:24 fredette Exp $ */
+/* $Id: module.c,v 1.9 2007/02/21 01:31:12 fredette Exp $ */
 
 /* libtme/module.c - module management: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: module.c,v 1.6 2005/01/26 12:59:24 fredette Exp $");
+_TME_RCSID("$Id: module.c,v 1.9 2007/02/21 01:31:12 fredette Exp $");
 
 /* includes: */
 #include <tme/threads.h>
@@ -107,7 +107,7 @@ _tme_modules_find(const char *top_name,
   FILE *modules_index;
 
   /* pass over the search path environment variables: */
-  for (pass = 0; ++pass < 2; ) {
+  for (pass = 0; ++pass <= 2; ) {
 
     /* get the next search path environment variable value: */
     search_path = NULL;
@@ -214,7 +214,7 @@ tme_module_open(const char *module_fake_pathname, void **_module, char **_output
   char *modules_dir;
   char line_buffer[1024];
   char **tokens;
-  unsigned int tokens_count;
+  int tokens_count;
   char *module_basename;
   char *module_pathname;
   lt_dlhandle handle;
@@ -230,7 +230,7 @@ tme_module_open(const char *module_fake_pathname, void **_module, char **_output
   for (p1 = module_raw_name;
        (c = *p1) != '\0';
        p1++) {
-    if (!isalnum(c)) {
+    if (!isalnum((unsigned char) c)) {
       *p1 = '_';
       if (c == '/'
 	  && first_slash == NULL) {

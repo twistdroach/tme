@@ -1,4 +1,4 @@
-/* $Id: i825x6.c,v 1.5 2005/05/11 00:12:24 fredette Exp $ */
+/* $Id: i825x6.c,v 1.7 2007/08/25 21:09:06 fredette Exp $ */
 
 /* ic/i825x6.c - implementation of the Intel 825x6 emulation: */
 
@@ -34,7 +34,9 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: i825x6.c,v 1.5 2005/05/11 00:12:24 fredette Exp $");
+_TME_RCSID("$Id: i825x6.c,v 1.7 2007/08/25 21:09:06 fredette Exp $");
+
+/* XXX FIXME - TLB usage here is not thread-safe: */
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -124,9 +126,13 @@ struct tme_i825x6_rx_buffer {
 
   /* the generic ethernet frame chunk.  this must be first, since we
      abuse its tme_ethernet_frame_chunk_next for our own next pointer: */
-  struct tme_ethernet_frame_chunk tme_i825x6_rx_buffer_frame_chunk;
+  union {
+    struct tme_i825x6_rx_buffer *_tme_i825x6_rx_buffer_u_next;
+    struct tme_ethernet_frame_chunk _tme_i825x6_rx_buffer_u_frame_chunk;
+  } _tme_i825x6_rx_buffer_u;
 #define TME_I825X6_RX_BUFFER_NEXT(rx_buffer) \
-  (*((struct tme_i825x6_rx_buffer **) &(rx_buffer)->tme_i825x6_rx_buffer_frame_chunk.tme_ethernet_frame_chunk_next))
+  ((rx_buffer)->_tme_i825x6_rx_buffer_u._tme_i825x6_rx_buffer_u_next)
+#define tme_i825x6_rx_buffer_frame_chunk _tme_i825x6_rx_buffer_u._tme_i825x6_rx_buffer_u_frame_chunk
 
   /* when this is TME_I825X6_RU_ADDRESS_UNDEF, this rx buffer was made
      from a fast-write TLB entry, and the generic ethernet frame chunk
@@ -159,7 +165,8 @@ struct tme_i825x6 {
   int tme_i825x6_callout_flags;
 
   /* our DMA TLB hash: */
-  TME_ATOMIC(struct tme_bus_tlb *, tme_i825x6_tlb_hash);
+  struct tme_bus_tlb * tme_shared tme_i825x6_tlb_hash;
+  tme_rwlock_t tme_i825x6_tlb_hash_rwlock;
 
   /* the i825x6 bus signals: */
   struct tme_bus_signals tme_i825x6_bus_signals;
@@ -284,7 +291,9 @@ _tme_i825x6_tlb_hash(void *_i825x6,
   i825x6 = (struct tme_i825x6 *) _i825x6;
 
   /* return the TLB entry: */
-  return (TME_ATOMIC_READ(struct tme_bus_tlb *, i825x6->tme_i825x6_tlb_hash)
+  return (tme_memory_atomic_pointer_read(struct tme_bus_tlb *,
+					 i825x6->tme_i825x6_tlb_hash,
+					 &i825x6->tme_i825x6_tlb_hash_rwlock)
 	  + ((linear_address >> 10) & (TME_I825X6_TLB_HASH_SIZE - 1)));
 }
 
@@ -396,22 +405,30 @@ _tme_i825x6_rx_buffers_add(struct tme_i825x6 *i825x6,
     tlb = _tme_i825x6_tlb_hash(i825x6,
 			       address_init,
 			       TME_BUS_CYCLE_WRITE);
+
+    /* busy this TLB entry: */
+    tme_bus_tlb_busy(tlb);
     
-    /* if this TLB entry doesn't cover this address, or if it doesn't
-       allow writing, reload it: */
-    tlb_addr_last = TME_ATOMIC_READ(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last);
-    if (address_init < TME_ATOMIC_READ(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first)
+    /* if this TLB entry is invalid, or doesn't cover this address, or
+       if it doesn't allow writing, reload it: */
+    tlb_addr_last = tlb->tme_bus_tlb_addr_last;
+    if (tme_bus_tlb_is_invalid(tlb)
+	|| address_init < tlb->tme_bus_tlb_addr_first
 	|| address_init > tlb_addr_last
 	|| (tlb->tme_bus_tlb_emulator_off_write == TME_EMULATOR_OFF_UNDEF
 	    && !(tlb->tme_bus_tlb_cycles_ok & TME_BUS_CYCLE_WRITE))) {
+
+      /* unbusy this TLB entry for filling: */
+      tme_bus_tlb_unbusy_fill(tlb);
       
       /* reserve this TLB entry: */
-      tme_bus_tlb_reserve(tlb, &tlb_local);
+      tlb_local.tme_bus_tlb_global = tlb;
       tlb = &tlb_local;
       
       /* get our bus connection: */
-      conn_bus = TME_ATOMIC_READ(struct tme_bus_connection *,
-				 i825x6->tme_i825x6_device.tme_bus_device_connection);
+      conn_bus = tme_memory_atomic_pointer_read(struct tme_bus_connection *,
+				                i825x6->tme_i825x6_device.tme_bus_device_connection,
+				                &i825x6->tme_i825x6_device.tme_bus_device_connection_rwlock);
       
       /* unlock the mutex: */
       tme_mutex_unlock(&i825x6->tme_i825x6_mutex);
@@ -432,15 +449,11 @@ _tme_i825x6_rx_buffers_add(struct tme_i825x6 *i825x6,
 	abort();
       }
       
-      /* the TLB entry must cover this address and allow writing: */
-      tlb_addr_last = TME_ATOMIC_READ(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last);
-      assert (address_init >= TME_ATOMIC_READ(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first)
-	      && address_init <= tlb_addr_last
-	      && (tlb->tme_bus_tlb_emulator_off_write != TME_EMULATOR_OFF_UNDEF
-		  || (tlb->tme_bus_tlb_cycles_ok & TME_BUS_CYCLE_WRITE)));
-      
       /* store the TLB entry: */
       tme_bus_tlb_back(tlb);
+      
+      /* loop to check the newly filled TLB entry: */
+      continue;
     }
     
     /* see how many addresses we can cover with this TLB entry,
@@ -466,7 +479,12 @@ _tme_i825x6_rx_buffers_add(struct tme_i825x6 *i825x6,
       /* this is a fast rx buffer: */
       rx_buffer->tme_i825x6_rx_buffer_rb_address = TME_I825X6_RU_ADDRESS_UNDEF;
       rx_buffer->tme_i825x6_rx_buffer_frame_chunk.tme_ethernet_frame_chunk_bytes
-	= tlb->tme_bus_tlb_emulator_off_write + address_init;
+	/* XXX FIXME - this breaks volatile: */
+	= (tme_uint8_t *) tlb->tme_bus_tlb_emulator_off_write + address_init;
+
+      /* unbusy the TLB: */
+      /* XXX FIXME - this is not thread-safe: */
+      tme_bus_tlb_unbusy(tlb);
     }
 
     /* otherwise, this TLB entry does not allow fast writing: */
@@ -856,16 +874,16 @@ _tme_i825x6_callout_ca(struct tme_i825x6 *i825x6, tme_uint16_t stat_cus_rus_t)
       
     case TME_I825X6_SCB_RUC_START:
       
-      /* if the Receive Unit is still Ready or Suspended: */
+      /* if the Receive Unit is not Idle: */
       switch (stat_cus_rus_t & TME_I82586_SCB_RUS_MASK) {
       case TME_I825X6_SCB_RUS_READY:
       case TME_I825X6_SCB_RUS_SUSPENDED:
+      case TME_I825X6_SCB_RUS_ERESOURCE:
 
 	/* abort the Receive Unit: */
 	_tme_i825x6_abort_ru(i825x6);
 	break;
 
-      case TME_I825X6_SCB_RUS_ERESOURCE:
       case TME_I825X6_SCB_RUS_IDLE:
 	break;
 
@@ -1250,8 +1268,10 @@ _tme_i825x6_callout_cu(struct tme_i825x6 *i825x6, tme_uint16_t stat_cus_rus_t)
     break;
 
   case TME_I825X6_CB_CMD_DUMP:
-  case TME_I825X6_CB_CMD_DIAGNOSE:
     abort();
+
+  case TME_I825X6_CB_CMD_DIAGNOSE:
+    break;
   }
   
   /* add to the callouts and return the current status: */
@@ -1742,8 +1762,9 @@ _tme_i825x6_callout(struct tme_i825x6 *i825x6, int new_callouts)
       tme_mutex_unlock(&i825x6->tme_i825x6_mutex);
       
       /* get our bus connection: */
-      conn_bus = TME_ATOMIC_READ(struct tme_bus_connection *,
-				 i825x6->tme_i825x6_device.tme_bus_device_connection);
+      conn_bus = tme_memory_atomic_pointer_read(struct tme_bus_connection *,
+						i825x6->tme_i825x6_device.tme_bus_device_connection,
+						&i825x6->tme_i825x6_device.tme_bus_device_connection_rwlock);
       
       /* call out the bus interrupt signal edge: */
       rc = (*conn_bus->tme_bus_signal)
@@ -1788,7 +1809,7 @@ _tme_i825x6_signal(void *_i825x6,
 
   /* take out the signal level: */
   level = signal & TME_BUS_SIGNAL_LEVEL_MASK;
-  signal ^= level;
+  signal = TME_BUS_SIGNAL_WHICH(signal);
 
   /* dispatch on the generic bus signals: */
   switch (signal) {
@@ -1891,6 +1912,7 @@ _tme_i825x6_read(struct tme_ethernet_connection *conn_eth,
   tme_uint16_t value16;
   tme_uint32_t value32;
   int rc, err;
+  int length;
 
   /* recover our data structures: */
   i825x6 = conn_eth->tme_ethernet_connection.tme_connection_element->tme_element_private;
@@ -1911,7 +1933,7 @@ _tme_i825x6_read(struct tme_ethernet_connection *conn_eth,
   tme_mutex_lock(&i825x6->tme_i825x6_mutex);
 
   /* assume that we will have no packet to transmit: */
-  rc = 0;
+  length = 0;
 
   /* if we have a packet to transmit: */
   if ((i825x6->tme_i825x6_el_s_i_cmd
@@ -1926,10 +1948,10 @@ _tme_i825x6_read(struct tme_ethernet_connection *conn_eth,
 #define CHUNKS_DMA_TX(addr, size)						\
       err = _tme_i825x6_chunks_dma_tx(i825x6, frame_chunks, (addr), (size));	\
       if (err != TME_OK) break;							\
-      rc += size
+      length += size
 #define CHUNKS_MEM_TX(data, size)						\
       _tme_i825x6_chunks_mem_tx(frame_chunks, (data), (size));			\
-      rc += size
+      length += size
 
       /* if AL-LOC is set to zero, add the Ethernet/802.3 MAC header: */
       if (i825x6->tme_i825x6_al_loc == 0) {
@@ -1991,7 +2013,7 @@ _tme_i825x6_read(struct tme_ethernet_connection *conn_eth,
       c_b_ok_a |= TME_I825X6_TCB_STATUS_UNDERRUN;
 
       /* return an error to our caller: */
-      rc = -ENOENT;
+      length = -ENOENT;
     }
 
     /* update the CB status word: */
@@ -2014,7 +2036,7 @@ _tme_i825x6_read(struct tme_ethernet_connection *conn_eth,
   tme_mutex_unlock(&i825x6->tme_i825x6_mutex);
 
   /* done: */
-  return (rc);
+  return (length);
 }
 
 /* this makes a new Ethernet connection: */
@@ -2071,20 +2093,23 @@ _tme_i825x6_connection_make_bus(struct tme_connection *conn,
      hash yet, allocate it and add our bus signals: */
   if (rc == TME_OK
       && state == TME_CONNECTION_FULL
-      && TME_ATOMIC_READ(struct tme_bus_tlb *,
-			 i825x6->tme_i825x6_tlb_hash) == NULL) {
+      && tme_memory_atomic_pointer_read(struct tme_bus_tlb *,
+					i825x6->tme_i825x6_tlb_hash,
+					&i825x6->tme_i825x6_tlb_hash_rwlock) == NULL) {
 
     /* get our bus connection: */
     conn_bus
-      = TME_ATOMIC_READ(struct tme_bus_connection *,
-			i825x6->tme_i825x6_device.tme_bus_device_connection);
+      = tme_memory_atomic_pointer_read(struct tme_bus_connection *,
+				       i825x6->tme_i825x6_device.tme_bus_device_connection,
+				       &i825x6->tme_i825x6_device.tme_bus_device_connection_rwlock);
 
     /* allocate the TLB set: */
     rc = ((*conn_bus->tme_bus_tlb_set_allocate)
 	  (conn_bus,
 	   TME_I825X6_TLB_HASH_SIZE, 
 	   sizeof(struct tme_bus_tlb),
-	   TME_ATOMIC_POINTER(&i825x6->tme_i825x6_tlb_hash)));
+	   &i825x6->tme_i825x6_tlb_hash,
+	   &i825x6->tme_i825x6_device.tme_bus_device_connection_rwlock));
     assert (rc == TME_OK);
 
     /* add our bus signals: */

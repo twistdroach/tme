@@ -1,4 +1,4 @@
-/* $Id: scsi-bus.c,v 1.5 2005/02/18 03:16:37 fredette Exp $ */
+/* $Id: scsi-bus.c,v 1.8 2007/02/15 01:30:43 fredette Exp $ */
 
 /* scsi/scsi-bus.c - a generic SCSI bus element: */
 
@@ -34,10 +34,11 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: scsi-bus.c,v 1.5 2005/02/18 03:16:37 fredette Exp $");
+_TME_RCSID("$Id: scsi-bus.c,v 1.8 2007/02/15 01:30:43 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/scsi.h>
+#include <tme/threads.h>
 #ifdef HAVE_STDARG_H
 #include <stdarg.h>
 #else  /* HAVE_STDARG_H */
@@ -79,6 +80,9 @@ struct tme_scsi_connection_int {
 
   /* the external SCSI connection: */
   struct tme_scsi_connection tme_scsi_connection_int;
+
+  /* the cycle marker for this connection: */
+  tme_uint32_t tme_scsi_connection_int_cycle_marker;
 
   /* the control and data lines currently asserted by this connection: */
   tme_scsi_control_t tme_scsi_connection_int_control;
@@ -184,8 +188,8 @@ _tme_scsi_bus_callout(struct tme_scsi_bus *scsi_bus, int new_callouts)
 	conn_int->tme_scsi_connection_int_last_data
 	  = data;
 
-	/* get the events triggered, actions taken, and any DMA
-           structure: */
+	/* get and clear the events triggered, actions taken, and any
+           DMA structure: */
 	events_triggered = conn_int->tme_scsi_connection_int_events_triggered;
 	actions_taken = conn_int->tme_scsi_connection_int_actions_taken;
 	dma = conn_int->tme_scsi_connection_int_dma;
@@ -193,6 +197,12 @@ _tme_scsi_bus_callout(struct tme_scsi_bus *scsi_bus, int new_callouts)
 	  dma_buffer = *dma;
 	  dma = &dma_buffer;
 	}
+	conn_int->tme_scsi_connection_int_events_triggered = 0;
+	conn_int->tme_scsi_connection_int_actions_taken = 0;
+	conn_int->tme_scsi_connection_int_dma = NULL;
+
+	/* add the cycle marker to the actions taken: */
+	actions_taken |= conn_int->tme_scsi_connection_int_cycle_marker;
 
 	/* unlock the mutex: */
 	tme_mutex_unlock(&scsi_bus->tme_scsi_bus_mutex);
@@ -259,6 +269,10 @@ _tme_scsi_bus_cycle(struct tme_scsi_connection *conn_scsi,
 
   /* lock the mutex: */
   tme_mutex_lock(&scsi_bus->tme_scsi_bus_mutex);
+
+  /* update the cycle marker for this device: */
+  conn_int_asker->tme_scsi_connection_int_cycle_marker = (actions_asker & TME_SCSI_ACTION_CYCLE_MARKER);
+  actions_asker &= ~TME_SCSI_ACTION_CYCLE_MARKER;
 
   /* update the signals that this device is asserting: */
   conn_int_asker->tme_scsi_connection_int_control = control;
@@ -369,6 +383,13 @@ _tme_scsi_bus_cycle(struct tme_scsi_connection *conn_scsi,
       events = conn_int->tme_scsi_connection_int_events_waiting;
       actions = conn_int->tme_scsi_connection_int_actions_waiting;
 
+      /* if this device isn't waiting for any events and has no
+         actions to take, continue now: */
+      if (events == TME_SCSI_EVENT_NONE
+	  && actions == TME_SCSI_ACTION_NONE) {
+	continue;
+      }
+
       /* if this device is waiting on any change to the bus state, and
          the bus has changed: */
       if ((events & TME_SCSI_EVENT_BUS_CHANGE)
@@ -467,6 +488,7 @@ _tme_scsi_bus_cycle(struct tme_scsi_connection *conn_scsi,
       /* if this device is selecting or reselecting another device: */
       if (TME_SCSI_ACTIONS_SELECTED(actions,
 				    (TME_SCSI_ACTION_SELECT
+				     | TME_SCSI_ACTION_SELECT_WITH_ATN
 				     | TME_SCSI_ACTION_SELECT_SINGLE_INITIATOR
 				     | TME_SCSI_ACTION_RESELECT))) {
 
@@ -502,6 +524,10 @@ _tme_scsi_bus_cycle(struct tme_scsi_connection *conn_scsi,
 	  = (TME_SCSI_SIGNAL_SEL
 	     | ((actions & TME_SCSI_ACTION_RESELECT)
 		? TME_SCSI_SIGNAL_I_O
+		: 0)
+	     | (((actions & TME_SCSI_ACTION_SELECT_WITH_ATN)
+		 == TME_SCSI_ACTION_SELECT_WITH_ATN)
+		? TME_SCSI_SIGNAL_ATN
 		: 0));
 	again = TRUE;
 	bus_changed = TRUE;
@@ -510,11 +536,13 @@ _tme_scsi_bus_cycle(struct tme_scsi_connection *conn_scsi,
 	conn_int->tme_scsi_connection_int_actions_taken
 	  |= ((actions
 	       & (TME_SCSI_ACTION_SELECT
+		  | TME_SCSI_ACTION_SELECT_WITH_ATN
 		  | TME_SCSI_ACTION_SELECT_SINGLE_INITIATOR
 		  | TME_SCSI_ACTION_RESELECT))
 	      | TME_SCSI_ACTION_ID_SELF(TME_SCSI_ACTION_ID_SELF_WHICH(actions))
 	      | TME_SCSI_ACTION_ID_OTHER(TME_SCSI_ACTION_ID_OTHER_WHICH(actions)));
 	actions &= ~(TME_SCSI_ACTION_SELECT
+		     | TME_SCSI_ACTION_SELECT_WITH_ATN
 		     | TME_SCSI_ACTION_SELECT_SINGLE_INITIATOR
 		     | TME_SCSI_ACTION_RESELECT);
       }
@@ -577,7 +605,9 @@ _tme_scsi_bus_cycle(struct tme_scsi_connection *conn_scsi,
 
       /* there can be at most one device in an initiator or target
 	 information transfer phase DMA sequence: */
-      else if (TME_SCSI_ACTIONS_SELECTED(actions, TME_SCSI_ACTION_DMA_INITIATOR)) {
+      else if (TME_SCSI_ACTIONS_SELECTED(actions, 
+					 (TME_SCSI_ACTION_DMA_INITIATOR
+					  | TME_SCSI_ACTION_DMA_INITIATOR_HOLD_ACK))) {
 	assert (dma_initiator == NULL);
 	dma_initiator = conn_int;
       }
@@ -591,10 +621,12 @@ _tme_scsi_bus_cycle(struct tme_scsi_connection *conn_scsi,
       conn_int->tme_scsi_connection_int_actions_waiting = actions;
       if ((actions
 	   & (TME_SCSI_ACTION_DMA_INITIATOR
+	      | TME_SCSI_ACTION_DMA_INITIATOR_HOLD_ACK
 	      | TME_SCSI_ACTION_DMA_TARGET
 	      | TME_SCSI_ACTION_RESPOND_SELECTED
 	      | TME_SCSI_ACTION_RESPOND_RESELECTED
 	      | TME_SCSI_ACTION_SELECT
+	      | TME_SCSI_ACTION_SELECT_WITH_ATN
 	      | TME_SCSI_ACTION_SELECT_SINGLE_INITIATOR
 	      | TME_SCSI_ACTION_RESELECT
 	      | TME_SCSI_ACTION_ARBITRATE_HALF
@@ -606,117 +638,6 @@ _tme_scsi_bus_cycle(struct tme_scsi_connection *conn_scsi,
 	new_callouts
 	  |= TME_SCSI_BUS_CALLOUT_CYCLE;
       }
-    }
-
-    /* if we need to loop again, do so immediately: */
-    if (again) {
-      continue;
-    }
-
-    /* if a device is in the initiator information transfer phase DMA
-       sequence, but the information transfer phase has changed,
-       callout a cycle on this device: */
-    if (dma_initiator != NULL
-	&& (TME_SCSI_PHASE(control)
-	    != TME_SCSI_PHASE(dma_initiator->tme_scsi_connection_int_last_control))) {
-      dma_initiator->tme_scsi_connection_int_callout_flags
-	|= TME_SCSI_BUS_CALLOUT_CYCLE;
-      dma_initiator->tme_scsi_connection_int_actions_waiting
-	= TME_SCSI_ACTION_NONE;
-      dma_initiator->tme_scsi_connection_int_actions_taken
-	|= TME_SCSI_ACTION_DMA_INITIATOR;
-      new_callouts
-	|= TME_SCSI_BUS_CALLOUT_CYCLE;
-      dma_initiator = NULL;
-    }
-
-    /* if initiator and target are both in their respective DMA
-       sequences, we can do a bulk copy between them: */
-    if (dma_initiator != NULL
-	&& dma_target != NULL) {
-
-      /* sort the devices' DMA structures into input and output: */
-      if (control & TME_SCSI_SIGNAL_I_O) {
-	dma_in = dma_initiator->tme_scsi_connection_int_dma;
-	dma_out = dma_target->tme_scsi_connection_int_dma;
-      }
-      else {
-	dma_out = dma_initiator->tme_scsi_connection_int_dma;
-	dma_in = dma_target->tme_scsi_connection_int_dma;
-      }
-      assert (dma_out != NULL && dma_in != NULL);
-
-      /* get the size of the bulk copy: */
-      count = TME_MIN(dma_out->tme_scsi_dma_resid,
-		      dma_in->tme_scsi_dma_resid);
-      assert (count > 0);
-
-      /* do the bulk copy: */
-      memcpy(dma_in->tme_scsi_dma_in,
-	     dma_out->tme_scsi_dma_out,
-	     count);
-
-      /* advance the DMA pointers: */
-      dma_in->tme_scsi_dma_in += count;
-      dma_out->tme_scsi_dma_out += count;
-
-      /* if the target's DMA has been exhausted, be sure to negate
-	 REQ, and callout a cycle on the device: */
-      dma = dma_target->tme_scsi_connection_int_dma;
-      if ((dma->tme_scsi_dma_resid -= count) == 0) {
-
-	/* negate REQ on the target's behalf: */
-	dma_target->tme_scsi_connection_int_control
-	  &= ~TME_SCSI_SIGNAL_REQ;
-	again = TRUE;
-	bus_changed = TRUE;
-
-	/* request the callout: */
-	dma_target->tme_scsi_connection_int_callout_flags
-	  |= TME_SCSI_BUS_CALLOUT_CYCLE;
-	dma_target->tme_scsi_connection_int_actions_waiting
-	  = TME_SCSI_ACTION_NONE;
-	dma_target->tme_scsi_connection_int_actions_taken
-	  |= TME_SCSI_ACTION_DMA_TARGET;
-	new_callouts
-	  |= TME_SCSI_BUS_CALLOUT_CYCLE;
-
-	/* no device is currently in the target information phase
-           transfer DMA sequence: */
-	dma_target = NULL;
-      }
-
-      /* otherwise, the target's DMA has not been exhausted.  be sure
-	 that we return to state zero in the DMA target sequence: */
-      else {
-	dma_target->tme_scsi_connection_int_sequence_step = 0;
-      }
-      
-      /* if the initiator's DMA has been exhausted, callout a cycle on
-         the device: */
-      dma = dma_initiator->tme_scsi_connection_int_dma;
-      if ((dma->tme_scsi_dma_resid -= count) == 0) {
-
-	/* request the callout: */
-	dma_initiator->tme_scsi_connection_int_callout_flags
-	  |= TME_SCSI_BUS_CALLOUT_CYCLE;
-	dma_initiator->tme_scsi_connection_int_actions_waiting
-	  = TME_SCSI_ACTION_NONE;
-	dma_initiator->tme_scsi_connection_int_actions_taken
-	  |= TME_SCSI_ACTION_DMA_INITIATOR;
-	new_callouts
-	  |= TME_SCSI_BUS_CALLOUT_CYCLE;
-
-	/* no device is currently in the initiator information phase
-           transfer DMA sequence: */
-	dma_initiator = NULL;
-      }
-
-      /* otherwise, the initiator's DMA has not been exhausted.  be sure
-	 that we return to state zero in the DMA initiator sequence: */
-      else {
-	dma_initiator->tme_scsi_connection_int_sequence_step = 0;
-      }      
     }
 
     /* if we need to loop again, do so immediately: */
@@ -874,6 +795,72 @@ _tme_scsi_bus_cycle(struct tme_scsi_connection *conn_scsi,
 	  break;
 	}
 	  
+	/* if the information transfer phase has changed, callout a
+	   cycle on this device: */
+	if (TME_SCSI_PHASE(control)
+	    != TME_SCSI_PHASE(dma_initiator->tme_scsi_connection_int_last_control)) {
+	  dma_initiator->tme_scsi_connection_int_callout_flags
+	    |= TME_SCSI_BUS_CALLOUT_CYCLE;
+	  dma_initiator->tme_scsi_connection_int_actions_taken
+	    |= dma_initiator->tme_scsi_connection_int_actions_waiting;
+	  dma_initiator->tme_scsi_connection_int_actions_waiting
+	    = TME_SCSI_ACTION_NONE;
+	  new_callouts
+	    |= TME_SCSI_BUS_CALLOUT_CYCLE;
+	  break;
+	}
+
+	/* if another device is in the target information transfer
+	   phase DMA sequence, we may do a bulk copy between them: */
+	if (dma_target != NULL) {
+	  assert (dma_target->tme_scsi_connection_int_sequence_step == 1);
+
+	  /* sort the devices' DMA structures into input and output: */
+	  if (control & TME_SCSI_SIGNAL_I_O) {
+	    dma_in = dma_initiator->tme_scsi_connection_int_dma;
+	    dma_out = dma_target->tme_scsi_connection_int_dma;
+	  }
+	  else {
+	    dma_out = dma_initiator->tme_scsi_connection_int_dma;
+	    dma_in = dma_target->tme_scsi_connection_int_dma;
+	  }
+	  assert (dma_out != NULL && dma_in != NULL);
+
+	  /* get the size of the bulk copy.  we won't copy all
+	     possible bytes, since this code doesn't know how to
+	     assert control lines or make callouts.  instead, we bulk
+	     copy one less than all possible bytes, and let the
+	     normal, non-bulk code handle the final byte: */
+	  count = TME_MIN(dma_out->tme_scsi_dma_resid,
+			  dma_in->tme_scsi_dma_resid);
+	  assert (count > 0);
+
+	  /* if we have bytes to bulk copy: */
+	  count--;
+	  if (count > 0) {
+	  
+	    /* do the bulk copy: */
+	    memcpy(dma_in->tme_scsi_dma_in,
+		   dma_out->tme_scsi_dma_out,
+		   count);
+
+	    /* advance: */
+	    dma_in->tme_scsi_dma_in += count;
+	    dma_in->tme_scsi_dma_resid -= count;
+	    dma_out->tme_scsi_dma_out += count;
+	    dma_out->tme_scsi_dma_resid -= count;
+
+	    /* if I/O is asserted, assert the new data on the target's
+               behalf: */
+	    if (control & TME_SCSI_SIGNAL_I_O) {
+	      data = *(dma_out->tme_scsi_dma_out);
+	      dma_target->tme_scsi_connection_int_data = data;
+	      again = TRUE;
+	      bus_changed = TRUE;
+	    }
+	  }
+	}
+
 	/* if I/O is true, read the data, else
 	   write the data: */
 	if (control & TME_SCSI_SIGNAL_I_O) {
@@ -905,11 +892,17 @@ _tme_scsi_bus_cycle(struct tme_scsi_connection *conn_scsi,
 	  break;
 	}
 	
-	/* negate ACK on the initiator's behalf: */
-	dma_initiator->tme_scsi_connection_int_control
-	  &= ~TME_SCSI_SIGNAL_ACK;
-	again = TRUE;
-	bus_changed = TRUE;
+	/* unless the initiator wants ACK held: */
+	if ((dma_initiator->tme_scsi_connection_int_actions_waiting
+	     & TME_SCSI_ACTION_DMA_INITIATOR_HOLD_ACK) 
+	    != TME_SCSI_ACTION_DMA_INITIATOR_HOLD_ACK) {
+
+	  /* negate ACK on the initiator's behalf: */
+	  dma_initiator->tme_scsi_connection_int_control
+	    &= ~TME_SCSI_SIGNAL_ACK;
+	  again = TRUE;
+	  bus_changed = TRUE;
+	}
 	
 	/* if the DMA has been exhausted, callout a cycle on this
 	   device: */
@@ -922,10 +915,10 @@ _tme_scsi_bus_cycle(struct tme_scsi_connection *conn_scsi,
 	if (--dma->tme_scsi_dma_resid == 0) {
 	  dma_initiator->tme_scsi_connection_int_callout_flags
 	    |= TME_SCSI_BUS_CALLOUT_CYCLE;
+	  dma_initiator->tme_scsi_connection_int_actions_taken
+	    |= dma_initiator->tme_scsi_connection_int_actions_waiting;
 	  dma_initiator->tme_scsi_connection_int_actions_waiting
 	    = TME_SCSI_ACTION_NONE;
-	  dma_initiator->tme_scsi_connection_int_actions_taken
-	    |= TME_SCSI_ACTION_DMA_INITIATOR;
 	  new_callouts |= TME_SCSI_BUS_CALLOUT_CYCLE;
 	}
 	

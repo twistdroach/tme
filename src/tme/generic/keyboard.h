@@ -1,4 +1,4 @@
-/* $Id: keyboard.h,v 1.4 2003/10/16 02:48:25 fredette Exp $ */
+/* $Id: keyboard.h,v 1.5 2007/02/15 01:27:37 fredette Exp $ */
 
 /* tme/generic/keyboard.h - header file for generic keyboard support: */
 
@@ -37,7 +37,7 @@
 #define _TME_GENERIC_KEYBOARD_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: keyboard.h,v 1.4 2003/10/16 02:48:25 fredette Exp $");
+_TME_RCSID("$Id: keyboard.h,v 1.5 2007/02/15 01:27:37 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -105,6 +105,10 @@ _TME_RCSID("$Id: keyboard.h,v 1.4 2003/10/16 02:48:25 fredette Exp $");
   ((((b)->tme_keyboard_buffer_head + 1)		\
     & ((b)->tme_keyboard_buffer_size - 1))	\
    == (b)->tme_keyboard_buffer_tail)
+
+/* this convert between a tme_hash_data_t and a keyval: */
+#define tme_keyboard_hash_data_from_keyval(x)	tme_hash_data_from_uint32(x)
+#define tme_keyboard_hash_data_to_keyval(x)	tme_hash_data_to_uint32(x)
 
 /* types: */
 

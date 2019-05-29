@@ -1,4 +1,4 @@
-/* $Id: sun.h,v 1.7 2005/04/30 15:07:26 fredette Exp $ */
+/* $Id: sun.h,v 1.12 2007/08/24 01:09:40 fredette Exp $ */
 
 /* tme/machine/sun.h - public header file for Sun emulation: */
 
@@ -37,7 +37,7 @@
 #define _TME_MACHINE_SUN_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun.h,v 1.7 2005/04/30 15:07:26 fredette Exp $");
+_TME_RCSID("$Id: sun.h,v 1.12 2007/08/24 01:09:40 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -54,6 +54,7 @@ _TME_RCSID("$Id: sun.h,v 1.7 2005/04/30 15:07:26 fredette Exp $");
 /* classic Sun z8530 socket: */
 #define TME_SUN_Z8530_SOCKET_INIT { \
   TME_Z8530_SOCKET_0, /* the socket version */ \
+  0, /* socket flags */ \
   4, /* the bus address of channel A */ \
   0, /* the bus address of channel B */ \
   0, /* within each channel, the offset of the csr register */ \
@@ -84,6 +85,15 @@ _TME_RCSID("$Id: sun.h,v 1.7 2005/04/30 15:07:26 fredette Exp $");
 #define TME_SUN_MMU_TLB_SYSTEM	(1 << 0)
 #define TME_SUN_MMU_TLB_USER	(1 << 1)
 
+/* real sun IDPROM offsets: */
+#define TME_SUN_IDPROM_OFF_MACHTYPE		(0x1)
+
+/* real sun IDPROM machine type architecture and model identifiers: */
+#define TME_SUN_IDPROM_TYPE_MASK_ARCH		(0xf0)
+#define TME_SUN_IDPROM_TYPE_ARCH_SUN4		(0x20)
+#define TME_SUN_IDPROM_TYPE_ARCH_SUN4C		(0x50)
+#define TME_SUN_IDPROM_TYPE_CODE_CALVIN		(0x55)
+
 /* structures: */
 
 /* one page table entry in a classic two-level Sun MMU: */
@@ -110,15 +120,17 @@ struct tme_sun_mmu_info {
 
   /* the number of bits in a page table entry index: */
   tme_uint8_t tme_sun_mmu_info_pteindex_bits;
+ 
+  /* if greater than zero, the number of top address bits in a region
+     map entry index.  if less than zero, the number of top address
+     bits that must be the same, and define the address hole: */
+  tme_int8_t tme_sun_mmu_info_topindex_bits;
 
   /* the number of contexts: */
   tme_uint8_t tme_sun_mmu_info_contexts;
 
   /* the number of PMEGs: */
   unsigned short tme_sun_mmu_info_pmegs;
-
-  /* the invalid PMEG: */
-  unsigned short tme_sun_mmu_info_seginv;
 
   /* a TLB filler: */
   void *tme_sun_mmu_info_tlb_fill_private;
@@ -144,7 +156,7 @@ unsigned short tme_sun_mmu_segmap_get _TME_P((void *, tme_uint8_t, tme_uint32_t)
 unsigned short tme_sun_mmu_tlb_fill _TME_P((void *, struct tme_bus_tlb *, tme_uint8_t, tme_uint32_t, unsigned short));
 void tme_sun_mmu_tlbs_invalidate _TME_P((void *));
 void tme_sun_mmu_tlbs_context_set _TME_P((void *, tme_uint8_t));
-int tme_sun_mmu_tlb_set_allocate _TME_P((void *, unsigned int, unsigned int, TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb *)));
+int tme_sun_mmu_tlb_set_allocate _TME_P((void *, unsigned int, unsigned int, struct tme_bus_tlb * tme_shared *, tme_rwlock_t *));
 
 /* onboard Intel Ethernet support: */
 int tme_sun_obie _TME_P((struct tme_element *, _tme_const char * _tme_const *, char **));
@@ -157,5 +169,8 @@ int tme_sun_si _TME_P((struct tme_element *, _tme_const char * _tme_const *, cha
 
 /* cgtwo support: */
 int tme_sun_cgtwo _TME_P((struct tme_element *, _tme_const char * _tme_const *, char **));
+
+/* cgthree support: */
+int tme_sun_cgthree _TME_P((struct tme_element *, _tme_const char * _tme_const *, char **));
 
 #endif /* !_TME_MACHINE_SUN_H */

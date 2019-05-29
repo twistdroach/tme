@@ -15,14 +15,15 @@
 #define	TMESH_TOKEN_MV	265
 #define	TMESH_TOKEN_COMMAND	266
 #define	TMESH_TOKEN_LOG	267
-#define	TMESH_TOKEN_AT	268
-#define	TMESH_TOKEN_PATHNAME	269
-#define	TMESH_TOKEN_ARG	270
-#define	TMESH_TOKEN_OPTS	271
+#define	TMESH_TOKEN_ALIAS	268
+#define	TMESH_TOKEN_AT	269
+#define	TMESH_TOKEN_PATHNAME	270
+#define	TMESH_TOKEN_ARG	271
+#define	TMESH_TOKEN_OPTS	272
 
 #line 1 "../../tmesh/tmesh-input.y"
 
-/* $Id: tmesh-input.y,v 1.3 2005/02/18 02:15:47 fredette Exp $ */
+/* $Id: tmesh-input.y,v 1.4 2006/11/15 23:11:31 fredette Exp $ */
 
 /* tmesh/tmesh-input.y - the tme shell scanner and parser: */
 
@@ -58,7 +59,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: tmesh-input.y,v 1.3 2005/02/18 02:15:47 fredette Exp $");
+_TME_RCSID("$Id: tmesh-input.y,v 1.4 2006/11/15 23:11:31 fredette Exp $");
 
 /* includes: */
 #include <tme/threads.h>
@@ -109,11 +110,11 @@ static void _tmesh_parser_argv_arg _TME_P((struct tmesh_parser_argv *, char *, i
 
 
 
-#define	YYFINAL		69
+#define	YYFINAL		74
 #define	YYFLAG		-32768
-#define	YYNTBASE	20
+#define	YYNTBASE	21
 
-#define YYTRANSLATE(x) ((unsigned)(x) <= 271 ? yytranslate[x] : 40)
+#define YYTRANSLATE(x) ((unsigned)(x) <= 272 ? yytranslate[x] : 42)
 
 static const char yytranslate[] = {     0,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -121,7 +122,7 @@ static const char yytranslate[] = {     0,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-     2,     2,     2,     2,     2,     2,     2,    19,    18,     2,
+     2,     2,     2,     2,     2,     2,     2,    20,    19,     2,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -143,39 +144,42 @@ static const char yytranslate[] = {     0,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
      2,     2,     2,     2,     2,     1,     3,     4,     5,     6,
      7,     8,     9,    10,    11,    12,    13,    14,    15,    16,
-    17
+    17,    18
 };
 
 #if YYDEBUG != 0
 static const short yyprhs[] = {     0,
      0,     2,     4,     6,     8,    10,    12,    14,    16,    18,
-    20,    22,    25,    27,    31,    35,    39,    43,    46,    51,
-    55,    58,    62,    67,    71,    75,    77,    79,    80,    82,
-    85,    87,    90,    92,    94,    98,   104,   108,   110
+    20,    22,    24,    27,    29,    33,    37,    41,    45,    48,
+    53,    57,    60,    64,    69,    73,    77,    82,    84,    86,
+    87,    89,    92,    94,    97,    99,   101,   105,   111,   115,
+   117
 };
 
-static const short yyrhs[] = {    21,
-     0,    22,     0,    23,     0,    24,     0,    25,     0,    26,
-     0,    27,     0,    28,     0,    29,     0,    30,     0,    31,
-     0,     1,    18,     0,    18,     0,     3,    32,    18,     0,
-     4,    32,    18,     0,     5,    32,    18,     0,     6,    32,
-    18,     0,     7,    18,     0,     8,    39,    33,    18,     0,
-     9,    38,    18,     0,    38,    18,     0,    10,    32,    18,
-     0,    11,    32,    32,    18,     0,    12,    34,    18,     0,
-    13,    34,    18,     0,    15,     0,    15,     0,     0,    15,
-     0,    34,    16,     0,    16,     0,    35,    16,     0,    19,
-     0,    14,     0,    34,    36,    35,     0,    34,    37,    35,
-    36,    35,     0,    34,    37,    35,     0,    17,     0,     0
+static const short yyrhs[] = {    22,
+     0,    23,     0,    24,     0,    25,     0,    26,     0,    27,
+     0,    28,     0,    29,     0,    30,     0,    31,     0,    32,
+     0,    33,     0,     1,    19,     0,    19,     0,     3,    34,
+    19,     0,     4,    34,    19,     0,     5,    34,    19,     0,
+     6,    34,    19,     0,     7,    19,     0,     8,    41,    35,
+    19,     0,     9,    40,    19,     0,    40,    19,     0,    10,
+    34,    19,     0,    11,    34,    34,    19,     0,    12,    36,
+    19,     0,    13,    36,    19,     0,    14,    34,    34,    19,
+     0,    16,     0,    16,     0,     0,    16,     0,    36,    17,
+     0,    17,     0,    37,    17,     0,    20,     0,    15,     0,
+    36,    38,    37,     0,    36,    39,    37,    38,    37,     0,
+    36,    39,    37,     0,    18,     0,     0
 };
 
 #endif
 
 #if YYDEBUG != 0
 static const short yyrline[] = { 0,
-    98,    99,   100,   101,   102,   103,   104,   105,   106,   107,
-   108,   109,   110,   115,   119,   124,   129,   134,   137,   146,
-   148,   153,   158,   167,   172,   177,   181,   182,   187,   194,
-   204,   210,   219,   222,   225,   235,   241,   250,   251
+    99,   100,   101,   102,   103,   104,   105,   106,   107,   108,
+   109,   110,   111,   112,   117,   121,   126,   131,   136,   139,
+   148,   150,   155,   160,   169,   174,   179,   188,   192,   193,
+   198,   205,   215,   221,   230,   233,   236,   246,   252,   261,
+   262
 };
 #endif
 
@@ -185,78 +189,82 @@ static const short yyrline[] = { 0,
 static const char * const yytname[] = {   "$","error","$undefined.","TMESH_TOKEN_SOURCE",
 "TMESH_TOKEN_MKDIR","TMESH_TOKEN_RMDIR","TMESH_TOKEN_CD","TMESH_TOKEN_PWD","TMESH_TOKEN_LS",
 "TMESH_TOKEN_CONNECT","TMESH_TOKEN_RM","TMESH_TOKEN_MV","TMESH_TOKEN_COMMAND",
-"TMESH_TOKEN_LOG","TMESH_TOKEN_AT","TMESH_TOKEN_PATHNAME","TMESH_TOKEN_ARG",
-"TMESH_TOKEN_OPTS","';'","':'","command","command_source","command_mkdir","command_rmdir",
-"command_cd","command_pwd","command_ls","command_connect","command_rm","command_mv",
-"command_command","command_log","pathname","pathname_opt","pathname_args","args",
-"colon","at","connection","opts_opt", NULL
+"TMESH_TOKEN_LOG","TMESH_TOKEN_ALIAS","TMESH_TOKEN_AT","TMESH_TOKEN_PATHNAME",
+"TMESH_TOKEN_ARG","TMESH_TOKEN_OPTS","';'","':'","command","command_source",
+"command_mkdir","command_rmdir","command_cd","command_pwd","command_ls","command_connect",
+"command_rm","command_mv","command_command","command_log","command_alias","pathname",
+"pathname_opt","pathname_args","args","colon","at","connection","opts_opt", NULL
 };
 #endif
 
 static const short yyr1[] = {     0,
-    20,    20,    20,    20,    20,    20,    20,    20,    20,    20,
-    20,    20,    20,    21,    22,    23,    24,    25,    26,    27,
-    27,    28,    29,    30,    31,    32,    33,    33,    34,    34,
-    35,    35,    36,    37,    38,    38,    38,    39,    39
+    21,    21,    21,    21,    21,    21,    21,    21,    21,    21,
+    21,    21,    21,    21,    22,    23,    24,    25,    26,    27,
+    28,    28,    29,    30,    31,    32,    33,    34,    35,    35,
+    36,    36,    37,    37,    38,    39,    40,    40,    40,    41,
+    41
 };
 
 static const short yyr2[] = {     0,
      1,     1,     1,     1,     1,     1,     1,     1,     1,     1,
-     1,     2,     1,     3,     3,     3,     3,     2,     4,     3,
-     2,     3,     4,     3,     3,     1,     1,     0,     1,     2,
-     1,     2,     1,     1,     3,     5,     3,     1,     0
+     1,     1,     2,     1,     3,     3,     3,     3,     2,     4,
+     3,     2,     3,     4,     3,     3,     4,     1,     1,     0,
+     1,     2,     1,     2,     1,     1,     3,     5,     3,     1,
+     0
 };
 
 static const short yydefact[] = {     0,
-     0,     0,     0,     0,     0,     0,    39,     0,     0,     0,
-     0,     0,    29,    13,     1,     2,     3,     4,     5,     6,
-     7,     8,     9,    10,    11,     0,     0,    12,    26,     0,
-     0,     0,     0,    18,    38,    28,     0,     0,     0,     0,
-     0,    34,    30,    33,     0,     0,    21,    14,    15,    16,
-    17,    27,     0,    20,    22,     0,    24,    25,    31,    35,
-    37,    19,    23,    32,     0,    36,     0,     0,     0
+     0,     0,     0,     0,     0,     0,    41,     0,     0,     0,
+     0,     0,     0,    31,    14,     1,     2,     3,     4,     5,
+     6,     7,     8,     9,    10,    11,    12,     0,     0,    13,
+    28,     0,     0,     0,     0,    19,    40,    30,     0,     0,
+     0,     0,     0,     0,    36,    32,    35,     0,     0,    22,
+    15,    16,    17,    18,    29,     0,    21,    23,     0,    25,
+    26,     0,    33,    37,    39,    20,    24,    27,    34,     0,
+    38,     0,     0,     0
 };
 
-static const short yydefgoto[] = {    67,
-    15,    16,    17,    18,    19,    20,    21,    22,    23,    24,
-    25,    30,    53,    26,    60,    45,    46,    27,    36
+static const short yydefgoto[] = {    72,
+    16,    17,    18,    19,    20,    21,    22,    23,    24,    25,
+    26,    27,    32,    56,    28,    64,    48,    49,    29,    38
 };
 
-static const short yypact[] = {     8,
-   -14,    -5,    -5,    -5,    -5,     6,    18,    24,    -5,    -5,
-    24,    24,-32768,-32768,-32768,-32768,-32768,-32768,-32768,-32768,
--32768,-32768,-32768,-32768,-32768,    11,    10,-32768,-32768,    15,
-    22,    23,    25,-32768,-32768,    27,    28,    29,    -5,    13,
-    16,-32768,-32768,-32768,    32,    32,-32768,-32768,-32768,-32768,
--32768,-32768,    31,-32768,-32768,    33,-32768,-32768,-32768,    34,
-   -11,-32768,-32768,-32768,    32,    34,    44,    45,-32768
+static const short yypact[] = {    39,
+   -15,     1,     1,     1,     1,    -7,     3,     6,     1,     1,
+     6,     6,     1,-32768,-32768,-32768,-32768,-32768,-32768,-32768,
+-32768,-32768,-32768,-32768,-32768,-32768,-32768,    -6,     4,-32768,
+-32768,     7,     9,    10,    11,-32768,-32768,    15,    13,    14,
+     1,    -4,    -1,     1,-32768,-32768,-32768,    17,    17,-32768,
+-32768,-32768,-32768,-32768,-32768,    16,-32768,-32768,    18,-32768,
+-32768,    20,-32768,    19,   -12,-32768,-32768,-32768,-32768,    17,
+    19,    25,    27,-32768
 };
 
 static const short yypgoto[] = {-32768,
 -32768,-32768,-32768,-32768,-32768,-32768,-32768,-32768,-32768,-32768,
--32768,    -3,-32768,    26,   -43,    -9,-32768,    46,-32768
+-32768,-32768,    -3,-32768,     8,   -46,   -11,-32768,    48,-32768
 };
 
 
-#define	YYLAST		54
+#define	YYLAST		58
 
 
-static const short yytable[] = {    31,
-    32,    33,    61,    28,    64,    38,    39,    44,     1,    29,
-     2,     3,     4,     5,     6,     7,     8,     9,    10,    11,
-    12,    66,    13,    34,    42,    14,    43,    47,    43,    44,
-    57,    43,    48,    58,    35,    56,    40,    41,    13,    49,
-    50,    52,    51,    68,    69,    54,    55,    59,    62,    64,
-    63,    65,     0,    37
+static const short yytable[] = {    33,
+    34,    35,    65,    30,    69,    40,    41,    47,    45,    44,
+    46,    36,    46,    47,    60,    46,    31,    61,    42,    43,
+    37,    14,    50,    71,    73,    51,    74,    52,    53,    54,
+    55,    57,    58,    63,    66,    69,    67,    59,    68,     1,
+    62,     2,     3,     4,     5,     6,     7,     8,     9,    10,
+    11,    12,    13,    70,    14,    39,     0,    15
 };
 
 static const short yycheck[] = {     3,
-     4,     5,    46,    18,    16,     9,    10,    19,     1,    15,
-     3,     4,     5,     6,     7,     8,     9,    10,    11,    12,
-    13,    65,    15,    18,    14,    18,    16,    18,    16,    19,
-    18,    16,    18,    18,    17,    39,    11,    12,    15,    18,
-    18,    15,    18,     0,     0,    18,    18,    16,    18,    16,
-    18,    61,    -1,     8
+     4,     5,    49,    19,    17,     9,    10,    20,    15,    13,
+    17,    19,    17,    20,    19,    17,    16,    19,    11,    12,
+    18,    16,    19,    70,     0,    19,     0,    19,    19,    19,
+    16,    19,    19,    17,    19,    17,    19,    41,    19,     1,
+    44,     3,     4,     5,     6,     7,     8,     9,    10,    11,
+    12,    13,    14,    65,    16,     8,    -1,    19
 };
 /* -*-C-*-  Note some compilers choke on comments on `#line' lines.  */
 #line 3 "/usr/pkg/share/bison.simple"
@@ -802,115 +810,127 @@ yyreduce:
   switch (yyn) {
 
 case 1:
-#line 98 "../../tmesh/tmesh-input.y"
-{ *_tmesh_input_parsed = yyvsp[0]; YYACCEPT; ;
-    break;}
-case 2:
 #line 99 "../../tmesh/tmesh-input.y"
 { *_tmesh_input_parsed = yyvsp[0]; YYACCEPT; ;
     break;}
-case 3:
+case 2:
 #line 100 "../../tmesh/tmesh-input.y"
 { *_tmesh_input_parsed = yyvsp[0]; YYACCEPT; ;
     break;}
-case 4:
+case 3:
 #line 101 "../../tmesh/tmesh-input.y"
 { *_tmesh_input_parsed = yyvsp[0]; YYACCEPT; ;
     break;}
-case 5:
+case 4:
 #line 102 "../../tmesh/tmesh-input.y"
 { *_tmesh_input_parsed = yyvsp[0]; YYACCEPT; ;
     break;}
-case 6:
+case 5:
 #line 103 "../../tmesh/tmesh-input.y"
 { *_tmesh_input_parsed = yyvsp[0]; YYACCEPT; ;
     break;}
-case 7:
+case 6:
 #line 104 "../../tmesh/tmesh-input.y"
 { *_tmesh_input_parsed = yyvsp[0]; YYACCEPT; ;
     break;}
-case 8:
+case 7:
 #line 105 "../../tmesh/tmesh-input.y"
 { *_tmesh_input_parsed = yyvsp[0]; YYACCEPT; ;
     break;}
-case 9:
+case 8:
 #line 106 "../../tmesh/tmesh-input.y"
 { *_tmesh_input_parsed = yyvsp[0]; YYACCEPT; ;
     break;}
-case 10:
+case 9:
 #line 107 "../../tmesh/tmesh-input.y"
 { *_tmesh_input_parsed = yyvsp[0]; YYACCEPT; ;
     break;}
-case 11:
+case 10:
 #line 108 "../../tmesh/tmesh-input.y"
 { *_tmesh_input_parsed = yyvsp[0]; YYACCEPT; ;
     break;}
-case 12:
+case 11:
 #line 109 "../../tmesh/tmesh-input.y"
-{ YYABORT; ;
+{ *_tmesh_input_parsed = yyvsp[0]; YYACCEPT; ;
+    break;}
+case 12:
+#line 110 "../../tmesh/tmesh-input.y"
+{ *_tmesh_input_parsed = yyvsp[0]; YYACCEPT; ;
     break;}
 case 13:
 #line 111 "../../tmesh/tmesh-input.y"
-{ _tmesh_input_parsed->tmesh_parser_value_token = TMESH_TOKEN_UNDEF; YYACCEPT; ;
+{ YYABORT; ;
     break;}
 case 14:
-#line 116 "../../tmesh/tmesh-input.y"
-{ yyval = yyvsp[-1]; yyval.tmesh_parser_value_token = yyvsp[-2].tmesh_parser_value_token; ;
+#line 113 "../../tmesh/tmesh-input.y"
+{ _tmesh_input_parsed->tmesh_parser_value_token = TMESH_TOKEN_UNDEF; YYACCEPT; ;
     break;}
 case 15:
-#line 120 "../../tmesh/tmesh-input.y"
+#line 118 "../../tmesh/tmesh-input.y"
 { yyval = yyvsp[-1]; yyval.tmesh_parser_value_token = yyvsp[-2].tmesh_parser_value_token; ;
     break;}
 case 16:
-#line 125 "../../tmesh/tmesh-input.y"
+#line 122 "../../tmesh/tmesh-input.y"
 { yyval = yyvsp[-1]; yyval.tmesh_parser_value_token = yyvsp[-2].tmesh_parser_value_token; ;
     break;}
 case 17:
-#line 130 "../../tmesh/tmesh-input.y"
+#line 127 "../../tmesh/tmesh-input.y"
 { yyval = yyvsp[-1]; yyval.tmesh_parser_value_token = yyvsp[-2].tmesh_parser_value_token; ;
     break;}
-case 19:
-#line 138 "../../tmesh/tmesh-input.y"
+case 18:
+#line 132 "../../tmesh/tmesh-input.y"
+{ yyval = yyvsp[-1]; yyval.tmesh_parser_value_token = yyvsp[-2].tmesh_parser_value_token; ;
+    break;}
+case 20:
+#line 140 "../../tmesh/tmesh-input.y"
 {
   yyval = yyvsp[-2];
   yyval.tmesh_parser_value_strings[1] = yyvsp[-1].tmesh_parser_value_strings[0];
   yyval.tmesh_parser_value_token = yyvsp[-3].tmesh_parser_value_token;
 ;
-    break;}
-case 20:
-#line 147 "../../tmesh/tmesh-input.y"
-{ yyval = yyvsp[-1]; yyval.tmesh_parser_value_token = yyvsp[-2].tmesh_parser_value_token; ;
     break;}
 case 21:
 #line 149 "../../tmesh/tmesh-input.y"
-{ yyval = yyvsp[-1]; yyval.tmesh_parser_value_token = TMESH_TOKEN_CONNECT; ;
-    break;}
-case 22:
-#line 154 "../../tmesh/tmesh-input.y"
 { yyval = yyvsp[-1]; yyval.tmesh_parser_value_token = yyvsp[-2].tmesh_parser_value_token; ;
     break;}
+case 22:
+#line 151 "../../tmesh/tmesh-input.y"
+{ yyval = yyvsp[-1]; yyval.tmesh_parser_value_token = TMESH_TOKEN_CONNECT; ;
+    break;}
 case 23:
-#line 159 "../../tmesh/tmesh-input.y"
+#line 156 "../../tmesh/tmesh-input.y"
+{ yyval = yyvsp[-1]; yyval.tmesh_parser_value_token = yyvsp[-2].tmesh_parser_value_token; ;
+    break;}
+case 24:
+#line 161 "../../tmesh/tmesh-input.y"
 {
   yyval = yyvsp[-2];
   yyval.tmesh_parser_value_strings[1] = yyvsp[-1].tmesh_parser_value_strings[0];
   yyval.tmesh_parser_value_token = yyvsp[-3].tmesh_parser_value_token;
 ;
     break;}
-case 24:
-#line 168 "../../tmesh/tmesh-input.y"
-{ yyval = yyvsp[-1]; yyval.tmesh_parser_value_token = yyvsp[-2].tmesh_parser_value_token; ;
-    break;}
 case 25:
-#line 173 "../../tmesh/tmesh-input.y"
+#line 170 "../../tmesh/tmesh-input.y"
 { yyval = yyvsp[-1]; yyval.tmesh_parser_value_token = yyvsp[-2].tmesh_parser_value_token; ;
     break;}
-case 28:
-#line 183 "../../tmesh/tmesh-input.y"
+case 26:
+#line 175 "../../tmesh/tmesh-input.y"
+{ yyval = yyvsp[-1]; yyval.tmesh_parser_value_token = yyvsp[-2].tmesh_parser_value_token; ;
+    break;}
+case 27:
+#line 180 "../../tmesh/tmesh-input.y"
+{
+  yyval = yyvsp[-2];
+  yyval.tmesh_parser_value_strings[1] = yyvsp[-1].tmesh_parser_value_strings[0];
+  yyval.tmesh_parser_value_token = yyvsp[-3].tmesh_parser_value_token;
+;
+    break;}
+case 30:
+#line 194 "../../tmesh/tmesh-input.y"
 { yyval.tmesh_parser_value_strings[0] = NULL; ;
     break;}
-case 29:
-#line 188 "../../tmesh/tmesh-input.y"
+case 31:
+#line 199 "../../tmesh/tmesh-input.y"
 { 
   _tmesh_parser_argv_arg(&yyval.tmesh_parser_value_argvs[0], 
 			 yyvsp[0].tmesh_parser_value_pathname0, 
@@ -918,26 +938,9 @@ case 29:
   _tmesh_scanner_in_args();
 ;
     break;}
-case 30:
-#line 195 "../../tmesh/tmesh-input.y"
-{
-  yyval = yyvsp[-1]; 
-  _tmesh_parser_argv_arg(&yyval.tmesh_parser_value_argvs[0], 
-			 yyvsp[0].tmesh_parser_value_arg, 
-			 FALSE);
-;
-    break;}
-case 31:
-#line 205 "../../tmesh/tmesh-input.y"
-{
-  _tmesh_parser_argv_arg(&yyval.tmesh_parser_value_argvs[0], 
-			 yyvsp[0].tmesh_parser_value_arg, 
-			 TRUE);
-;
-    break;}
 case 32:
-#line 211 "../../tmesh/tmesh-input.y"
-{ 
+#line 206 "../../tmesh/tmesh-input.y"
+{
   yyval = yyvsp[-1]; 
   _tmesh_parser_argv_arg(&yyval.tmesh_parser_value_argvs[0], 
 			 yyvsp[0].tmesh_parser_value_arg, 
@@ -945,15 +948,32 @@ case 32:
 ;
     break;}
 case 33:
-#line 219 "../../tmesh/tmesh-input.y"
-{ _tmesh_scanner_in_args(); ;
+#line 216 "../../tmesh/tmesh-input.y"
+{
+  _tmesh_parser_argv_arg(&yyval.tmesh_parser_value_argvs[0], 
+			 yyvsp[0].tmesh_parser_value_arg, 
+			 TRUE);
+;
     break;}
 case 34:
 #line 222 "../../tmesh/tmesh-input.y"
-{ _tmesh_scanner_in_args(); ;
+{ 
+  yyval = yyvsp[-1]; 
+  _tmesh_parser_argv_arg(&yyval.tmesh_parser_value_argvs[0], 
+			 yyvsp[0].tmesh_parser_value_arg, 
+			 FALSE);
+;
     break;}
 case 35:
-#line 226 "../../tmesh/tmesh-input.y"
+#line 230 "../../tmesh/tmesh-input.y"
+{ _tmesh_scanner_in_args(); ;
+    break;}
+case 36:
+#line 233 "../../tmesh/tmesh-input.y"
+{ _tmesh_scanner_in_args(); ;
+    break;}
+case 37:
+#line 237 "../../tmesh/tmesh-input.y"
 {
   if (yyvsp[-2].tmesh_parser_value_argvs[0].tmesh_parser_argv_argc > 1) {
     yyerror(_("expected 'at'"));
@@ -964,24 +984,24 @@ case 35:
   yyval.tmesh_parser_value_argvs[2] = yyvsp[0].tmesh_parser_value_argvs[0];
 ;
     break;}
-case 36:
-#line 236 "../../tmesh/tmesh-input.y"
+case 38:
+#line 247 "../../tmesh/tmesh-input.y"
 {
   yyval.tmesh_parser_value_argvs[0] = yyvsp[-4].tmesh_parser_value_argvs[0];
   yyval.tmesh_parser_value_argvs[1] = yyvsp[-2].tmesh_parser_value_argvs[0];
   yyval.tmesh_parser_value_argvs[2] = yyvsp[0].tmesh_parser_value_argvs[0];
 ;
     break;}
-case 37:
-#line 242 "../../tmesh/tmesh-input.y"
+case 39:
+#line 253 "../../tmesh/tmesh-input.y"
 {
   yyval.tmesh_parser_value_argvs[0] = yyvsp[-2].tmesh_parser_value_argvs[0];
   yyval.tmesh_parser_value_argvs[1] = yyvsp[0].tmesh_parser_value_argvs[0];
   yyval.tmesh_parser_value_argvs[2].tmesh_parser_argv_argv = NULL;
 ;
     break;}
-case 39:
-#line 252 "../../tmesh/tmesh-input.y"
+case 41:
+#line 263 "../../tmesh/tmesh-input.y"
 { yyval.tmesh_parser_value_strings[0] = NULL; ;
     break;}
 }
@@ -1206,7 +1226,7 @@ yyerrhandle:
     }
   return 1;
 }
-#line 255 "../../tmesh/tmesh-input.y"
+#line 266 "../../tmesh/tmesh-input.y"
 
 
 /* this adds a new argument to an argument vector: */
@@ -1325,6 +1345,9 @@ _tmesh_scanner_token(struct tmesh_scanner *scanner)
     }  
     else if (!strcmp(string, "log")) {
       token = TMESH_TOKEN_LOG;
+    }  
+    else if (!strcmp(string, "alias")) {
+      token = TMESH_TOKEN_ALIAS;
     }  
     else if (string[0] == '-') {
       token = TMESH_TOKEN_OPTS;
@@ -1591,6 +1614,7 @@ _tmesh_yyparse(struct tmesh *tmesh, struct tmesh_parser_value *value, char **_ou
     case TMESH_TOKEN_RM:	command = TMESH_COMMAND_RM; break;
     case TMESH_TOKEN_COMMAND:	command = TMESH_COMMAND_COMMAND; break;
     case TMESH_TOKEN_LOG:	command = TMESH_COMMAND_LOG; break;
+    case TMESH_TOKEN_ALIAS:	command = TMESH_COMMAND_ALIAS; break;
     }
     value->tmesh_parser_value_command = command;
   }

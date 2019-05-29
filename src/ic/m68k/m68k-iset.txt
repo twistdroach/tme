@@ -1,4 +1,4 @@
-! $Id: m68k-iset.txt,v 1.8 2005/03/23 11:55:34 fredette Exp $
+! $Id: m68k-iset.txt,v 1.9 2007/08/25 20:50:32 fredette Exp $
 
 ! ic/m68k/m68k-iset.txt: the m68k instruction set
 
@@ -59,8 +59,10 @@ eax-cat control un	nnynnyyyyyynnnn
 .if m68020 || m68030
 specop specop16 cmp2_chk2
 0000 0ss0 11xx xxxx cmp2_chk2 X, x0/control	! chk2 pp 174, cmp2 pp 185
-specop specop16 cas
-0000 1SS0 11xx xxxx cas.S X, x0/memalt/un	! cas pp 169
+specop specop16 cas.s
+0000 1010 11xx xxxx cas8 X, x0/memalt/un	! cas pp 169
+0000 1100 11xx xxxx cas16 X, x0/memalt/un	! cas pp 169
+0000 1110 11xx xxxx cas32 X, x0/memalt/un	! cas pp 169
 specop specop16 cas2_16 cas2_32
 0000 1100 1111 1100 cas2_16 #16			! cas2 pp 169
 0000 1110 1111 1100 cas2_32 #16			! cas2 pp 169

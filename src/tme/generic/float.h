@@ -1,4 +1,4 @@
-/* $Id: float.h,v 1.3 2005/05/14 22:09:17 fredette Exp $ */
+/* $Id: float.h,v 1.4 2007/08/24 01:10:41 fredette Exp $ */
 
 /* tme/generic/float.h - public header file for floating-point emulation */
 
@@ -37,7 +37,7 @@
 #define _TME_GENERIC_FLOAT_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: float.h,v 1.3 2005/05/14 22:09:17 fredette Exp $");
+_TME_RCSID("$Id: float.h,v 1.4 2007/08/24 01:10:41 fredette Exp $");
 
 /* includes: */
 #include <tme/threads.h>
@@ -413,6 +413,16 @@ tme_float_assert_formats(_tme_const struct tme_float *x, unsigned int formats)
        ? ((x)->tme_float_value_double < 0) \
        : TME_FLOAT_IF_LONG_DOUBLE(((x)->tme_float_value_long_double < 0) ||) FALSE))
 
+/* if possible, this returns a positive or negative infinity
+   float, otherwise, this returns the float value
+   closest to that infinity: */
+float tme_float_infinity_float _TME_P((int));
+
+/* if possible, this returns a negative zero float.
+   otherwise, this returns the negative float value closest
+   to zero: */
+float tme_float_negative_zero_float _TME_P((void));
+
 /* this returns the radix 2 mantissa and exponent of an in-range float.
    the mantissa is either zero, or in the range [1,2): */
 float tme_float_radix2_mantissa_exponent_float _TME_P((float, tme_int32_t *));
@@ -426,6 +436,16 @@ float tme_float_radix10_mantissa_exponent_float _TME_P((float, tme_int32_t *));
 
 /* this scales a value by adding n to its exponent: */
 float tme_float_radix10_scale_float _TME_P((float, tme_int32_t));
+
+/* if possible, this returns a positive or negative infinity
+   double, otherwise, this returns the double value
+   closest to that infinity: */
+double tme_float_infinity_double _TME_P((int));
+
+/* if possible, this returns a negative zero double.
+   otherwise, this returns the negative double value closest
+   to zero: */
+double tme_float_negative_zero_double _TME_P((void));
 
 /* this returns the radix 2 mantissa and exponent of an in-range double.
    the mantissa is either zero, or in the range [1,2): */
@@ -442,6 +462,16 @@ double tme_float_radix10_mantissa_exponent_double _TME_P((double, tme_int32_t *)
 double tme_float_radix10_scale_double _TME_P((double, tme_int32_t));
 
 #ifdef _TME_HAVE_LONG_DOUBLE
+
+/* if possible, this returns a positive or negative infinity
+   long double, otherwise, this returns the long double value
+   closest to that infinity: */
+long double tme_float_infinity_long_double _TME_P((int));
+
+/* if possible, this returns a negative zero long double.
+   otherwise, this returns the negative long double value closest
+   to zero: */
+long double tme_float_negative_zero_long_double _TME_P((void));
 
 /* this returns the radix 2 mantissa and exponent of an in-range long double.
    the mantissa is either zero, or in the range [1,2): */

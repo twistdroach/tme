@@ -1,4 +1,4 @@
-/* $Id: m68k-misc.c,v 1.23 2005/03/23 12:42:56 fredette Exp $ */
+/* $Id: m68k-misc.c,v 1.26 2007/08/25 22:45:12 fredette Exp $ */
 
 /* ic/m68k/m68k-misc.c - miscellaneous things for the m68k emulator: */
 
@@ -36,7 +36,7 @@
 /* includes: */
 #include "m68k-impl.h"
 
-_TME_RCSID("$Id: m68k-misc.c,v 1.23 2005/03/23 12:42:56 fredette Exp $");
+_TME_RCSID("$Id: m68k-misc.c,v 1.26 2007/08/25 22:45:12 fredette Exp $");
 
 /* the memory buffer read and write functions: */
 #if TME_M68K_SIZE_8 != 1
@@ -219,9 +219,11 @@ tme_m68k_external_check(struct tme_m68k *ic, tme_uint32_t internal_exceptions)
     tme_mutex_unlock(&ic->tme_m68k_external_mutex);
     
     /* acknowledge the interrupt and get the vector: */
+    tme_m68k_callout_unlock(ic);
     rc = (*ic->_tme_m68k_bus_connection->tme_m68k_bus_connection.tme_bus_intack)
       (&ic->_tme_m68k_bus_connection->tme_m68k_bus_connection,
        ipl, &vector);
+    tme_m68k_callout_relock(ic);
     if (rc == TME_EDEADLK) {
       abort();
     }
@@ -275,6 +277,12 @@ tme_m68k_thread(struct tme_m68k *ic)
   /* we use longjmp to redispatch: */
   do { } while (setjmp(ic->_tme_m68k_dispatcher));
 
+  /* we must not have a busy fast instruction TLB entry: */
+  assert (ic->_tme_m68k_insn_fetch_fast_itlb == NULL);
+
+  /* clear the group 0 hook: */
+  ic->_tme_m68k_group0_hook = NULL;
+
   /* dispatch on the current mode: */
   switch (ic->_tme_m68k_mode) {
 
@@ -313,11 +321,6 @@ _tme_m68k_generic_tlb_fill(struct tme_m68k_bus_connection *conn_m68k,
 
   /* recover our IC: */
   ic = conn_m68k->tme_m68k_bus_connection.tme_bus_connection.tme_connection_element->tme_element_private;
-
-  /* this m68k implementation never fills TLB entries on the stack, so
-     a TLB entry reserves itself.  this also means that we don't have
-     to call tme_bus_tlb_back() after the fill: */
-  tme_bus_tlb_reserve(&tlb->tme_m68k_tlb_bus_tlb, &tlb->tme_m68k_tlb_bus_tlb);
 
   /* call the generic bus TLB filler: */
   (ic->_tme_m68k_bus_generic->tme_bus_tlb_fill)
@@ -415,14 +418,16 @@ _tme_m68k_connection_make(struct tme_connection *conn, unsigned int state)
       (&ic->_tme_m68k_bus_connection->tme_m68k_bus_connection, 
        _TME_M68K_TLB_HASH_SIZE, 
        sizeof(struct tme_m68k_tlb),
-       TME_ATOMIC_POINTER((struct tme_bus_tlb **) &ic->_tme_m68k_tlb_array));
+       &ic->_tme_m68k_tlb_array_bus,
+       &ic->_tme_m68k_tlbs_rwlock);
 
     /* allocate the ITLB set: */
     (*ic->_tme_m68k_bus_connection->tme_m68k_bus_connection.tme_bus_tlb_set_allocate)
       (&ic->_tme_m68k_bus_connection->tme_m68k_bus_connection, 
        1, 
        sizeof(struct tme_m68k_tlb),
-       TME_ATOMIC_POINTER((struct tme_bus_tlb **) &ic->_tme_m68k_itlb));
+       &ic->_tme_m68k_itlb_bus,
+       &ic->_tme_m68k_tlbs_rwlock);
   }
 
   /* NB: the machine needs to issue a reset to bring the CPU out of halt. */
@@ -553,13 +558,13 @@ tme_m68k_new(struct tme_m68k *ic, const char * const *args, const void *extra, c
   /* dispatch on the type: */
   switch (ic->tme_m68k_type) {
   case TME_M68K_M68000:
-    ic->_tme_m68k_bus_16bit = TRUE;
+    ic->_tme_m68k_bus_16bit = 1;
     break;
   case TME_M68K_M68010:
-    ic->_tme_m68k_bus_16bit = TRUE;
+    ic->_tme_m68k_bus_16bit = 1;
     break;
   case TME_M68K_M68020:
-    ic->_tme_m68k_bus_16bit = FALSE;
+    ic->_tme_m68k_bus_16bit = 0;
     break;
   default:
     abort();
@@ -646,8 +651,17 @@ tme_m68k_go_slow(const struct tme_m68k *ic)
 {
   struct tme_m68k_tlb *tlb;
   tme_uint32_t linear_pc;
+  const tme_shared tme_uint8_t *emulator_load;
+  const tme_shared tme_uint8_t *emulator_load_last;
 
-  tlb = TME_ATOMIC_READ(struct tme_m68k_tlb *, ic->_tme_m68k_itlb);
+  tlb = tme_memory_atomic_pointer_read(struct tme_m68k_tlb *, ic->_tme_m68k_itlb, &ic->_tme_m68k_tlbs_rwlock);
+  emulator_load = tlb->tme_m68k_tlb_emulator_off_read;
+  emulator_load_last = emulator_load;
+  if (emulator_load != TME_EMULATOR_OFF_UNDEF) {
+    emulator_load += tlb->tme_m68k_tlb_linear_first;
+    emulator_load_last += tlb->tme_m68k_tlb_linear_last;
+    assert (emulator_load <= emulator_load_last);
+  }
   linear_pc = ic->tme_m68k_ireg_pc;
   return (
 	  
@@ -664,6 +678,25 @@ tme_m68k_go_slow(const struct tme_m68k *ic)
 	  || (((unsigned long) tlb->tme_m68k_tlb_emulator_off_read)
 	      & (sizeof(tme_uint32_t) - 1))
 
+	  /* the ITLB emulator memory must not be so low that the
+	     first valid pointer minus one, or the last valid pointer
+	     minus (sizeof(tme_uint32_t) - 1), wraps around, nor so
+	     high that the last valid pointer, plus one, wraps around: */
+	  /* NB: this enables the fast instruction word fetch macros
+	     to simply fetch 16 and 32 bit values until fetch_fast_next
+	     is greater than ic->_tme_m68k_insn_fetch_fast_last, and 
+	     not have to do any pointer math or ever check for pointer
+	     wrapping: */
+	  || ((emulator_load
+	       - 1)
+	      >= emulator_load)
+	  || ((emulator_load_last
+	       - (sizeof(tme_uint32_t) - 1))
+	      >= emulator_load_last)
+	  || ((emulator_load_last
+	       + 1)
+	      <= emulator_load_last)
+
 	  /* the linear PC must be 16-bit aligned: */
 	  || (linear_pc & 1)
 
@@ -675,6 +708,18 @@ tme_m68k_go_slow(const struct tme_m68k *ic)
 void
 tme_m68k_redispatch(struct tme_m68k *ic)
 {
+  struct tme_m68k_tlb *tlb;
+
+  /* if we have a busy fast instruction TLB entry: */
+  tlb = ic->_tme_m68k_insn_fetch_fast_itlb;
+  if (__tme_predict_true(tlb != NULL)) {
+
+    /* unbusy and forget the fast instruction TLB entry: */
+    tme_m68k_tlb_unbusy(tlb);
+    ic->_tme_m68k_insn_fetch_fast_itlb = NULL;
+  }
+
+  /* do the redispatch: */
 #ifdef _TME_M68K_STATS
   ic->tme_m68k_stats.tme_m68k_stats_redispatches++;
 #endif /* _TME_M68K_STATS */
@@ -711,7 +756,13 @@ tme_m68k_tlb_fill(struct tme_m68k *ic, struct tme_m68k_tlb *tlb,
   /* this m68k implementation never fills TLB entries on the stack, so
      a TLB entry reserves itself.  this also means that we don't have
      to call tme_bus_tlb_back() after the fill: */
-  tme_bus_tlb_reserve(&tlb->tme_m68k_tlb_bus_tlb, &tlb->tme_m68k_tlb_bus_tlb);
+  tlb->tme_m68k_tlb_bus_tlb.tme_bus_tlb_global = &tlb->tme_m68k_tlb_bus_tlb;
+
+  /* unbusy the TLB entry for filling: */
+  tme_bus_tlb_unbusy_fill(&tlb->tme_m68k_tlb_bus_tlb);
+
+  /* unlock for the callout: */
+  tme_m68k_callout_unlock(ic);
 
   /* fill the TLB entry: */
   (*ic->_tme_m68k_bus_connection->tme_m68k_bus_tlb_fill)
@@ -720,14 +771,20 @@ tme_m68k_tlb_fill(struct tme_m68k *ic, struct tme_m68k_tlb *tlb,
      external_address,
      cycles);
 
+  /* relock after the callout: */
+  tme_m68k_callout_relock(ic);
+
+  /* rebusy the TLB entry: */
+  tme_bus_tlb_busy(&tlb->tme_m68k_tlb_bus_tlb);
+
   /* if this code isn't 32-bit clean, we have to deal: */
   if (external_address != linear_address) {
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb_internal.tme_bus_tlb_addr_first,
-		     TME_ATOMIC_READ(tme_bus_addr_t, tlb->tme_m68k_tlb_linear_first)
-		     | (linear_address ^ external_address));
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb_internal.tme_bus_tlb_addr_last,
-		     TME_ATOMIC_READ(tme_bus_addr_t, tlb->tme_m68k_tlb_linear_last)
-		     | (linear_address ^ external_address));
+    tlb_internal.tme_bus_tlb_addr_first
+      = (tlb->tme_m68k_tlb_linear_first
+	 | (linear_address ^ external_address));
+    tlb_internal.tme_bus_tlb_addr_last
+      = (tlb->tme_m68k_tlb_linear_last
+	 | (linear_address ^ external_address));
     tlb_internal.tme_bus_tlb_cycles_ok = tlb->tme_m68k_tlb_bus_tlb.tme_bus_tlb_cycles_ok;
     tme_bus_tlb_map(&tlb->tme_m68k_tlb_bus_tlb, external_address,
 		    &tlb_internal, linear_address);
@@ -1114,7 +1171,7 @@ tme_m68k_rte_finish(struct tme_m68k *ic, tme_uint32_t format_extra)
 /* this stores the group 0 sequence into a region of host memory.
    this is used when preparing the state information to be stored
    on the stack for a bus or address error: */
-int
+unsigned int
 tme_m68k_sequence_empty(const struct tme_m68k *ic, tme_uint8_t *raw, unsigned int raw_avail)
 {
   const struct _tme_m68k_sequence *sequence;
@@ -1160,7 +1217,7 @@ tme_m68k_sequence_empty(const struct tme_m68k *ic, tme_uint8_t *raw, unsigned in
 /* this restores the group 0 sequence from a region of host memory.
    this is used when reading the state information stored on the
    stack for a bus or address error: */
-int
+unsigned int
 tme_m68k_sequence_fill(struct tme_m68k *ic, const tme_uint8_t *raw, unsigned int raw_avail)
 {
   struct _tme_m68k_sequence *sequence;
@@ -1173,7 +1230,7 @@ tme_m68k_sequence_fill(struct tme_m68k *ic, const tme_uint8_t *raw, unsigned int
   /* we used 8 bits for the mode (2 bits) and flags (6 bits): */
   raw_used += sizeof(tme_uint8_t);
   if (raw_avail < raw_used) {
-    return (-1);
+    return (0);
   }
   sequence->_tme_m68k_sequence_mode = *raw >> 6;
   sequence->_tme_m68k_sequence_mode_flags = (*(raw++) & (TME_BIT(6) - 1));
@@ -1182,7 +1239,7 @@ tme_m68k_sequence_fill(struct tme_m68k *ic, const tme_uint8_t *raw, unsigned int
      (12 bits) and already-transferred byte count (4 bits): */
   raw_used += sizeof(tme_uint16_t);
   if (raw_avail < raw_used) {
-    return (-1);
+    return (0);
   }
   sequence->_tme_m68k_sequence_transfer_faulted = 
     (((tme_uint16_t) raw[0]) << 4)
@@ -1194,7 +1251,7 @@ tme_m68k_sequence_fill(struct tme_m68k *ic, const tme_uint8_t *raw, unsigned int
   /* we used sizeof(_tme_m68k_sequence_uid) bytes for the sequence UID: */
   raw_used += sizeof(sequence->_tme_m68k_sequence_uid);
   if (raw_avail < raw_used) {
-    return (-1);
+    return (0);
   }
   memcpy(&sequence->_tme_m68k_sequence_uid,
 	 raw,
@@ -1209,240 +1266,730 @@ tme_m68k_sequence_fill(struct tme_m68k *ic, const tme_uint8_t *raw, unsigned int
   return (raw_used);
 }
 
-/* this transfers the instruction buffer to or from a region of host
-   memory.  unlike the raw region in host memory, where the 16- and
-   32-bit parts of the instruction are contiguous and therefore
-   potentially misaligned, in the instruction buffer these instruction
-   parts are all properly aligned.  given the instruction buffer, a
-   contiguous host memory buffer, a count of instruction bytes and the
-   sizes of the instruction fetches, this transfers from one buffer to
-   the other.
-
-   this is used to fill the instruction buffer when we're restoring
-   our state from an exception stack or when we fault anywhere inside
-   the fast executor, and it's used to empty the instruction buffer
-   into an exception stack when we fault: */
-int
-tme_m68k_insn_buffer_xfer(struct tme_m68k *ic, tme_uint8_t *raw, unsigned int raw_avail, int what)
+/* this empties the instruction buffer into an exception frame: */
+unsigned int
+tme_m68k_insn_buffer_empty(const struct tme_m68k *ic, tme_uint8_t *raw, unsigned int raw_avail)
 {
-  int fill, sanity_assert;
-  tme_uint16_t fetch_total;
-  tme_uint16_t fetch_sizes;
-  unsigned int fetch_sizes_bits;
-  unsigned int insn_buffer_off, fetch_off, fetch_size, resid;
-#define _FETCH_SIZES_BITS (8 * sizeof(ic->_tme_m68k_insn_buffer_fetch_sizes))
-#define _FETCH_SIZE_BIT (1 << (_FETCH_SIZES_BITS - 1))
-#define _FETCH_SANITY(e) \
-do { \
-  if (sanity_assert) \
-    assert(e); \
-  else if (!(e)) \
-    return (-1); \
-} while (/* CONSTCOND */ 0)
+  unsigned int fetch_total;
   
-  /* if what is zero, we faulted somewhere inside the fast executor
-     and we need to fill the instruction buffer from raw host memory: */
-  if (what == 0) {
-    fill = TRUE;
-    sanity_assert = TRUE;
+  /* get the total number of bytes in the instruction buffer: */
+  fetch_total = ic->_tme_m68k_insn_fetch_slow_count_total;
 
-    /* the fetch total and sizes are in the state: */
-    fetch_total = ic->_tme_m68k_insn_buffer_fetch_total;
-    fetch_sizes = ic->_tme_m68k_insn_buffer_fetch_sizes;
-    raw_avail = fetch_total;
-  }
-
-  /* else, if what is one, we're emptying the instruction buffer into
-     an exception frame: */
-  else if (what == 1) {
-    fill = FALSE;
-    sanity_assert = TRUE;
-
-    /* the fetch total and sizes are in the state: */
-    fetch_total = ic->_tme_m68k_insn_buffer_fetch_total;
-    fetch_sizes = ic->_tme_m68k_insn_buffer_fetch_sizes;
-
-    /* the first word we place into the exception frame is
-       (fetch_sizes << 4) | (fetch_total >> 1): */
-    _FETCH_SANITY(raw_avail >= sizeof(tme_uint16_t));
-    raw[1] = (fetch_sizes << 4) | (fetch_total >> 1);
-    raw[0] = (fetch_sizes >> 4);
-    raw += sizeof(tme_uint16_t);
-    raw_avail -= sizeof(tme_uint16_t);
-  }
-
-  /* otherwise, we're filling the instruction buffer from an exception
-     frame: */
-  else {
-    fill = TRUE;
-    sanity_assert = FALSE;
-
-    /* this function previously emptied the instruction buffer into
-       this exception frame, and the first big-endian word placed
-       there is (fetch_sizes << 4) | (fetch_total >> 1): */
-    _FETCH_SANITY(raw_avail >= sizeof(tme_uint16_t));
-    fetch_total = (raw[1] & 0x0f) << 1;
-    fetch_sizes = (raw[0] << 4) | (raw[1] >> 4);
-    raw += sizeof(tme_uint16_t);
-    raw_avail -= sizeof(tme_uint16_t);
-  }
-
-  /* fetch_total must be even, because we only fetch some multiple of
-     16-bit words: */
-  _FETCH_SANITY((fetch_total & (sizeof(tme_uint16_t) - 1)) == 0);
-
-  /* fetch_sizes is a bitmask, with a one bit representing a 32-bit
-     fetch and a zero bit representing a 16-bit fetch, and the least
-     significant bit is the *last* fetch performed.  count the number
-     of significant bits in fetch_sizes and confirm that it makes
-     sense with fetch_total: */
-  fetch_sizes_bits = 0;
-  for (fetch_off = 0; fetch_off < fetch_total; ) {
-    _FETCH_SANITY(fetch_sizes_bits < _FETCH_SIZES_BITS);
-    fetch_off += ((fetch_sizes & (1 << fetch_sizes_bits))
-		  /* a 32-bit fetch: */
-		  ? sizeof(tme_uint32_t)
-		  /* a 16-bit fetch: */
-		  : sizeof(tme_uint16_t));
-    fetch_sizes_bits++;
-  }
-  _FETCH_SANITY(fetch_off == fetch_total);
-
-  /* we must have enough raw space available: */
-  _FETCH_SANITY(raw_avail >= fetch_total);
-
-  /* shift fetch_sizes up so the bit for the first transfer
-     is the most significant bit: */
-  fetch_sizes <<= (_FETCH_SIZES_BITS - fetch_sizes_bits);
-
-  /* now fill or empty the instruction buffer: */
-  insn_buffer_off = 0;
-  for (fetch_off = 0; fetch_off < fetch_total; ) {
-
-    /* get the size of this fetch: */
-    fetch_size = ((fetch_sizes & _FETCH_SIZE_BIT)
-		  /* a 32-bit fetch: */
-		  ? sizeof(tme_uint32_t)
-		  /* a 16-bit fetch: */
-		  : sizeof(tme_uint16_t));
-    fetch_sizes <<= 1;
-
-    /* do one transfer.  the insn buffer is kept in host byte
-       order, like the internal registers are: */
-    insn_buffer_off = TME_ALIGN(insn_buffer_off, fetch_size);
-    if (fill) {
-      for (resid = fetch_size; resid-- > 0; ) {
-	ic->_tme_m68k_insn_buffer[(insn_buffer_off
-				   + (resid
-#ifndef WORDS_BIGENDIAN
-				      ^ (fetch_size - 1)
-#endif /* !WORDS_BIGENDIAN */
-				      ))] 
-	  = raw[fetch_off + resid];
-      }
-    }
-    else {
-      for (resid = fetch_size; resid-- > 0; ) {
-	raw[fetch_off + resid] = 
-	  ic->_tme_m68k_insn_buffer[(insn_buffer_off
-				     + (resid
-#ifndef WORDS_BIGENDIAN
-					^ (fetch_size - 1)
-#endif /* !WORDS_BIGENDIAN */
-					))];
-      }
-    }
-    insn_buffer_off += fetch_size;
-    fetch_off += fetch_size;
-
-    /* if we faulted somewhere in the fast executor, we need to
-       account for the instruction fetches in the group0 sequence: */
-    if (what == 0) {
-      ic->_tme_m68k_group0_sequence._tme_m68k_sequence_transfer_next++;
-    }
-  }
-
-  /* NB: for total consistency we might want to store the fetch total
-     and sizes into the state when we're filling the instruction
-     buffer from an execution frame.  however this isn't really needed
-     because the fetch pattern from the restarting slow executor
-     should be exactly the same and it doesn't care anyways. 
-     if the user bashes the exception frame all bets are off. */
-
+  /* save the total number of bytes fetched into the instruction
+     buffer, the number of bytes in the instruction buffer fetched by
+     the fast executor, and then the instruction buffer itself: */
+  assert ((fetch_total % sizeof(tme_uint16_t)) == 0
+	  && fetch_total <= (TME_M68K_INSN_WORDS_MAX * sizeof(tme_uint16_t)));
+  assert ((ic->_tme_m68k_insn_fetch_slow_count_fast % sizeof(tme_uint16_t)) == 0
+	  && ic->_tme_m68k_insn_fetch_slow_count_fast <= fetch_total);
+  assert (raw_avail >= (sizeof(tme_uint8_t) + sizeof(tme_uint8_t) + fetch_total));
+  raw[0] = fetch_total;
+  raw[1] = ic->_tme_m68k_insn_fetch_slow_count_fast;
+  memcpy(raw + 2,
+	 &ic->_tme_m68k_insn_fetch_buffer[0],
+	 fetch_total);
+  
   /* return the number of bytes we put in an exception frame: */
-  return (sizeof(tme_uint16_t) + fetch_total);
+  return (sizeof(tme_uint8_t) + sizeof(tme_uint8_t) + fetch_total);
+}
+
+/* this fills the instruction buffer from an exception frame: */
+unsigned int
+tme_m68k_insn_buffer_fill(struct tme_m68k *ic, const tme_uint8_t *raw, unsigned int raw_avail)
+{
+  unsigned int fetch_total;
+  unsigned int fetch_fast;
+
+  /* there must be at least two bytes in the exception frame: */
+  if (raw_avail >= (sizeof(tme_uint8_t) + sizeof(tme_uint8_t))) {
+
+    /* restore the total number of bytes fetched into the instruction
+       buffer, and the number of bytes in the instruction buffer
+       fetched by the fast executor: */
+    fetch_total = raw[0];
+    fetch_fast = raw[1];
+    if ((fetch_total % sizeof(tme_uint16_t)) == 0
+	&& fetch_total <= (TME_M68K_INSN_WORDS_MAX * sizeof(tme_uint16_t))
+	&& (fetch_fast % sizeof(tme_uint16_t)) == 0
+	&& fetch_fast <= fetch_total
+	&& raw_avail >= (sizeof(tme_uint8_t) + sizeof(tme_uint8_t) + fetch_total)) {
+
+      /* restore the total number of bytes fetched into the instruction
+	 buffer, the number of bytes in the instruction buffer fetched by
+	 the fast executor, and then the instruction buffer itself: */
+      ic->_tme_m68k_insn_fetch_slow_count_total = fetch_total;
+      ic->_tme_m68k_insn_fetch_slow_count_fast = fetch_fast;
+      memcpy(&ic->_tme_m68k_insn_fetch_buffer[0],
+	     raw + 2,
+	     fetch_total);
+
+      /* return the number of bytes restored from the exception frame: */
+      return ((sizeof(tme_uint8_t) + sizeof(tme_uint8_t) + fetch_total));
+    }
+  }
+
+  /* this exception frame is invalid: */
+  return (0);
+}
+
+/* this unlocks data structures before a callout: */
+void
+tme_m68k_callout_unlock(struct tme_m68k *ic)
+{
+  struct tme_m68k_tlb *tlb;
+
+  assert ((ic->_tme_m68k_mode == TME_M68K_MODE_EXECUTION)
+	  || (ic->_tme_m68k_insn_fetch_fast_itlb == NULL));
+
+  /* if we have a busy fast instruction TLB entry: */
+  tlb = ic->_tme_m68k_insn_fetch_fast_itlb;
+  if (tlb != NULL) {
+
+    /* unbusy the fast instruction TLB entry: */
+    tme_m68k_tlb_unbusy(tlb);
+  }
+}
+
+/* this relocks data structures after a callout: */
+void
+tme_m68k_callout_relock(struct tme_m68k *ic)
+{
+  struct tme_m68k_tlb *tlb;
+  struct tme_m68k_tlb *tlb_now;
+
+  assert ((ic->_tme_m68k_mode == TME_M68K_MODE_EXECUTION)
+	  || (ic->_tme_m68k_insn_fetch_fast_itlb == NULL));
+
+  /* if we have a busy fast instruction TLB entry: */
+  tlb = ic->_tme_m68k_insn_fetch_fast_itlb;
+  if (tlb != NULL) {
+
+    /* rebusy the fast instruction TLB entry: */
+    tme_m68k_tlb_busy(tlb);
+      
+    /* get what should be our instruction TLB entry now: */
+    tlb_now = tme_memory_atomic_pointer_read(struct tme_m68k_tlb *, ic->_tme_m68k_itlb, &ic->_tme_m68k_tlbs_rwlock);
+
+    /* if the instruction TLB entry has changed or is invalid: */
+    if (__tme_predict_false(tlb_now != tlb
+			    || tme_bus_tlb_is_invalid(&tlb->tme_m68k_tlb_bus_tlb))) {
+
+      /* poison ic->_tme_m68k_insn_fetch_fast_last so the fast
+	 instruction executor fetch macros will fail: */
+      assert ((ic->_tme_m68k_insn_fetch_fast_next - 1) < ic->_tme_m68k_insn_fetch_fast_next);
+      ic->_tme_m68k_insn_fetch_fast_last = ic->_tme_m68k_insn_fetch_fast_next - 1;
+    }
+  }
 }
 
 /* this is the group 0 fault hook for the fast executor: */
 void
 tme_m68k_group0_hook_fast(struct tme_m68k *ic)
 {
-  struct tme_m68k_tlb *tlb;
-  tme_uint8_t *raw;
+  unsigned int fetch_fast;
 
-  /* fill the instruction buffer and increase the transfer count
-     as if the slow executor had been doing the fetching: */
-  /* NB that this breaks const: */
-  tlb = TME_ATOMIC_READ(struct tme_m68k_tlb *, ic->_tme_m68k_itlb);
-  raw = (tme_uint8_t *) (tlb->tme_m68k_tlb_emulator_off_read + ic->tme_m68k_ireg_pc);
-  tme_m68k_insn_buffer_xfer(ic, raw, 0, 0);
+  /* get the number of bytes in the instruction buffer.  they have all
+     been fetched by the fast executor: */
+  /* NB: it's possible for this to be zero: */
+  fetch_fast = (ic->_tme_m68k_insn_fetch_fast_next - ic->_tme_m68k_insn_fetch_fast_start);
+  assert ((fetch_fast % sizeof(tme_uint16_t)) == 0
+	  && fetch_fast <= (TME_M68K_INSN_WORDS_MAX * sizeof(tme_uint16_t)));
+  ic->_tme_m68k_insn_fetch_slow_count_total = fetch_fast;
+  ic->_tme_m68k_insn_fetch_slow_count_fast = fetch_fast;
 }
 
-/* this starts a read/modify/write cycle.  this works in conjunction
-   with the tme_m68k_readSIZE() and tme_m68k_writeSIZE() functions to
-   aggregate many bus transactions into a larger transaction: */
-struct tme_m68k_tlb *
-tme_m68k_rmw_start(struct tme_m68k *ic)
+/* this starts a read/modify/write cycle: */
+int
+tme_m68k_rmw_start(struct tme_m68k *ic,
+		   struct tme_m68k_rmw *rmw)
 {
+  struct tme_m68k_tlb *tlb_set;
+  struct tme_m68k_tlb *tlbs_all[3];
+  int tlbs_busy[2];
   struct tme_m68k_tlb *tlb;
+  struct tme_m68k_tlb *tlb_use;
+  unsigned int tlb_i;
+  unsigned int address_i;
+  unsigned int address_i_fill;
+  tme_uint32_t address;
+  unsigned int address_cycles[2];
+  unsigned int address_fills[2];
+  tme_uint32_t *buffer_reg;
+  int supported;
 
-  /* if the user reran the cycle, do nothing: */
+  /* if the user reran the cycle: */
   if (TME_M68K_SEQUENCE_RESTARTING
       && (ic->_tme_m68k_group0_buffer_read_softrr > 0
 	  || ic->_tme_m68k_group0_buffer_write_softrr > 0)) {
-    return (NULL);
+
+    /* return failure: */
+    return (-1);
   }
 
   /* we always rerun read/modify/write cycles in their entirety: */
   ic->_tme_m68k_sequence._tme_m68k_sequence_transfer_faulted
     = ic->_tme_m68k_sequence._tme_m68k_sequence_transfer_next - 1;
 
-  /* get an applicable TLB entry: */
-  tlb = TME_M68K_TLB_ENTRY(ic, ic->_tme_m68k_ea_function_code, ic->_tme_m68k_ea_address);
+  /* we only support tas and cas, which have one address, and cas2,
+     which has two addresses: */
+  assert (rmw->tme_m68k_rmw_address_count == 1
+	  || rmw->tme_m68k_rmw_address_count == 2);
 
-  /* we *must* guarantee that a read/modify/write cycle be atomic.
-     unfortunately, the only way we can really do that is to acquire a
-     single lock, now, that somehow protects all of the things we want
-     to do, and hold that lock for the duration.
+  /* get the TLB set from which we will get all TLB entries for this
+     instruction.  for some machines it may be important to guarantee
+     that no one can observe an atomic operation being split by a TLB
+     set change: */
+  tlb_set = tme_memory_atomic_pointer_read(struct tme_m68k_tlb *,
+					   ic->_tme_m68k_tlb_array,
+					   &ic->_tme_m68k_tlbs_rwlock);
 
-     the only way we can do this is to require that read/modify/write
-     cycles always involve TLB entries that allow fast reads and
-     writes.  this gives us a single rwlock that we can lock for
-     writing now and hold until we're done: */
+  /* assume that we will only consider one TLB entry, for the first
+     address: */
+  tlbs_all[0] = TME_M68K_TLB_ENTRY_SET(tlb_set,
+				       ic->_tme_m68k_ea_function_code,
+				       rmw->tme_m68k_rmw_addresses[0]);
+  tlbs_all[1] = NULL;
 
-  /* we invalidate the TLB entry so we can set the TLB rwlock to NULL,
-     which is seen by the first tme_m68k_readSIZE (or
-     tme_m68k_writeSIZE, in the bizarre case that that's called first)
-     as a signal that, after it reloads the TLB entry, it has to lock
-     the rwlock: */
-  tme_bus_tlb_invalidate(&tlb->tme_m68k_tlb_bus_tlb);
-  tlb->tme_m68k_tlb_bus_rwlock = NULL;
+  /* if there are two addresses: */
+  if (rmw->tme_m68k_rmw_address_count == 2) {
 
-  return (tlb);
+    /* we will consider another TLB entry for the second address: */
+    tlbs_all[1] = TME_M68K_TLB_ENTRY_SET(tlb_set,
+					 ic->_tme_m68k_ea_function_code,
+					 rmw->tme_m68k_rmw_addresses[1]);
+
+    /* if the TLB entry for the second address collides with the TLB
+       entry for the first address: */
+    if (tlbs_all[1] == tlbs_all[0]) {
+
+      /* we will instead consider an alternate TLB entry for the
+         second address: */
+      tlbs_all[1] = TME_M68K_TLB_ENTRY_SET(tlb_set,
+					   ic->_tme_m68k_ea_function_code,
+					   (rmw->tme_m68k_rmw_addresses[1]
+					    + TME_M68K_TLB_ADDRESS_BIAS(1)));
+      assert (tlbs_all[1] != tlbs_all[0]);
+    }
+  }
+
+  /* make sure that the list of TLB entries to consider is terminated: */
+  tlbs_all[2] = NULL;
+
+  /* none of the TLB entries to consider are busy: */
+  tlbs_busy[0] = FALSE;
+  tlbs_busy[1] = FALSE;
+
+  /* the addresses aren't using any TLB entries yet: */
+  rmw->tme_m68k_rmw_tlbs[0] = NULL;
+  rmw->tme_m68k_rmw_tlbs[1] = NULL;
+
+  /* we haven't done any slow reads for any addresses yet: */
+  rmw->tme_m68k_rmw_slow_reads[0] = FALSE;
+  rmw->tme_m68k_rmw_slow_reads[1] = FALSE;
+
+  /* whenever we need to find a TLB entry to use for an address, we
+     always prefer one that allows both reading and writing, because
+     we hope that such a TLB entry allows both fast reading and fast
+     writing.
+
+     if we can't find such a TLB entry initially, we try to fill a TLB
+     entry for writing (you can't fill a TLB entry for both reading
+     and writing), in the hopes that this gives us a TLB entry that
+     allows both fast reading and fast writing.  filling for writing
+     is important with some virtual memory hardware, and may actually
+     be required to enable writing.
+
+     if this fill gives us a TLB entry that doesn't allow both fast
+     reading and fast writing, it actually might not allow reading at
+     all.  to check for this, we then try to fill a TLB entry for
+     reading.
+
+     if we still don't have a TLB entry that allows both fast reading
+     and fast writing, we must at least have a TLB entry that allows
+     slow reading.  at this point we do a slow read to start a locked
+     read-modify-write cycle (unless this is a cas2, in which case we
+     do a normal slow read).
+
+     we always want to return to the caller with a TLB entry that
+     allows writing, so after we do a slow read we do one more TLB
+     fill for writing.
+
+     the first TLB fill we do for an address will be for writing, so
+     that is how we initialize an address' address_cycles mask: */
+  address_cycles[0] = TME_BUS_CYCLE_WRITE;
+  address_cycles[1] = TME_BUS_CYCLE_WRITE;
+
+  /* we haven't filled TLBs for any addresses yet: */
+  address_fills[0] = 0;
+  address_fills[1] = 0;
+
+  /* assume that we can support this instruction on the given memory: */
+  supported = TRUE;  
+
+  /* loop forever: */
+  for (;;) {
+
+    /* assume that no address needs a TLB fill: */
+    address_i_fill = rmw->tme_m68k_rmw_address_count;
+
+    /* walk the addresses: */
+    address_i = 0;
+    do {
+      
+      /* get this address: */
+      address = rmw->tme_m68k_rmw_addresses[address_i];
+
+      /* this address isn't using a TLB entry yet: */
+      tlb_use = NULL;
+
+      /* walk the TLB entries we are considering: */
+      for (tlb_i = 0; 
+	   (tlb = tlbs_all[tlb_i]) != NULL;
+	   tlb_i++) {
+
+	/* if this TLB entry isn't busy, busy it: */
+	if (!tlbs_busy[tlb_i]) {
+	  tme_bus_tlb_busy(&tlb->tme_m68k_tlb_bus_tlb);
+	  tlbs_busy[tlb_i] = TRUE;
+	}
+
+	/* if this TLB entry is valid, applies to this function code
+	   and address, and allows at least the desired cycle(s), and
+	   either this address isn't already using a TLB entry, or the
+	   TLB entry it's using doesn't cover the entire operand, or
+	   this TLB entry allows more cycles or allows both fast
+	   reading and fast writing: */
+	if (tme_bus_tlb_is_valid(&tlb->tme_m68k_tlb_bus_tlb)
+	    && (tlb->tme_m68k_tlb_function_codes_mask
+		& TME_BIT(ic->_tme_m68k_ea_function_code)) != 0
+	    && address >= tlb->tme_m68k_tlb_linear_first
+	    && address <= tlb->tme_m68k_tlb_linear_last
+	    && (tlb->tme_m68k_tlb_cycles_ok
+		& address_cycles[address_i]) != 0
+	    && (tlb_use == NULL
+		|| (tlb_use->tme_m68k_tlb_linear_last - address) < rmw->tme_m68k_rmw_size
+		|| tlb->tme_m68k_tlb_cycles_ok > tlb_use->tme_m68k_tlb_cycles_ok
+		|| (tlb->tme_m68k_tlb_emulator_off_read != TME_EMULATOR_OFF_UNDEF
+		    && tlb->tme_m68k_tlb_emulator_off_write != TME_EMULATOR_OFF_UNDEF))) {
+
+	  /* update the TLB entry this address is using: */
+	  tlb_use = tlb;
+	}
+      }
+
+      /* set the TLB entry being used by this address: */
+      rmw->tme_m68k_rmw_tlbs[address_i] = tlb_use;
+
+      /* if this address is not using any TLB entry: */
+      if (tlb_use == NULL) {
+
+	/* we need to fill a TLB entry for this address: */
+	address_i_fill = address_i;
+      }
+
+    } while (++address_i < rmw->tme_m68k_rmw_address_count);
+
+    /* if we need to fill a TLB entry for an address: */
+    address_i = address_i_fill;
+    if (address_i < rmw->tme_m68k_rmw_address_count) {
+
+      /* get this address: */
+      address = rmw->tme_m68k_rmw_addresses[address_i];
+
+      /* get an unused TLB entry to fill: */
+      tlb_i = 0;
+      tlb = tlbs_all[0];
+      if (tlb == rmw->tme_m68k_rmw_tlbs[!address_i]) {
+	tlb_i = 1;
+	tlb = tlbs_all[1];
+      }
+      assert (tlb != NULL
+	      && tlb != rmw->tme_m68k_rmw_tlbs[!address_i]);
+
+      /* NB: cas2 can need two TLB entries.  we may find one good TLB
+	 entry for one address, but need to call out to fill a TLB for
+	 the second address, and unfortunately we have to unbusy the
+	 good one while we're doing the fill.  while the good one is
+	 unbusy, it can be invalidated, and we'll have to fill it
+	 again, unbusying the good one we just filled, possibly
+	 leading to a vicious cycle.
+
+	 it's also possible that the TLB entry we fill here could be
+	 invalidated after it's been filled and before we've busied it
+	 again.  this is also the case for the single-TLB operations:
+	 normal memory reads and writes, and tas and cas, and to
+	 handle that we simply loop around the fill.  since these
+	 operations only use a single TLB entry, we assume that there
+	 won't be a vicious cycle - that eventually a single filled
+	 TLB entry will stay valid until we can busy it and use it.
+
+	 but we can't really guarantee this for two TLB entries.
+	 there's not much we can do about this, except put a limit on
+	 the number of times we will fill for each address.  this
+	 limit is somewhat arbitrary: */
+      /* XXX FIXME - this should be a macro, or a per-m68k argument: */
+      if (rmw->tme_m68k_rmw_address_count == 2
+	  && address_fills[address_i]++ >= 20) {
+
+	/* we can't support this instruction on this memory: */
+	supported = FALSE;
+	break;
+      }
+
+      /* if the other TLB entry is busy, unbusy it: */
+      if (tlbs_busy[!tlb_i]) {
+	tme_bus_tlb_unbusy(&tlbs_all[tlb_i]->tme_m68k_tlb_bus_tlb);
+	tlbs_busy[!tlb_i] = FALSE;
+      }
+
+      /* fill this TLB entry: */
+      tme_m68k_tlb_fill(ic,
+			tlb,
+			ic->_tme_m68k_ea_function_code,
+			address,
+			address_cycles[address_i]);
+
+      /* restart: */
+      continue;
+    }
+
+    /* walk the addresses: */
+    address_i = 0;
+    do {
+
+      /* get this address and its TLB entry: */
+      address = rmw->tme_m68k_rmw_addresses[address_i];
+      tlb = rmw->tme_m68k_rmw_tlbs[address_i];
+
+      /* if this TLB entry doesn't cover the entire operand: */
+      if ((tlb->tme_m68k_tlb_linear_last - address) < rmw->tme_m68k_rmw_size) {
+
+	/* we can't support this instruction on this memory, because
+	   we can't split an atomic operation across TLB entries.  on
+	   a real m68k, the CPU can do repeated bus cycles under one
+	   bus lock: */
+	supported = FALSE;
+	break;
+      }
+
+      /* if this TLB entry supports both fast reading and fast
+         writing: */
+      if (tlb->tme_m68k_tlb_emulator_off_read != TME_EMULATOR_OFF_UNDEF
+	  && tlb->tme_m68k_tlb_emulator_off_write != TME_EMULATOR_OFF_UNDEF) {
+
+	/* if fast reading and fast writing aren't to the same memory: */
+	if (tlb->tme_m68k_tlb_emulator_off_read
+	    != tlb->tme_m68k_tlb_emulator_off_write) {
+	  
+	  /* we can't support this instruction on this memory, because
+	     we can't split an atomic operation across two memories.
+	     on a real m68k, the CPU can do repeated bus cycles under
+	     one bus lock: */
+	  supported = FALSE;
+	  break;
+	}
+      }
+
+      /* otherwise, this TLB entry does not support both fast reading
+	 and fast writing: */
+
+      /* if we have already done a slow read for this address: */
+      else if (rmw->tme_m68k_rmw_slow_reads[address_i]) {
+
+	/* this TLB entry must support writing: */
+	assert (tlb->tme_m68k_tlb_cycles_ok & TME_BUS_CYCLE_WRITE);
+
+	/* nothing to do: */
+      }
+
+      /* otherwise, we have not already done a slow read for this
+         address: */
+
+      /* if this TLB entry doesn't support slow reading: */
+      else if ((tlb->tme_m68k_tlb_cycles_ok & TME_BUS_CYCLE_READ) == 0) {
+
+	/* we must fill a TLB entry for reading: */
+	assert (address_cycles[address_i] == TME_BUS_CYCLE_WRITE);
+	address_cycles[address_i] = TME_BUS_CYCLE_READ;
+
+	/* restart: */
+	break;
+      }
+
+      /* otherwise, this TLB entry does support slow reading: */
+      else {
+
+	/* if the other TLB entry is busy, unbusy it: */
+	tlb_i = (tlb == tlbs_all[1]);
+	if (tlbs_busy[!tlb_i]) {
+	  tme_bus_tlb_unbusy(&tlbs_all[tlb_i]->tme_m68k_tlb_bus_tlb);
+	  tlbs_busy[!tlb_i] = FALSE;
+	}
+
+	/* this instruction can fault: */
+	TME_M68K_INSN_CANFAULT;
+
+	/* do a slow read.  if this is the first address, we start a
+	   slow read-modify-write cycle, otherwise we do a normal slow
+	   read cycle: */
+	assert (rmw->tme_m68k_rmw_size <= sizeof(ic->tme_m68k_ireg_memx32));
+	tme_m68k_read(ic,
+		      tlb,
+		      &ic->_tme_m68k_ea_function_code,
+		      &rmw->tme_m68k_rmw_addresses[address_i],
+		      (((tme_uint8_t *) 
+			(address_i == 0
+			 ? &ic->tme_m68k_ireg_memx32
+			 : &ic->tme_m68k_ireg_memy32))
+		       + (TME_ENDIAN_NATIVE == TME_ENDIAN_BIG
+			  ? (sizeof(ic->tme_m68k_ireg_memx32)
+			     - rmw->tme_m68k_rmw_size)
+			  : 0)),
+		      rmw->tme_m68k_rmw_size,
+		      (address_i == 0
+		       ? TME_M68K_BUS_CYCLE_RMW
+		       : TME_M68K_BUS_CYCLE_NORMAL));
+
+	/* we have done a slow read for this address: */
+	rmw->tme_m68k_rmw_slow_reads[address_i] = TRUE;
+
+	/* now we need a TLB entry for this address that supports writing: */
+	address_cycles[address_i] = TME_BUS_CYCLE_WRITE;
+
+	/* restart: */
+	break;
+      }
+
+    } while (++address_i < rmw->tme_m68k_rmw_address_count);
+
+    /* if this instruction is not supported or we've handled all
+       addresses, stop now: */
+    if (!supported
+	|| address_i >= rmw->tme_m68k_rmw_address_count) {
+      break;
+    }
+  }
+
+  /* unbusy any TLB entries that aren't being used: */
+  if (tlbs_busy[0]
+      && (!supported
+	  || (tlbs_all[0] != rmw->tme_m68k_rmw_tlbs[0]
+	      && tlbs_all[0] != rmw->tme_m68k_rmw_tlbs[1]))) {
+    tme_bus_tlb_unbusy(&tlbs_all[0]->tme_m68k_tlb_bus_tlb);
+  }
+  if (tlbs_busy[1]
+      && (!supported
+	  || (tlbs_all[1] != rmw->tme_m68k_rmw_tlbs[0]
+	      && tlbs_all[1] != rmw->tme_m68k_rmw_tlbs[1]))) {
+    tme_bus_tlb_unbusy(&tlbs_all[1]->tme_m68k_tlb_bus_tlb);
+  }
+
+  /* if this instruction is not supported on this memory: */
+  if (!supported) {
+
+    /* cause an illegal instruction exception: */
+    TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_ILL);
+  }
+
+  /* if this is the cas2 instruction: */
+  if (rmw->tme_m68k_rmw_address_count == 2) {
+
+    /* cas2 is a difficult instruction to emulate, since it accesses
+       two different addresses during one atomic read-modify-write
+       cycle.
+
+       most host CPUs can't do this, so when threads are not
+       cooperative, we're forced to suspend all other threads when
+       running a cas2 instruction: */
+    if (!TME_THREADS_COOPERATIVE) {
+      tme_thread_suspend_others();
+    }
+
+    /* the cas2 functions also assume that we have read all operands
+       into the memory buffers, which means we have to fast-read any
+       addresses that we haven't already slow-read: */
+    address_i = 0;
+    do {
+
+      /* skip this address if we really did slow read it: */
+      if (rmw->tme_m68k_rmw_slow_reads[address_i]) {
+	continue;
+      }
+
+      /* get this address and its TLB entry: */
+      address = rmw->tme_m68k_rmw_addresses[address_i];
+      tlb = rmw->tme_m68k_rmw_tlbs[address_i];
+
+      /* this TLB entry must support fast reading and fast writing: */
+      assert (tlb->tme_m68k_tlb_emulator_off_read != TME_EMULATOR_OFF_UNDEF
+	      && tlb->tme_m68k_tlb_emulator_off_write == tlb->tme_m68k_tlb_emulator_off_read);
+
+      /* do the fast read.  all other threads are suspended here, so
+	 we can do a memcpy instead of an atomic read: */
+      assert (rmw->tme_m68k_rmw_size <= sizeof(ic->tme_m68k_ireg_memx32));
+      buffer_reg
+	= (address_i == 0
+	   ? &ic->tme_m68k_ireg_memx32
+	   : &ic->tme_m68k_ireg_memy32);
+      memcpy((((tme_uint8_t *) buffer_reg)
+	      + (sizeof(ic->tme_m68k_ireg_memx32)
+		 - rmw->tme_m68k_rmw_size)),
+	     (((tme_uint8_t *)
+	       tlb->tme_m68k_tlb_emulator_off_read)
+	      + address),
+	     rmw->tme_m68k_rmw_size);
+
+      /* byteswap the value read: */
+      *buffer_reg = tme_betoh_u32(*buffer_reg);
+    
+    } while (++address_i < rmw->tme_m68k_rmw_address_count);
+  }
+
+  /* return success: */
+  return (0);
 }
 
-/* this finishes a read/modify/write cycle.  this works in conjunction
-   with the tme_m68k_readSIZE() and tme_m68k_writeSIZE() functions to
-   aggregate many bus transactions into a larger transaction: */
+/* this finishes a read/modify/write cycle: */
 void
-tme_m68k_rmw_finish(struct tme_m68k *ic, struct tme_m68k_tlb *tlb)
+tme_m68k_rmw_finish(struct tme_m68k *ic, 
+		    struct tme_m68k_rmw *rmw,
+		    int do_write)
 {
-  
-  /* if we didn't acquire the rwlock, something is wrong: */
-  assert(tlb->tme_m68k_tlb_bus_rwlock != NULL);
-  
-  /* unlock the lock: */
-  tme_rwlock_unlock(tlb->tme_m68k_tlb_bus_rwlock);
+  struct tme_m68k_tlb *tlbs_all[2];
+  int tlbs_busy[2];
+  struct tme_m68k_tlb *tlb;
+  unsigned int tlb_i;
+  unsigned int address_i;
+  tme_uint32_t address;
+  int supported;
+  tme_uint32_t *buffer_reg;
+
+  /* recover the tlbs_all[] array and tlbs_busy[] information: */
+  tlbs_all[0] = rmw->tme_m68k_rmw_tlbs[0];
+  tlbs_busy[0] = TRUE;
+  if (rmw->tme_m68k_rmw_tlbs[1] != NULL
+      && rmw->tme_m68k_rmw_tlbs[1] != rmw->tme_m68k_rmw_tlbs[0]) {
+    tlbs_all[1] = rmw->tme_m68k_rmw_tlbs[1];
+    tlbs_busy[1] = TRUE;
+  }
+  else {
+    tlbs_all[1] = NULL;
+    tlbs_busy[1] = FALSE;
+  }
+
+  /* assume that this instruction is supported: */
+  supported = TRUE;
+
+  /* loop over the addresses: */
+  address_i = 0;
+  do {
+
+    /* get this address and TLB entry: */
+    address = rmw->tme_m68k_rmw_addresses[address_i];
+    tlb = rmw->tme_m68k_rmw_tlbs[address_i];
+
+    /* get the buffer for this address: */
+    buffer_reg
+      = (address_i == 0
+	 ? &ic->tme_m68k_ireg_memx32
+	 : &ic->tme_m68k_ireg_memy32);
+
+    /* if we did a slow read for this operand: */
+    if (rmw->tme_m68k_rmw_slow_reads[address_i]) {
+
+      /* if the other TLB entry is busy, unbusy it: */
+      tlb_i = (tlb == tlbs_all[1]);
+      if (tlbs_busy[!tlb_i]) {
+	tme_bus_tlb_unbusy(&tlbs_all[tlb_i]->tme_m68k_tlb_bus_tlb);
+	tlbs_busy[!tlb_i] = FALSE;
+      }
+
+      /* do the slow write for this operand: */
+      assert (rmw->tme_m68k_rmw_size <= sizeof(ic->tme_m68k_ireg_memx32));
+      tme_m68k_write(ic,
+		     tlb,
+		     &ic->_tme_m68k_ea_function_code,
+		     &rmw->tme_m68k_rmw_addresses[address_i],
+		     (((tme_uint8_t *) buffer_reg)
+		      + (TME_ENDIAN_NATIVE == TME_ENDIAN_BIG
+			 ? (sizeof(ic->tme_m68k_ireg_memx32)
+			    - rmw->tme_m68k_rmw_size)
+			 : 0)),
+		     rmw->tme_m68k_rmw_size,
+		     (address_i == 0
+		      ? TME_M68K_BUS_CYCLE_RMW
+		      : TME_M68K_BUS_CYCLE_NORMAL));
+
+      /* if this is the cas2 instruction: */
+      if (rmw->tme_m68k_rmw_address_count == 2) {
+
+	/* if a cas2 slow write doesn't fault, it just did a slow
+	   write to device memory, which is actually bad because we
+	   can't do an atomic cas2 involving any device memory at all
+	   (we can't do the dual reads and dual writes all atomically).
+
+	   we tried to do the slow write anyways hoping that the slow
+	   write was really to write-protected memory that would
+	   fault, and when we would restart this address would point
+	   to fast-writable memory.
+
+	   unfortunately, we can't undo the slow write.  we do cause
+	   an illegal instruction exception, to make this problem
+	   visible: */
+	supported = FALSE;
+	break;
+      }
+    }
+
+    /* otherwise, if this is the cas2 instruction, and we're writing: */
+    else if (rmw->tme_m68k_rmw_address_count == 2
+	     && do_write) {
+
+      /* this TLB entry must support fast reading and fast writing: */
+      assert (tlb->tme_m68k_tlb_emulator_off_read != TME_EMULATOR_OFF_UNDEF
+	      && tlb->tme_m68k_tlb_emulator_off_write == tlb->tme_m68k_tlb_emulator_off_read);
+
+      /* byteswap the value to write: */
+      *buffer_reg = tme_htobe_u32(*buffer_reg);
+
+      /* do the fast write.  all other threads are suspended here, so
+	 we can do a memcpy instead of an atomic write: */
+      assert (rmw->tme_m68k_rmw_size <= sizeof(ic->tme_m68k_ireg_memx32));
+      memcpy((((tme_uint8_t *)
+	       tlb->tme_m68k_tlb_emulator_off_read)
+	      + address),
+	     (((tme_uint8_t *) buffer_reg)
+	      + (sizeof(ic->tme_m68k_ireg_memx32)
+		 - rmw->tme_m68k_rmw_size)),
+	     rmw->tme_m68k_rmw_size);
+    }
+
+  } while (++address_i < rmw->tme_m68k_rmw_address_count);
+
+  /* unbusy all TLB entries: */
+  if (tlbs_busy[0]) {
+    tme_bus_tlb_unbusy(&tlbs_all[0]->tme_m68k_tlb_bus_tlb);
+  }
+  if (tlbs_busy[1]) {
+    tme_bus_tlb_unbusy(&tlbs_all[1]->tme_m68k_tlb_bus_tlb);
+  }
+
+  /* cas2 is a difficult instruction to emulate, since it accesses two
+     different addresses during one atomic read-modify-write cycle.
+     most host CPUs can't do this, so when threads are not
+     cooperative, we're forced to suspend all other threads when
+     running a cas2 instruction: */
+  if (!TME_THREADS_COOPERATIVE
+      && rmw->tme_m68k_rmw_address_count > 1) {
+    tme_thread_resume_others();
+  }
+
+  /* if this instruction is not supported on this memory: */
+  if (!supported) {
+
+    /* cause an illegal instruction exception: */
+    TME_M68K_INSN_EXCEPTION(TME_M68K_EXCEPTION_ILL);
+  }
 }
 
 /* this handles a bitfield offset.  if the bitfield is in memory,
@@ -1794,5 +2341,56 @@ tme_m68k_dump(struct tme_m68k *ic)
   fprintf(stderr, "opcode = 0x%04x  specop = 0x%04x\n",
 	  ic->_tme_m68k_insn_opcode,
 	  ic->_tme_m68k_insn_specop);
+}
+
+void
+tme_m68k_dump_memory(struct tme_m68k *ic, tme_uint32_t address, tme_uint32_t resid)
+{
+  unsigned int saved_ea_function_code;
+  tme_uint32_t saved_ea_address;
+  tme_uint32_t address_display;
+  tme_uint8_t buffer[16];
+  tme_uint32_t count;
+  tme_uint32_t byte_i;
+
+  /* save any EA function code and address: */
+  saved_ea_function_code = ic->_tme_m68k_ea_function_code;
+  saved_ea_address = ic->_tme_m68k_ea_address;
+
+  /* we always display aligned rows: */
+  address_display = address & (((tme_uint32_t) 0) - sizeof(buffer));
+
+  /* while we have memory to dump: */
+  for (; resid > 0; ) {
+
+    /* read more data: */
+    byte_i = address % sizeof(buffer);
+    count = TME_MIN(resid, sizeof(buffer) - byte_i);
+    ic->_tme_m68k_ea_function_code = TME_M68K_FUNCTION_CODE_DATA(ic);
+    ic->_tme_m68k_ea_address = address;
+    tme_m68k_read_mem(ic, &buffer[byte_i], count);
+    count += byte_i;
+
+    /* display the row: */
+    fprintf(stderr, "0x%08x ", address_display);
+    for (byte_i = 0;
+	 byte_i < count;
+	 byte_i++, address_display++) {
+      if (address_display < address) {
+	fprintf(stderr, "   ");
+      }
+      else {
+	fprintf(stderr, " %02x",
+		buffer[byte_i]);
+	address++;
+	resid--;
+      }
+    }
+    fputc('\n', stderr);
+  }
+
+  /* restore any EA function code and address: */
+  ic->_tme_m68k_ea_function_code = saved_ea_function_code;
+  ic->_tme_m68k_ea_address = saved_ea_address;
 }
 #endif /* 1 */

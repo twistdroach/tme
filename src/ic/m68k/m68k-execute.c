@@ -1,4 +1,4 @@
-/* $Id: m68k-execute.c,v 1.20 2005/04/30 15:18:33 fredette Exp $ */
+/* $Id: m68k-execute.c,v 1.23 2007/02/21 01:28:59 fredette Exp $ */
 
 /* ic/m68k/m68k-execute.c - executes Motorola 68k instructions: */
 
@@ -33,7 +33,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-_TME_RCSID("$Id: m68k-execute.c,v 1.20 2005/04/30 15:18:33 fredette Exp $");
+_TME_RCSID("$Id: m68k-execute.c,v 1.23 2007/02/21 01:28:59 fredette Exp $");
 
 /* includes: */
 #include "m68k-auto.h"
@@ -46,13 +46,10 @@ _TME_M68K_EXECUTE_NAME(struct tme_m68k *ic)
 #undef _TME_M68K_INSN_FETCH_SAVE
 #ifdef _TME_M68K_EXECUTE_FAST
   struct tme_m68k_tlb *tlb;
-  const tme_uint8_t *emulator_load, *emulator_load_last;
-  const tme_uint8_t *emulator_load_start;
-  tme_uint16_t insn_fetch_sizes;
+  const tme_shared tme_uint8_t *fetch_fast_next;
 #define _TME_M68K_INSN_FETCH_SAVE \
 do { \
-  ic->_tme_m68k_insn_buffer_fetch_total = emulator_load - emulator_load_start; \
-  ic->_tme_m68k_insn_buffer_fetch_sizes = insn_fetch_sizes; \
+  ic->_tme_m68k_insn_fetch_fast_next = fetch_fast_next; \
 } while (/* CONSTCOND */ 0)
 #define _TME_M68K_SEQUENCE_RESTARTING	(FALSE)
 #else  /* !_TME_M68K_EXECUTE_FAST */
@@ -77,7 +74,6 @@ do { \
   tme_uint16_t opw, extword;
   void (*func) _TME_P((struct tme_m68k *, void *, void *));
   tme_uint32_t params;
-  unsigned int first_ea_extword_offset;
   int ea_size;
   int ea_reg, ea_pre_index;
   unsigned int ea_index_long, ea_index_scale;
@@ -110,7 +106,7 @@ do { \
       = ic->_tme_m68k_instruction_burst;
 
     /* if this is a cooperative threading system, yield: */
-#ifdef TME_THREADS_COOPERATIVE
+#if TME_THREADS_COOPERATIVE
     tme_thread_yield();
 #endif /* TME_THREADS_COOPERATIVE */
   }
@@ -118,7 +114,8 @@ do { \
 #ifdef _TME_M68K_EXECUTE_FAST
 
   /* get our instruction TLB entry and reload it: */
-  tlb = TME_ATOMIC_READ(struct tme_m68k_tlb *, ic->_tme_m68k_itlb);
+  tlb = tme_memory_atomic_pointer_read(struct tme_m68k_tlb *, ic->_tme_m68k_itlb, &ic->_tme_m68k_tlbs_rwlock);
+  tme_m68k_tlb_busy(tlb);
   if (!TME_M68K_TLB_OK_FAST_READ(tlb, function_code_program, ic->tme_m68k_ireg_pc, ic->tme_m68k_ireg_pc)) {
     tme_m68k_tlb_fill(ic, tlb,
 		      function_code_program,
@@ -129,11 +126,14 @@ do { \
   /* if we have to go slow, run the slow executor: */
   if (TME_M68K_SEQUENCE_RESTARTING
       || tme_m68k_go_slow(ic)) {
-    return (_TME_M68K_EXECUTE_SLOW(ic));
+    tme_m68k_tlb_unbusy(tlb);
+    _TME_M68K_EXECUTE_SLOW(ic);
+    return;
   }
 
   /* set up to do fast reads from the instruction TLB entry: */
-  emulator_load_last = tlb->tme_m68k_tlb_emulator_off_read + TME_ATOMIC_READ(tme_bus_addr_t, tlb->tme_m68k_tlb_linear_last);
+  ic->_tme_m68k_insn_fetch_fast_last = tlb->tme_m68k_tlb_emulator_off_read + tlb->tme_m68k_tlb_linear_last - (sizeof(tme_uint32_t) - 1);
+  ic->_tme_m68k_insn_fetch_fast_itlb = tlb;
   ic->_tme_m68k_group0_hook = tme_m68k_group0_hook_fast;
 #else  /* !_TME_M68K_EXECUTE_FAST */
 
@@ -146,19 +146,24 @@ do { \
 
     /* reset for this instruction: */
 #ifdef _TME_M68K_EXECUTE_FAST
-    if (__tme_predict_false(TME_ATOMIC_READ(tme_bus_addr_t, tlb->tme_m68k_tlb_linear_last) == 0)) {
-      tme_m68k_redispatch(ic);
-    }
-    emulator_load_start = emulator_load = tlb->tme_m68k_tlb_emulator_off_read + ic->tme_m68k_ireg_pc;
-    insn_fetch_sizes = 0;
-    assert(TME_M68K_TLB_OK_FAST_READ(tlb, function_code_program, ic->tme_m68k_ireg_pc, ic->tme_m68k_ireg_pc)
-	   || (emulator_load - 1) == emulator_load_last);
-    tme_m68k_verify_begin(ic, emulator_load_start);
+    fetch_fast_next = tlb->tme_m68k_tlb_emulator_off_read + ic->tme_m68k_ireg_pc;
+    ic->_tme_m68k_insn_fetch_fast_start = fetch_fast_next;
+    assert (ic->_tme_m68k_insn_fetch_fast_itlb == tlb
+	    && tlb->tme_m68k_tlb_emulator_off_read != TME_EMULATOR_OFF_UNDEF
+	    && (tlb->tme_m68k_tlb_function_codes_mask & TME_BIT(function_code_program)) != 0
+	    && (fetch_fast_next > ic->_tme_m68k_insn_fetch_fast_last
+		|| ((tme_bus_tlb_is_valid(&tlb->tme_m68k_tlb_bus_tlb)
+		     || !TME_THREADS_COOPERATIVE)
+		    && ic->tme_m68k_ireg_pc >= tlb->tme_m68k_tlb_linear_first
+		    && (ic->tme_m68k_ireg_pc + sizeof(tme_uint16_t) - 1) <= tlb->tme_m68k_tlb_linear_last)));
+    tme_m68k_verify_begin(ic, fetch_fast_next);
 #else  /* !_TME_M68K_EXECUTE_FAST */
     linear_pc = ic->tme_m68k_ireg_pc;
-    ic->_tme_m68k_insn_buffer_off = 0;
-    ic->_tme_m68k_insn_buffer_fetch_total = 0;
-    ic->_tme_m68k_insn_buffer_fetch_sizes = 0;
+    ic->_tme_m68k_insn_fetch_slow_next = 0;
+    if (!_TME_M68K_SEQUENCE_RESTARTING) {
+      ic->_tme_m68k_insn_fetch_slow_count_fast = 0;
+      ic->_tme_m68k_insn_fetch_slow_count_total = 0;
+    }
     exceptions = 0;
     if (__tme_predict_false((ic->tme_m68k_ireg_sr & ic->_tme_m68k_sr_mask_t) == TME_M68K_FLAG_T1)) {
       ic->tme_m68k_ireg_pc_last = ic->tme_m68k_ireg_pc;
@@ -177,11 +182,10 @@ do { \
     ic->tme_m68k_stats.tme_m68k_stats_insns_slow++;
 #endif /* !_TME_M68K_EXECUTE_FAST */
 #endif /* _TME_M68K_STATS */
-    first_ea_extword_offset = sizeof(opw);
     ic->_tme_m68k_instruction_burst_remaining--;
     
     /* fetch and decode the first word of this instruction: */
-    _TME_M68K_EXECUTE_FETCH_U16(opw);
+    _TME_M68K_EXECUTE_FETCH_U16_FIXED(opw, _tme_m68k_insn_opcode);
     ic->_tme_m68k_insn_opcode = opw;
     params = _TME_M68K_EXECUTE_OPMAP[opw];
     func = tme_m68k_opcode_insns[TME_M68K_OPCODE_INSN_WHICH(params)];
@@ -214,8 +218,7 @@ do { \
 	else {
 
 	  /* fetch the FPgen command word: */
-	  _TME_M68K_EXECUTE_FETCH_U16(ic->_tme_m68k_insn_specop);
-	  first_ea_extword_offset = 4;
+	  _TME_M68K_EXECUTE_FETCH_U16_FIXED(ic->_tme_m68k_insn_specop, _tme_m68k_insn_specop);
 
 	  /* temporarily store the FPgen command word in extword: */
 	  extword = ic->_tme_m68k_insn_specop;
@@ -459,8 +462,7 @@ do { \
 	if ((params & TME_M68K_OPCODE_EA_Y) == 0) {
 
 	  /* many instructions have a single special extension word: */
-	  _TME_M68K_EXECUTE_FETCH_U16(ic->_tme_m68k_insn_specop);
-	  first_ea_extword_offset = 4;
+	  _TME_M68K_EXECUTE_FETCH_U16_FIXED(ic->_tme_m68k_insn_specop, _tme_m68k_insn_specop);
 	}
     }
 
@@ -586,19 +588,26 @@ do { \
 	  break;
 	}	    
 	  
+	/* the remaining modes use the PC of the first extension word
+	   as a base register: */
+#ifdef _TME_M68K_EXECUTE_FAST
+	ic->tme_m68k_ireg_pc_next = ic->tme_m68k_ireg_pc + (fetch_fast_next - ic->_tme_m68k_insn_fetch_fast_start);
+#else  /* !_TME_M68K_EXECUTE_FAST */
+	ic->tme_m68k_ireg_pc_next = linear_pc;
+#endif /* !_TME_M68K_EXECUTE_FAST */
+
 	/* program counter indirect with 16-bit displacement: */
 	if (ea_reg == TME_M68K_IREG_A2) {
 	  _TME_M68K_EXECUTE_FETCH_S16(ea_bd);
-	  /* XXX simulates preincremented pc: */
-	  ea_address = ic->tme_m68k_ireg_pc + first_ea_extword_offset + ea_bd;
+	  ea_address = ic->tme_m68k_ireg_pc_next + ea_bd;
 	  ea_function_code = function_code_program;
 	  break;
 	}
 	  
-	/* everything else is just like mode 6 except with the PC as
-	   the base register: */
+	/* everything else is just like mode 6 except with the PC of
+	   the first extension word as the base register: */
 	assert (ea_reg == TME_M68K_IREG_A3);
-	ea_reg = TME_M68K_IREG_PC;
+	ea_reg = TME_M68K_IREG_PC_NEXT;
 	eai_function_code = function_code_program;
 	/* FALLTHROUGH */
 	  
@@ -690,11 +699,7 @@ do { \
 		 ? ic->tme_m68k_ireg_int32(ea_pre_index)
 		 : ((tme_int32_t) ic->tme_m68k_ireg_int16(ea_pre_index << 1)))
 		<< ea_index_scale)
-	     + ea_bd
-	     + (ea_reg == TME_M68K_IREG_PC
-		/* XXX simulates preincremented pc: */
-		? first_ea_extword_offset
-		: 0));
+	     + ea_bd);
 	  
 	  /* if this is a memory indirect, read the indirect EA.
 	     don't disturb the EA in the IC state if we're restarting,
@@ -744,11 +749,7 @@ do { \
 	     + ((ea_index_long
 		 ? ic->tme_m68k_ireg_int32(ea_pre_index)
 		 : ((tme_int32_t) ic->tme_m68k_ireg_int16(ea_pre_index << 1)))
-		<< ea_index_scale)
-	     + (ea_reg == TME_M68K_IREG_PC
-		/* XXX simulates preincremented pc: */
-		? first_ea_extword_offset
-		: 0));
+		<< ea_index_scale));
 	  ea_function_code = eai_function_code;
 	}
 	break;
@@ -795,7 +796,7 @@ do { \
 
     /* set the next PC: */
 #ifdef _TME_M68K_EXECUTE_FAST
-    ic->tme_m68k_ireg_pc_next = ic->tme_m68k_ireg_pc + (emulator_load - emulator_load_start);
+    ic->tme_m68k_ireg_pc_next = ic->tme_m68k_ireg_pc + (fetch_fast_next - ic->_tme_m68k_insn_fetch_fast_start);
 #else  /* !_TME_M68K_EXECUTE_FAST */
     ic->tme_m68k_ireg_pc_next = linear_pc;
 #endif /* !_TME_M68K_EXECUTE_FAST */
@@ -872,9 +873,28 @@ do { \
       = ic->_tme_m68k_instruction_burst;
 
     /* if this is a cooperative threading system, yield: */
-#ifdef TME_THREADS_COOPERATIVE
+#if TME_THREADS_COOPERATIVE
+#ifdef _TME_M68K_EXECUTE_FAST
+    /* unbusy and forget the fast instruction TLB entry: */
+    assert (ic->_tme_m68k_insn_fetch_fast_itlb == tlb);
+    tme_m68k_tlb_unbusy(tlb);
+    ic->_tme_m68k_insn_fetch_fast_itlb = NULL;
+#endif /* _TME_M68K_EXECUTE_FAST */
     tme_thread_yield();
 #endif /* TME_THREADS_COOPERATIVE */
+
+#ifdef _TME_M68K_EXECUTE_FAST
+    /* if this instruction TLB entry has been invalidated, redispatch.
+       this can only happen in a multiprocessing (preemptive or true
+       multiprocessor) environment, and it means that during the
+       previous burst, another thread invalidated this instruction TLB
+       entry, but we didn't make any callouts at all (for TLB fills,
+       slow bus cycles, etc.) where we would have noticed this
+       earlier: */
+    if (tme_bus_tlb_is_invalid(&tlb->tme_m68k_tlb_bus_tlb)) {
+      tme_m68k_redispatch(ic);
+    }
+#endif /* _TME_M68K_EXECUTE_FAST */
 
   }
   /* NOTREACHED */
@@ -892,7 +912,7 @@ do { \
   _TME_M68K_INSN_FETCH_SAVE;
   ic->_tme_m68k_group0_flags = TME_M68K_BUS_CYCLE_FETCH | TME_M68K_BUS_CYCLE_READ;
   ic->_tme_m68k_group0_function_code = function_code_program;
-  ic->_tme_m68k_group0_address = ic->tme_m68k_ireg_pc + (emulator_load - emulator_load_start);
+  ic->_tme_m68k_group0_address = ic->tme_m68k_ireg_pc + (fetch_fast_next - ic->_tme_m68k_insn_fetch_fast_start);
   ic->_tme_m68k_group0_sequence = ic->_tme_m68k_sequence;
   ic->_tme_m68k_group0_sequence._tme_m68k_sequence_transfer_faulted_after = 0;
   ic->_tme_m68k_group0_buffer_read_size = 0;

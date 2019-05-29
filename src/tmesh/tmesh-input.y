@@ -1,5 +1,5 @@
 %{
-/* $Id: tmesh-input.y,v 1.3 2005/02/18 02:15:47 fredette Exp $ */
+/* $Id: tmesh-input.y,v 1.4 2006/11/15 23:11:31 fredette Exp $ */
 
 /* tmesh/tmesh-input.y - the tme shell scanner and parser: */
 
@@ -35,7 +35,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: tmesh-input.y,v 1.3 2005/02/18 02:15:47 fredette Exp $");
+_TME_RCSID("$Id: tmesh-input.y,v 1.4 2006/11/15 23:11:31 fredette Exp $");
 
 /* includes: */
 #include <tme/threads.h>
@@ -87,6 +87,7 @@ static void _tmesh_parser_argv_arg _TME_P((struct tmesh_parser_argv *, char *, i
 %token TMESH_TOKEN_MV
 %token TMESH_TOKEN_COMMAND
 %token TMESH_TOKEN_LOG
+%token TMESH_TOKEN_ALIAS
 %token TMESH_TOKEN_AT
 %token TMESH_TOKEN_PATHNAME
 %token TMESH_TOKEN_ARG
@@ -106,6 +107,7 @@ command:	command_source	{ *_tmesh_input_parsed = $1; YYACCEPT; }
 		| command_mv	{ *_tmesh_input_parsed = $1; YYACCEPT; }
 		| command_command { *_tmesh_input_parsed = $1; YYACCEPT; }
 		| command_log	{ *_tmesh_input_parsed = $1; YYACCEPT; }
+		| command_alias	{ *_tmesh_input_parsed = $1; YYACCEPT; }
 		| error	';'	{ YYABORT; }
 		| ';'
 { _tmesh_input_parsed->tmesh_parser_value_token = TMESH_TOKEN_UNDEF; YYACCEPT; }
@@ -171,6 +173,15 @@ command_command: TMESH_TOKEN_COMMAND pathname_args ';'
 /* the 'log' command: */
 command_log: TMESH_TOKEN_LOG pathname_args ';'
 { $$ = $2; $$.tmesh_parser_value_token = $1.tmesh_parser_value_token; }
+		;
+
+/* the 'alias' command: */
+command_alias:	TMESH_TOKEN_ALIAS pathname pathname ';'
+{
+  $$ = $2;
+  $$.tmesh_parser_value_strings[1] = $3.tmesh_parser_value_strings[0];
+  $$.tmesh_parser_value_token = $1.tmesh_parser_value_token;
+}
 		;
 
 /* a pathname: */
@@ -370,6 +381,9 @@ _tmesh_scanner_token(struct tmesh_scanner *scanner)
     }  
     else if (!strcmp(string, "log")) {
       token = TMESH_TOKEN_LOG;
+    }  
+    else if (!strcmp(string, "alias")) {
+      token = TMESH_TOKEN_ALIAS;
     }  
     else if (string[0] == '-') {
       token = TMESH_TOKEN_OPTS;
@@ -636,6 +650,7 @@ _tmesh_yyparse(struct tmesh *tmesh, struct tmesh_parser_value *value, char **_ou
     case TMESH_TOKEN_RM:	command = TMESH_COMMAND_RM; break;
     case TMESH_TOKEN_COMMAND:	command = TMESH_COMMAND_COMMAND; break;
     case TMESH_TOKEN_LOG:	command = TMESH_COMMAND_LOG; break;
+    case TMESH_TOKEN_ALIAS:	command = TMESH_COMMAND_ALIAS; break;
     }
     value->tmesh_parser_value_command = command;
   }

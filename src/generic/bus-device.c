@@ -1,4 +1,4 @@
-/* $Id: bus-device.c,v 1.8 2004/04/30 12:11:35 fredette Exp $ */
+/* $Id: bus-device.c,v 1.9 2006/09/30 12:43:35 fredette Exp $ */
 
 /* generic/bus-device.c - implementation of a generic bus device support: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: bus-device.c,v 1.8 2004/04/30 12:11:35 fredette Exp $");
+_TME_RCSID("$Id: bus-device.c,v 1.9 2006/09/30 12:43:35 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -60,8 +60,10 @@ tme_bus_device_connection_score(struct tme_connection *conn, unsigned int *_scor
   /* a simple bus device can have multiple connections, but they all
      must be from the same bus.  the only way we check that is by
      comparing elements: */
-  conn_bus_other_old = TME_ATOMIC_READ(struct tme_bus_connection *,
-				       device->tme_bus_device_connection);
+  conn_bus_other_old
+    = tme_memory_atomic_pointer_read(struct tme_bus_connection *,
+				     device->tme_bus_device_connection,
+				     &device->tme_bus_device_connection_rwlock);
   conn_bus_other_new = (struct tme_bus_connection *) conn->tme_connection_other;
   if (conn_bus_other_old != NULL
       && (conn_bus_other_old->tme_bus_connection.tme_connection_element
@@ -98,9 +100,10 @@ tme_bus_device_connection_make(struct tme_connection *conn, unsigned int state)
   if (state == TME_CONNECTION_FULL) {
 
     /* save our connection: */
-    TME_ATOMIC_WRITE(struct tme_bus_connection *,
-		     device->tme_bus_device_connection,
-		     (struct tme_bus_connection *) conn->tme_connection_other);
+    tme_memory_atomic_pointer_write(struct tme_bus_connection *,
+				    device->tme_bus_device_connection,
+				    (struct tme_bus_connection *) conn->tme_connection_other,
+				    &device->tme_bus_device_connection_rwlock);
   }
 
   return (TME_OK);

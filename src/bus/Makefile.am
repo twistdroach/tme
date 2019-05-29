@@ -4,5 +4,5 @@
 AUTOMAKE_OPTIONS = 1.4 gnu
 
 SUBDIRS = @TME_BUS_SUBDIRS@
-DIST_SUBDIRS = multibus
+DIST_SUBDIRS = multibus sbus
 

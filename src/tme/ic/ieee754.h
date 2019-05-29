@@ -1,4 +1,4 @@
-/* $Id: ieee754.h,v 1.2 2005/05/14 01:43:33 fredette Exp $ */
+/* $Id: ieee754.h,v 1.3 2006/11/16 02:54:40 fredette Exp $ */
 
 /* tme/ic/ieee754.h - public header file for IEEE 754 emulation */
 
@@ -37,7 +37,7 @@
 #define _TME_IC_IEEE754_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: ieee754.h,v 1.2 2005/05/14 01:43:33 fredette Exp $");
+_TME_RCSID("$Id: ieee754.h,v 1.3 2006/11/16 02:54:40 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/float.h>
@@ -48,6 +48,15 @@ _TME_RCSID("$Id: ieee754.h,v 1.2 2005/05/14 01:43:33 fredette Exp $");
 /* underflow tininess-detection modes: */
 #define TME_IEEE754_CTL_DETECT_TININESS_AFTER_ROUNDING	(0)
 #define TME_IEEE754_CTL_DETECT_TININESS_BEFORE_ROUNDING	(1)
+
+/* floating point register file formats: */
+#define TME_IEEE754_FPREG_FORMAT_NULL		(0)
+#define TME_IEEE754_FPREG_FORMAT_SINGLE		(1)
+#define TME_IEEE754_FPREG_FORMAT_DOUBLE		(2)
+#define TME_IEEE754_FPREG_FORMAT_QUAD		(4)
+#define TME_IEEE754_FPREG_FORMAT_ENDIAN_BIG	TME_BIT(5)
+#define TME_IEEE754_FPREG_FORMAT_ENDIAN_LITTLE	(0)
+#define TME_IEEE754_FPREG_FORMAT_BUILTIN	TME_BIT(6)
 
 /* structures: */
 
@@ -167,6 +176,13 @@ void tme_ieee754_exception_float _TME_P((int, void *));
 
 /* the softfloat unlock function: */
 int tme_ieee754_unlock_softfloat _TME_P((void));
+
+/* for processors that manage a fundamentally single-precision
+   floating-point register file, but that allow size-aligned sets of
+   registers to combine into double- and quad-precision registers,
+   this manages the register set and converts register contents
+   between formats: */
+void tme_ieee754_fpreg_format _TME_P((struct tme_float *, unsigned int *, unsigned int, unsigned int));
 
 /* globals: */
 

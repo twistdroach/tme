@@ -1038,7 +1038,7 @@ Optional Features:
   --enable-fast-install[=PKGS]
                           optimize for fast installation [default=yes]
   --disable-libtool-lock  avoid locking (might break parallel builds)
-  --disable-debug         don't compile debuggable libraries and programs (default=do)
+  --enable-debug          compile debuggable libraries and programs (default=don't)
   --disable-warnings      don't compile with warnings turned on (default=do)
 
 Optional Packages:
@@ -1820,7 +1820,7 @@ fi
 
 # Define the identity of the package.
  PACKAGE=tme
- VERSION=0.4
+ VERSION=0.6
 
 
 cat >>confdefs.h <<_ACEOF
@@ -6796,6 +6796,88 @@ if test $ac_cv_sizeof_int != 2 && test $ac_cv_sizeof_short != 2; then
 echo "$as_me: error: can't find a 16-bit type" >&2;}
    { (exit 1); exit 1; }; }
 fi
+if test $ac_cv_sizeof_long = 8; then
+  echo "$as_me:$LINENO: checking minimum alignment of int64_t" >&5
+echo $ECHO_N "checking minimum alignment of int64_t... $ECHO_C" >&6
+if test "${ac_cv_alignof_int64_t+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  if test "$cross_compiling" = yes; then
+  ac_cv_alignof_int64_t=64
+else
+  cat >conftest.$ac_ext <<_ACEOF
+#line $LINENO "configure"
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+#include <stdio.h>
+#include <sys/types.h>
+main()
+{
+#if (SIZEOF_SHORT * 8) == 64
+#define _type short
+#elif (SIZEOF_INT * 8) == 64
+#define _type int
+#else
+#define _type long
+#endif
+  char try_align_buffer[sizeof(_type) * 2];
+  int min_align, try_align, status;
+  _type value;
+  FILE *f=fopen("conftestval", "w");
+  if (!f) exit(1);
+  min_align = sizeof(_type);
+  for(try_align = sizeof(_type); try_align-- > 1;) {
+    switch(fork()) {
+    case -1: exit(1);
+    case 0: value = *((_type *) &try_align_buffer[try_align]);
+      fprintf(stderr, "%d\n", (int) (value / 2)); exit(0);
+    default: break;
+    }
+    wait(&status);
+    if (!status && try_align < min_align) {
+      min_align = try_align;
+    }
+  }
+  fprintf(f, "%d\n", min_align * 8);
+  exit(0);
+}
+_ACEOF
+rm -f conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && { ac_try='./conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_cv_alignof_int64_t=`cat conftestval`
+else
+  echo "$as_me: program exited with status $ac_status" >&5
+echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+( exit $ac_status )
+ac_cv_alignof_int64_t=64
+fi
+rm -f core core.* *.core gmon.out bb.out conftest$ac_exeext conftest.$ac_objext conftest.$ac_ext
+fi
+fi
+ac_cv_alignof_int64_t=`expr $ac_cv_alignof_int64_t / 8`
+echo "$as_me:$LINENO: result: $ac_cv_alignof_int64_t" >&5
+echo "${ECHO_T}$ac_cv_alignof_int64_t" >&6
+
+cat >>confdefs.h <<_ACEOF
+#define ALIGNOF_INT64_T $ac_cv_alignof_int64_t
+_ACEOF
+
+
+fi
 echo "$as_me:$LINENO: checking minimum alignment of int32_t" >&5
 echo $ECHO_N "checking minimum alignment of int32_t... $ECHO_C" >&6
 if test "${ac_cv_alignof_int32_t+set}" = set; then
@@ -6832,7 +6914,7 @@ main()
     switch(fork()) {
     case -1: exit(1);
     case 0: value = *((_type *) &try_align_buffer[try_align]);
-      fprintf(stderr, "%d\n", (int) value); exit(0);
+      fprintf(stderr, "%d\n", (int) (value / 2)); exit(0);
     default: break;
     }
     wait(&status);
@@ -6912,7 +6994,7 @@ main()
     switch(fork()) {
     case -1: exit(1);
     case 0: value = *((_type *) &try_align_buffer[try_align]);
-      fprintf(stderr, "%d\n", (int) value); exit(0);
+      fprintf(stderr, "%d\n", (int) (value / 2)); exit(0);
     default: break;
     }
     wait(&status);
@@ -6988,9 +7070,11 @@ main()
   unsigned int shift, max_shift;
   FILE *f=fopen("conftestval", "w");
   if (!f) exit(1);
-  center = 3 << ((sizeof(center) * 4) - 1);
+  center = 3;
+  center <<= ((sizeof(center) * 4) - 1);
   max_shift = 2047;
-  for (shift = (sizeof(center) * 8);
+  sscanf("0", "%d", &shift);
+  for (shift += (sizeof(center) * 8);
        shift < 2048;
        shift <<= 1) {
     right = (center >> shift);
@@ -7074,9 +7158,11 @@ main()
   unsigned int shift, max_shift;
   FILE *f=fopen("conftestval", "w");
   if (!f) exit(1);
-  center = 3 << ((sizeof(center) * 4) - 1);
+  center = 3;
+  center <<= ((sizeof(center) * 4) - 1);
   max_shift = 2047;
-  for (shift = (sizeof(center) * 8);
+  sscanf("0", "%d", &shift);
+  for (shift += (sizeof(center) * 8);
        shift < 2048;
        shift <<= 1) {
     right = (center >> shift);
@@ -7160,9 +7246,11 @@ main()
   unsigned int shift, max_shift;
   FILE *f=fopen("conftestval", "w");
   if (!f) exit(1);
-  center = 3 << ((sizeof(center) * 4) - 1);
+  center = 3;
+  center <<= ((sizeof(center) * 4) - 1);
   max_shift = 2047;
-  for (shift = (sizeof(center) * 8);
+  sscanf("0", "%d", &shift);
+  for (shift += (sizeof(center) * 8);
        shift < 2048;
        shift <<= 1) {
     right = (center >> shift);
@@ -10840,7 +10928,7 @@ fi
 
 systems=all
 if echo " ${systems} " | grep ' all ' > /dev/null 2>&1; then
-  systems="sun2 sun3"
+  systems="sun2 sun3 sun4"
 fi
 TME_MACHINE_SUBDIRS=
 TME_IC_SUBDIRS=
@@ -10868,6 +10956,14 @@ for system in $systems; do
 	machines="sun sun3"
 	ics="m68k isil7170 z8530 i825x6 ieee754 ncr5380"
 	buses="multibus"
+	fb_xlats="1152x900d1b1s0p32om 1152x900d8b8s0p32ommi8 1152x900d1b1s0p32omccmi8"
+	;;
+
+    # the sun4:
+    sun4)
+	machines="sun sun4"
+	ics="sparc isil7170 z8530 am7930 am7990 ieee754 ncr53c9x mk48txx lsi64854 nec765"
+	buses="sbus"
 	fb_xlats="1152x900d1b1s0p32om 1152x900d8b8s0p32ommi8 1152x900d1b1s0p32omccmi8"
 	;;
 
@@ -11605,7 +11701,7 @@ ia64-*-hpux*)
   ;;
 *-*-irix6*)
   # Find out which ABI we are using.
-  echo '#line 11608 "configure"' > conftest.$ac_ext
+  echo '#line 11704 "configure"' > conftest.$ac_ext
   if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
   (eval $ac_compile) 2>&5
   ac_status=$?
@@ -12623,7 +12719,7 @@ fi
 
 
 # Provide some information about the compiler.
-echo "$as_me:12626:" \
+echo "$as_me:12722:" \
      "checking for Fortran 77 compiler version" >&5
 ac_compiler=`set X $ac_compile; echo $2`
 { (eval echo "$as_me:$LINENO: \"$ac_compiler --version </dev/null >&5\"") >&5
@@ -13628,11 +13724,11 @@ else
    -e 's:.*FLAGS}? :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:13631: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:13727: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>conftest.err)
    ac_status=$?
    cat conftest.err >&5
-   echo "$as_me:13635: \$? = $ac_status" >&5
+   echo "$as_me:13731: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s "$ac_outfile"; then
      # The compiler can only warn and ignore the option if not recognized
      # So say no if there are warnings
@@ -13860,11 +13956,11 @@ else
    -e 's:.*FLAGS}? :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:13863: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:13959: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>conftest.err)
    ac_status=$?
    cat conftest.err >&5
-   echo "$as_me:13867: \$? = $ac_status" >&5
+   echo "$as_me:13963: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s "$ac_outfile"; then
      # The compiler can only warn and ignore the option if not recognized
      # So say no if there are warnings
@@ -13927,11 +14023,11 @@ else
    -e 's:.*FLAGS}? :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:13930: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:14026: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>out/conftest.err)
    ac_status=$?
    cat out/conftest.err >&5
-   echo "$as_me:13934: \$? = $ac_status" >&5
+   echo "$as_me:14030: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s out/conftest2.$ac_objext
    then
      # The compiler can only warn and ignore the option if not recognized
@@ -15939,7 +16035,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<EOF
-#line 15942 "configure"
+#line 16038 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -16037,7 +16133,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<EOF
-#line 16040 "configure"
+#line 16136 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -18169,11 +18265,11 @@ else
    -e 's:.*FLAGS}? :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:18172: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:18268: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>conftest.err)
    ac_status=$?
    cat conftest.err >&5
-   echo "$as_me:18176: \$? = $ac_status" >&5
+   echo "$as_me:18272: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s "$ac_outfile"; then
      # The compiler can only warn and ignore the option if not recognized
      # So say no if there are warnings
@@ -18236,11 +18332,11 @@ else
    -e 's:.*FLAGS}? :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:18239: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:18335: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>out/conftest.err)
    ac_status=$?
    cat out/conftest.err >&5
-   echo "$as_me:18243: \$? = $ac_status" >&5
+   echo "$as_me:18339: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s out/conftest2.$ac_objext
    then
      # The compiler can only warn and ignore the option if not recognized
@@ -19479,7 +19575,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<EOF
-#line 19482 "configure"
+#line 19578 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -19577,7 +19673,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<EOF
-#line 19580 "configure"
+#line 19676 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -20399,11 +20495,11 @@ else
    -e 's:.*FLAGS}? :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:20402: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:20498: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>conftest.err)
    ac_status=$?
    cat conftest.err >&5
-   echo "$as_me:20406: \$? = $ac_status" >&5
+   echo "$as_me:20502: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s "$ac_outfile"; then
      # The compiler can only warn and ignore the option if not recognized
      # So say no if there are warnings
@@ -20466,11 +20562,11 @@ else
    -e 's:.*FLAGS}? :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:20469: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:20565: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>out/conftest.err)
    ac_status=$?
    cat out/conftest.err >&5
-   echo "$as_me:20473: \$? = $ac_status" >&5
+   echo "$as_me:20569: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s out/conftest2.$ac_objext
    then
      # The compiler can only warn and ignore the option if not recognized
@@ -22406,11 +22502,11 @@ else
    -e 's:.*FLAGS}? :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:22409: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:22505: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>conftest.err)
    ac_status=$?
    cat conftest.err >&5
-   echo "$as_me:22413: \$? = $ac_status" >&5
+   echo "$as_me:22509: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s "$ac_outfile"; then
      # The compiler can only warn and ignore the option if not recognized
      # So say no if there are warnings
@@ -22638,11 +22734,11 @@ else
    -e 's:.*FLAGS}? :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:22641: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:22737: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>conftest.err)
    ac_status=$?
    cat conftest.err >&5
-   echo "$as_me:22645: \$? = $ac_status" >&5
+   echo "$as_me:22741: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s "$ac_outfile"; then
      # The compiler can only warn and ignore the option if not recognized
      # So say no if there are warnings
@@ -22705,11 +22801,11 @@ else
    -e 's:.*FLAGS}? :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:22708: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:22804: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>out/conftest.err)
    ac_status=$?
    cat out/conftest.err >&5
-   echo "$as_me:22712: \$? = $ac_status" >&5
+   echo "$as_me:22808: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s out/conftest2.$ac_objext
    then
      # The compiler can only warn and ignore the option if not recognized
@@ -24717,7 +24813,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<EOF
-#line 24720 "configure"
+#line 24816 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -24815,7 +24911,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<EOF
-#line 24818 "configure"
+#line 24914 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -25866,7 +25962,7 @@ fi
           ac_config_commands="$ac_config_commands default-1"
 
 
-                                                                                                                                                                                                                                                          ac_config_files="$ac_config_files Makefile tme/Makefile tme/ic/Makefile tme/machine/Makefile tme/generic/Makefile tme/scsi/Makefile libtme/Makefile ic/Makefile ic/m68k/Makefile ic/ieee754/Makefile machine/Makefile machine/sun/Makefile machine/sun2/Makefile machine/sun3/Makefile host/Makefile host/posix/Makefile host/bsd/Makefile host/gtk/Makefile bus/Makefile bus/multibus/Makefile serial/Makefile scsi/Makefile generic/Makefile tmesh/Makefile tools/Makefile"
+                                                                                                                                                                                                                                                                                        ac_config_files="$ac_config_files Makefile tme/Makefile tme/ic/Makefile tme/machine/Makefile tme/generic/Makefile tme/scsi/Makefile libtme/Makefile ic/Makefile ic/m68k/Makefile ic/ieee754/Makefile ic/sparc/Makefile machine/Makefile machine/sun/Makefile machine/sun2/Makefile machine/sun3/Makefile machine/sun4/Makefile host/Makefile host/posix/Makefile host/bsd/Makefile host/gtk/Makefile bus/Makefile bus/multibus/Makefile bus/sbus/Makefile serial/Makefile scsi/Makefile generic/Makefile tmesh/Makefile tools/Makefile"
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
 # tests run on this system so they can be shared between configure
@@ -26440,16 +26536,19 @@ do
   "ic/Makefile" ) CONFIG_FILES="$CONFIG_FILES ic/Makefile" ;;
   "ic/m68k/Makefile" ) CONFIG_FILES="$CONFIG_FILES ic/m68k/Makefile" ;;
   "ic/ieee754/Makefile" ) CONFIG_FILES="$CONFIG_FILES ic/ieee754/Makefile" ;;
+  "ic/sparc/Makefile" ) CONFIG_FILES="$CONFIG_FILES ic/sparc/Makefile" ;;
   "machine/Makefile" ) CONFIG_FILES="$CONFIG_FILES machine/Makefile" ;;
   "machine/sun/Makefile" ) CONFIG_FILES="$CONFIG_FILES machine/sun/Makefile" ;;
   "machine/sun2/Makefile" ) CONFIG_FILES="$CONFIG_FILES machine/sun2/Makefile" ;;
   "machine/sun3/Makefile" ) CONFIG_FILES="$CONFIG_FILES machine/sun3/Makefile" ;;
+  "machine/sun4/Makefile" ) CONFIG_FILES="$CONFIG_FILES machine/sun4/Makefile" ;;
   "host/Makefile" ) CONFIG_FILES="$CONFIG_FILES host/Makefile" ;;
   "host/posix/Makefile" ) CONFIG_FILES="$CONFIG_FILES host/posix/Makefile" ;;
   "host/bsd/Makefile" ) CONFIG_FILES="$CONFIG_FILES host/bsd/Makefile" ;;
   "host/gtk/Makefile" ) CONFIG_FILES="$CONFIG_FILES host/gtk/Makefile" ;;
   "bus/Makefile" ) CONFIG_FILES="$CONFIG_FILES bus/Makefile" ;;
   "bus/multibus/Makefile" ) CONFIG_FILES="$CONFIG_FILES bus/multibus/Makefile" ;;
+  "bus/sbus/Makefile" ) CONFIG_FILES="$CONFIG_FILES bus/sbus/Makefile" ;;
   "serial/Makefile" ) CONFIG_FILES="$CONFIG_FILES serial/Makefile" ;;
   "scsi/Makefile" ) CONFIG_FILES="$CONFIG_FILES scsi/Makefile" ;;
   "generic/Makefile" ) CONFIG_FILES="$CONFIG_FILES generic/Makefile" ;;

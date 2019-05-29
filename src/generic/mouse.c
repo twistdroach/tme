@@ -1,4 +1,4 @@
-/* $Id: mouse.c,v 1.1 2003/07/31 01:35:28 fredette Exp $ */
+/* $Id: mouse.c,v 1.2 2006/09/30 12:34:16 fredette Exp $ */
 
 /* generic/mouse.c - generic mouse implementation support: */
 
@@ -34,10 +34,11 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: mouse.c,v 1.1 2003/07/31 01:35:28 fredette Exp $");
+_TME_RCSID("$Id: mouse.c,v 1.2 2006/09/30 12:34:16 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/mouse.h>
+#include <errno.h>
 
 /* macros: */
 

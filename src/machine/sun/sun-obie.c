@@ -1,4 +1,4 @@
-/* $Id: sun-obie.c,v 1.2 2005/02/17 12:37:25 fredette Exp $ */
+/* $Id: sun-obie.c,v 1.4 2007/08/25 20:44:11 fredette Exp $ */
 
 /* machine/sun/sun-obie.c - classic Sun onboard Intel Ethernet implementation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun-obie.c,v 1.2 2005/02/17 12:37:25 fredette Exp $");
+_TME_RCSID("$Id: sun-obie.c,v 1.4 2007/08/25 20:44:11 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -387,6 +387,8 @@ _tme_sun_obie_bus_signal(struct tme_bus_connection *conn_bus,
 			 unsigned int signal)
 {
   struct tme_sun_obie *sun_obie;
+  tme_uint16_t csr;
+  int new_callouts;
 
   /* return now if this is not a generic bus signal: */
   if (TME_BUS_SIGNAL_INDEX(signal)
@@ -397,11 +399,64 @@ _tme_sun_obie_bus_signal(struct tme_bus_connection *conn_bus,
   /* recover our data structures: */
   sun_obie = conn_bus->tme_bus_connection.tme_connection_element->tme_element_private;
 
-  /* pass the i825x6's signal through to the obio bus: */
-  conn_bus = sun_obie->tme_sun_obie_conn_regs;
-  return (conn_bus != NULL
-	  ? (*conn_bus->tme_bus_signal)(conn_bus, signal)
-	  : ENXIO);
+  /* assume that we won't need any new callouts: */
+  new_callouts = TME_SUN_OBIE_CALLOUT_CHECK;
+
+  /* lock the mutex: */
+  tme_mutex_lock(&sun_obie->tme_sun_obie_mutex);
+
+  /* get the current CSR value: */
+  csr = TME_SUN_OBIE_CSR_GET(sun_obie);
+
+  /* if this bus signal is from the i825x6: */
+  if (conn_bus->tme_bus_connection.tme_connection_other
+      == &sun_obie->tme_sun_obie_conn_i825x6->tme_bus_connection) {
+
+    /* this must be the unspecified interrupt signal: */
+    assert (TME_BUS_SIGNAL_WHICH(signal) == TME_BUS_SIGNAL_INT_UNSPEC);
+
+    /* update the CSR value: */
+    csr
+      = ((csr
+	  & ~TME_SUN_OBIE_CSR_INTR)
+	 | (((signal & TME_BUS_SIGNAL_LEVEL_MASK)
+	     == TME_BUS_SIGNAL_LEVEL_ASSERTED)
+	    ? TME_SUN_OBIE_CSR_INTR
+	    : 0));
+
+    /* possibly call out an interrupt change to obio: */
+    new_callouts = TME_SUN_OBIE_CALLOUT_INT;
+  }
+
+  /* otherwise, this bus signal must be from obio: */
+  else {
+    assert (conn_bus->tme_bus_connection.tme_connection_other
+	    == &sun_obie->tme_sun_obie_conn_regs->tme_bus_connection);
+
+    /* if this is the negating edge of the reset signal: */
+    if (TME_BUS_SIGNAL_WHICH(signal) == TME_BUS_SIGNAL_RESET
+	&& (signal & TME_BUS_SIGNAL_LEVEL_MASK) == TME_BUS_SIGNAL_LEVEL_NEGATED) {
+
+      /* update the CSR value: */
+      csr &= TME_SUN_OBIE_CSR_NOLOOP;
+
+      /* possibly call out bus signal changes to the i825x6: */
+      new_callouts = TME_SUN_OBIE_CALLOUT_SIGNALS;
+    }
+  }
+
+  /* put the new CSR value: */
+  TME_SUN_OBIE_CSR_PUT(sun_obie, csr);
+
+  /* make any new callouts: */
+  if (new_callouts != TME_SUN_OBIE_CALLOUT_CHECK) {
+    _tme_sun_obie_callout(sun_obie, new_callouts);
+  }
+
+  /* unlock the mutex: */
+  tme_mutex_unlock(&sun_obie->tme_sun_obie_mutex);
+
+  return (TME_OK);
 }
 
 /* the sun_obie bus signals adder for the i825x6: */
@@ -437,7 +492,8 @@ _tme_sun_obie_bus_signals_add(struct tme_bus_connection *conn_bus,
 static int
 _tme_sun_obie_tlb_set_allocate(struct tme_bus_connection *conn_bus,
 			      unsigned int count, unsigned int sizeof_one, 
-			      TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb *) _tlbs)
+			       struct tme_bus_tlb * tme_shared *_tlbs,
+			       tme_rwlock_t *_tlbs_rwlock)
 {
   struct tme_sun_obie *sun_obie;
 
@@ -449,7 +505,7 @@ _tme_sun_obie_tlb_set_allocate(struct tme_bus_connection *conn_bus,
   return (conn_bus != NULL
 	  ? (*conn_bus->tme_bus_tlb_set_allocate)(conn_bus, 
 						  count, sizeof_one,
-						  _tlbs)
+						  _tlbs, _tlbs_rwlock)
 	  : ENXIO);
 }
 
@@ -498,10 +554,8 @@ _tme_sun_obie_tlb_fill_regs(struct tme_bus_connection *conn_bus,
   /* this address falls in the CSR: */
     
   /* this TLB entry covers this range: */
-  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first, TME_SUN_OBIE_REG_CSR);
-  TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last, (TME_SUN_OBIE_REG_CSR
-								+ TME_SUN_OBIE_SIZ_CSR
-								- 1));
+  tlb->tme_bus_tlb_addr_first = TME_SUN_OBIE_REG_CSR;
+  tlb->tme_bus_tlb_addr_last = TME_SUN_OBIE_REG_CSR + TME_SUN_OBIE_SIZ_CSR - 1;
 
   /* this TLB entry allows fast reading: */
   tlb->tme_bus_tlb_emulator_off_read = sun_obie->tme_sun_obie_regs;
@@ -701,6 +755,7 @@ _tme_sun_obie_connections_new(struct tme_element *element,
   }
   else if (regs) {
     conn_bus->tme_bus_subregions.tme_bus_subregion_address_last = TME_SUN_OBIE_SIZ_REGS - 1;
+    conn_bus->tme_bus_signal = _tme_sun_obie_bus_signal;
     conn_bus->tme_bus_tlb_fill = _tme_sun_obie_tlb_fill_regs;
   }
   else {

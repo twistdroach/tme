@@ -86,17 +86,29 @@
 #define TME_M68K_IREG32_COUNT		(32)
 #define TME_M68K_IREG_IMM32		(32)
 #define tme_m68k_ireg_imm32		tme_m68k_ireg_uint32(TME_M68K_IREG_IMM32)
-#define TME_M68K_IREG_EA		(33)
+#define TME_M68K_IREG_EA		(35)
 #define tme_m68k_ireg_ea		tme_m68k_ireg_uint32(TME_M68K_IREG_EA)
-#define TME_M68K_IREG_ZERO		(34)
-#define TME_M68K_IREG_ONE		(35)
-#define TME_M68K_IREG_TWO		(36)
-#define TME_M68K_IREG_THREE		(37)
-#define TME_M68K_IREG_FOUR		(38)
-#define TME_M68K_IREG_FIVE		(39)
-#define TME_M68K_IREG_SIX		(40)
-#define TME_M68K_IREG_SEVEN		(41)
-#define TME_M68K_IREG_EIGHT		(42)
+#define TME_M68K_IREG_ZERO		(36)
+#define TME_M68K_IREG_ONE		(37)
+#define TME_M68K_IREG_TWO		(38)
+#define TME_M68K_IREG_THREE		(39)
+#define TME_M68K_IREG_FOUR		(40)
+#define TME_M68K_IREG_FIVE		(41)
+#define TME_M68K_IREG_SIX		(42)
+#define TME_M68K_IREG_SEVEN		(43)
+#define TME_M68K_IREG_EIGHT		(44)
+
+/* the simple signed and unsigned fetch macros: */
+#define _TME_M68K_EXECUTE_FETCH_U16(v) \
+  _TME_M68K_EXECUTE_FETCH_16(tme_uint16_t, v)
+#define _TME_M68K_EXECUTE_FETCH_U16_FIXED(v, field) \
+  _TME_M68K_EXECUTE_FETCH_16_FIXED(tme_uint16_t, v, field)
+#define _TME_M68K_EXECUTE_FETCH_S16(v) \
+  _TME_M68K_EXECUTE_FETCH_16(tme_int16_t, v)
+#define _TME_M68K_EXECUTE_FETCH_U32(v) \
+  _TME_M68K_EXECUTE_FETCH_32(tme_uint32_t, v)
+#define _TME_M68K_EXECUTE_FETCH_S32(v) \
+  _TME_M68K_EXECUTE_FETCH_32(tme_int32_t, v)
 
 #endif /* _IC_M68K_MISC_H */
 
@@ -104,159 +116,69 @@
 
 /* these macros are for the fast executor: */
 
-/* on all hosts, 
-   this loads a 16-bit unsigned value for the fast instruction executor: */
-#undef _TME_M68K_EXECUTE_FETCH_U16
-#define _TME_M68K_EXECUTE_FETCH_U16(v) \
-  if ((emulator_load + (sizeof(tme_uint16_t) - 1)) > emulator_load_last) \
-    goto _tme_m68k_fast_fetch_failed; \
-  tme_memory_aligned_rdlock(tlb->tme_m68k_tlb_bus_rwlock); \
-  (v) = (tme_uint16_t) tme_betoh_u16(*((tme_uint16_t *) emulator_load)); \
-  tme_memory_aligned_unlock(tlb->tme_m68k_tlb_bus_rwlock); \
-  insn_fetch_sizes <<= 1; \
-  emulator_load += sizeof(tme_uint16_t)
+/* this fetches a 16-bit value for the fast executor: */
+#undef _TME_M68K_EXECUTE_FETCH_16
+#define _TME_M68K_EXECUTE_FETCH_16(type, v) \
+  /* use the raw fetch macro to fetch the value into the variable, \
+     and then save it in the instruction buffer.  the save doesn't \
+     need to be atomic; no one else can see the instruction buffer. \
+     however, the raw fetch macro has already advanced fetch_fast_next, \
+     so we need to compensate for that here: */ \
+  __TME_M68K_EXECUTE_FETCH_16(type, v); \
+  tme_memory_write16(((tme_uint16_t *) ((((tme_uint8_t *) &ic->_tme_m68k_insn_fetch_buffer[0]) - sizeof(tme_uint16_t)) + (fetch_fast_next - ic->_tme_m68k_insn_fetch_fast_start))), (tme_uint16_t) (v), sizeof(tme_uint16_t))
 
-/* on all hosts, 
-   this loads a 16-bit signed value for the fast instruction executor: */
-#undef _TME_M68K_EXECUTE_FETCH_S16
-#define _TME_M68K_EXECUTE_FETCH_S16(v) \
-  if ((emulator_load + (sizeof(tme_uint16_t) - 1)) > emulator_load_last) \
+/* this does a raw fetch of a 16-bit value for the fast executor: */
+#undef __TME_M68K_EXECUTE_FETCH_16
+#define __TME_M68K_EXECUTE_FETCH_16(type, v) \
+  /* if we can't do the fast read, we need to redispatch: */ \
+  /* NB: checks in tme_m68k_go_slow(), and proper setting of \
+     ic->_tme_m68k_insn_fetch_fast_last in _TME_M68K_EXECUTE_NAME(), \
+     allow  us to do a simple pointer comparison here, for \
+     any fetch size: */ \
+  if (__tme_predict_false(fetch_fast_next > ic->_tme_m68k_insn_fetch_fast_last)) \
     goto _tme_m68k_fast_fetch_failed; \
-  tme_memory_aligned_rdlock(tlb->tme_m68k_tlb_bus_rwlock); \
-  (v) = (tme_int16_t) tme_betoh_u16(*((tme_uint16_t *) emulator_load)); \
-  tme_memory_aligned_unlock(tlb->tme_m68k_tlb_bus_rwlock); \
-  insn_fetch_sizes <<= 1; \
-  emulator_load += sizeof(tme_int16_t)
+  (v) = ((type) \
+         tme_betoh_u16(tme_memory_bus_read16((const tme_shared tme_uint16_t *) fetch_fast_next, \
+                                             tlb->tme_m68k_tlb_bus_rwlock, \
+                                             sizeof(tme_uint16_t), \
+                                             sizeof(tme_uint32_t)))); \
+  fetch_fast_next += sizeof(tme_uint16_t)
 
-/* on a host with any alignment, 
-   this loads a 32-bit unsigned value for the fast instruction executor: */
-#if ALIGNOF_INT32_T <= ALIGNOF_INT16_T
-#undef _TME_M68K_EXECUTE_FETCH_U32
-#define _TME_M68K_EXECUTE_FETCH_U32(v) \
-  if ((emulator_load + (sizeof(tme_uint32_t) - 1)) > emulator_load_last) \
-    goto _tme_m68k_fast_fetch_failed; \
-  if (((unsigned long) emulator_load) & (sizeof(tme_uint32_t) - 1)) { \
-    tme_memory_unaligned_rdlock(tlb->tme_m68k_tlb_bus_rwlock); \
-    (v) = (tme_uint32_t) tme_betoh_u32(*((tme_uint32_t *) emulator_load)); \
-    tme_memory_unaligned_unlock(tlb->tme_m68k_tlb_bus_rwlock); \
-  } \
-  else { \
-    tme_memory_aligned_rdlock(tlb->tme_m68k_tlb_bus_rwlock); \
-    (v) = (tme_uint32_t) tme_betoh_u32(*((tme_uint32_t *) emulator_load)); \
-    tme_memory_aligned_unlock(tlb->tme_m68k_tlb_bus_rwlock); \
-  } \
-  insn_fetch_sizes = (insn_fetch_sizes << 1) | 1; \
-  emulator_load += sizeof(tme_uint32_t)
-#endif /* ALIGNOF_INT32_T <= ALIGNOF_INT16_T */
+/* this fetches a 16-bit value at a fixed instruction position
+   for the fast executor: */
+#undef _TME_M68K_EXECUTE_FETCH_16_FIXED
+#define _TME_M68K_EXECUTE_FETCH_16_FIXED(type, v, field) \
+  assert(&((struct tme_m68k *) 0)->field \
+         == (type *) (((tme_uint8_t *) &((struct tme_m68k *) 0)->_tme_m68k_insn_fetch_buffer[0]) + (fetch_fast_next - ic->_tme_m68k_insn_fetch_fast_start))); \
+  __TME_M68K_EXECUTE_FETCH_16(type, v)
 
-/* on a host with any alignment, 
-   this loads a 32-bit signed value for the fast instruction executor: */
-#if ALIGNOF_INT32_T <= ALIGNOF_INT16_T
-#undef _TME_M68K_EXECUTE_FETCH_S32
-#define _TME_M68K_EXECUTE_FETCH_S32(v) \
-  if ((emulator_load + (sizeof(tme_uint32_t) - 1)) > emulator_load_last) \
-    goto _tme_m68k_fast_fetch_failed; \
-  if (((unsigned long) emulator_load) & (sizeof(tme_uint32_t) - 1)) { \
-    tme_memory_unaligned_rdlock(tlb->tme_m68k_tlb_bus_rwlock); \
-    (v) = (tme_int32_t) tme_betoh_u32(*((tme_uint32_t *) emulator_load)); \
-    tme_memory_unaligned_unlock(tlb->tme_m68k_tlb_bus_rwlock); \
-  } \
-  else { \
-    tme_memory_aligned_rdlock(tlb->tme_m68k_tlb_bus_rwlock); \
-    (v) = (tme_int32_t) tme_betoh_u32(*((tme_uint32_t *) emulator_load)); \
-    tme_memory_aligned_unlock(tlb->tme_m68k_tlb_bus_rwlock); \
-  } \
-  insn_fetch_sizes = (insn_fetch_sizes << 1) | 1; \
-  emulator_load += sizeof(tme_int32_t)
-#endif /* ALIGNOF_INT32_T <= ALIGNOF_INT16_T */
+/* this fetches a 32-bit value for the fast executor: */
+#undef _TME_M68K_EXECUTE_FETCH_32
+#define _TME_M68K_EXECUTE_FETCH_32(type, v) \
+  /* use the raw fetch macro to fetch the value into the variable, \
+     and then save it in the instruction buffer.  the save doesn't \
+     need to be atomic; no one else can see the instruction buffer. \
+     however, the raw fetch macro has already advanced fetch_fast_next, \
+     so we need to compensate for that here: */ \
+  __TME_M68K_EXECUTE_FETCH_32(type, v); \
+  tme_memory_write32(((tme_uint32_t *) ((((tme_uint8_t *) &ic->_tme_m68k_insn_fetch_buffer[0]) - sizeof(tme_uint32_t)) + (fetch_fast_next - ic->_tme_m68k_insn_fetch_fast_start))), (tme_uint32_t) (v), sizeof(tme_uint16_t))
 
-/* on a little-endian host with strict alignment, 
-   this loads a 32-bit unsigned value for the fast instruction executor: */
-#if (ALIGNOF_INT32_T > ALIGNOF_INT16_T) && !defined(WORDS_BIGENDIAN)
-#undef _TME_M68K_EXECUTE_FETCH_U32
-#define _TME_M68K_EXECUTE_FETCH_U32(v) \
-  if ((emulator_load + (sizeof(tme_uint32_t) - 1)) > emulator_load_last) \
+/* this does a raw fetch of a 32-bit value for the fast executor: */
+#undef __TME_M68K_EXECUTE_FETCH_32
+#define __TME_M68K_EXECUTE_FETCH_32(type, v) \
+  /* if we can't do the fast read, we need to redispatch: */ \
+  /* NB: checks in tme_m68k_go_slow(), and proper setting of \
+     ic->_tme_m68k_insn_fetch_fast_last in _TME_M68K_EXECUTE_NAME(), \
+     allow  us to do a simple pointer comparison here, for \
+     any fetch size: */ \
+  if (__tme_predict_false(fetch_fast_next > ic->_tme_m68k_insn_fetch_fast_last)) \
     goto _tme_m68k_fast_fetch_failed; \
-  if (TME_SEQUENCE_ACCESS_NOT_COSTLIER || ((unsigned long) emulator_load) & (sizeof(tme_uint32_t) - 1)) { \
-    tme_memory_sequence_rdlock(tlb->tme_m68k_bus_tlb_rwlock); \
-    (v) = (tme_uint32_t) \
-      tme_betoh_u32((((tme_uint32_t) ((tme_uint16_t *) emulator_load)[1]) << 16) | \
-              ((tme_uint32_t) ((tme_uint16_t *) emulator_load)[0])); \
-    tme_memory_sequence_unlock(tlb->tme_m68k_bus_tlb_rwlock); \
-  } else { \
-    tme_memory_aligned_rdlock(tlb->tme_m68k_tlb_bus_rwlock); \
-    (v) = (tme_uint32_t) tme_betoh_u32(*((tme_uint32_t *) emulator_load)); \
-    tme_memory_aligned_unlock(tlb->tme_m68k_tlb_bus_rwlock); \
-  } \
-  insn_fetch_sizes = (insn_fetch_sizes << 1) | 1; \
-  emulator_load += sizeof(tme_uint32_t)
-#endif /* (ALIGNOF_INT32_T > ALIGNOF_INT16_T) && !defined(WORDS_BIGENDIAN) */
-
-/* on a little-endian host with strict alignment, 
-   this loads a 32-bit signed value for the fast instruction executor: */
-#if (ALIGNOF_INT32_T > ALIGNOF_INT16_T) && !defined(WORDS_BIGENDIAN)
-#undef _TME_M68K_EXECUTE_FETCH_S32
-#define _TME_M68K_EXECUTE_FETCH_S32(v) \
-  if ((emulator_load + (sizeof(tme_uint32_t) - 1)) > emulator_load_last) \
-    goto _tme_m68k_fast_fetch_failed; \
-  if (TME_SEQUENCE_ACCESS_NOT_COSTLIER || ((unsigned long) emulator_load) & (sizeof(tme_uint32_t) - 1)) { \
-    tme_memory_sequence_rdlock(tlb->tme_m68k_bus_tlb_rwlock); \
-    (v) = (tme_int32_t) \
-      tme_betoh_u32((((tme_uint32_t) ((tme_uint16_t *) emulator_load)[1]) << 16) | \
-              ((tme_uint32_t) ((tme_uint16_t *) emulator_load)[0])); \
-    tme_memory_sequence_unlock(tlb->tme_m68k_bus_tlb_rwlock); \
-  } else { \
-    tme_memory_aligned_rdlock(tlb->tme_m68k_tlb_bus_rwlock); \
-    (v) = (tme_int32_t) tme_betoh_u32(*((tme_uint32_t *) emulator_load)); \
-    tme_memory_aligned_unlock(tlb->tme_m68k_tlb_bus_rwlock); \
-  } \
-  insn_fetch_sizes = (insn_fetch_sizes << 1) | 1; \
-  emulator_load += sizeof(tme_int32_t)
-#endif /* (ALIGNOF_INT32_T > ALIGNOF_INT16_T) && !defined(WORDS_BIGENDIAN) */
-
-/* on a big-endian host with strict alignment, 
-   this loads a 32-bit unsigned value for the fast instruction executor: */
-#if (ALIGNOF_INT32_T > ALIGNOF_INT16_T) && defined(WORDS_BIGENDIAN)
-#undef _TME_M68K_EXECUTE_FETCH_U32
-#define _TME_M68K_EXECUTE_FETCH_U32(v) \
-  if ((emulator_load + (sizeof(tme_uint32_t) - 1)) > emulator_load_last) \
-    goto _tme_m68k_fast_fetch_failed; \
-  if (TME_SEQUENCE_ACCESS_NOT_COSTLIER || ((unsigned long) emulator_load) & (sizeof(tme_uint32_t) - 1)) { \
-    tme_memory_sequence_rdlock(tlb->tme_m68k_bus_tlb_rwlock); \
-    (v) = (tme_uint32_t) \
-      ((((tme_uint32_t) ((tme_uint16_t *) emulator_load)[0]) << 16) | \
-              ((tme_uint32_t) ((tme_uint16_t *) emulator_load)[1])); \
-    tme_memory_sequence_unlock(tlb->tme_m68k_bus_tlb_rwlock); \
-  } else { \
-    tme_memory_aligned_rdlock(tlb->tme_m68k_tlb_bus_rwlock); \
-    (v) = (tme_uint32_t) tme_betoh_u32(*((tme_uint32_t *) emulator_load)); \
-    tme_memory_aligned_unlock(tlb->tme_m68k_tlb_bus_rwlock); \
-  } \
-  insn_fetch_sizes = (insn_fetch_sizes << 1) | 1; \
-  emulator_load += sizeof(tme_uint32_t)
-#endif /* (ALIGNOF_INT32_T > ALIGNOF_INT16_T) && defined(WORDS_BIGENDIAN) */
-
-/* on a big-endian host with strict alignment, 
-   this loads a 32-bit signed value for the fast instruction executor: */
-#if (ALIGNOF_INT32_T > ALIGNOF_INT16_T) && defined(WORDS_BIGENDIAN)
-#undef _TME_M68K_EXECUTE_FETCH_S32
-#define _TME_M68K_EXECUTE_FETCH_S32(v) \
-  if ((emulator_load + (sizeof(tme_uint32_t) - 1)) > emulator_load_last) \
-    goto _tme_m68k_fast_fetch_failed; \
-  if (TME_SEQUENCE_ACCESS_NOT_COSTLIER || ((unsigned long) emulator_load) & (sizeof(tme_uint32_t) - 1)) { \
-    tme_memory_sequence_rdlock(tlb->tme_m68k_bus_tlb_rwlock); \
-    (v) = (tme_int32_t) \
-      ((((tme_uint32_t) ((tme_uint16_t *) emulator_load)[0]) << 16) | \
-              ((tme_uint32_t) ((tme_uint16_t *) emulator_load)[1])); \
-    tme_memory_sequence_unlock(tlb->tme_m68k_bus_tlb_rwlock); \
-  } else { \
-    tme_memory_aligned_rdlock(tlb->tme_m68k_tlb_bus_rwlock); \
-    (v) = (tme_int32_t) tme_betoh_u32(*((tme_uint32_t *) emulator_load)); \
-    tme_memory_aligned_unlock(tlb->tme_m68k_tlb_bus_rwlock); \
-  } \
-  insn_fetch_sizes = (insn_fetch_sizes << 1) | 1; \
-  emulator_load += sizeof(tme_int32_t)
-#endif /* (ALIGNOF_INT32_T > ALIGNOF_INT16_T) && defined(WORDS_BIGENDIAN) */
+  (v) = ((type) \
+         tme_betoh_u32(tme_memory_bus_read32((const tme_shared tme_uint32_t *) fetch_fast_next, \
+                                             tlb->tme_m68k_tlb_bus_rwlock, \
+                                             sizeof(tme_uint16_t), \
+                                             sizeof(tme_uint32_t)))); \
+  fetch_fast_next += sizeof(tme_uint32_t)
 
 #endif /* _TME_M68K_EXECUTE_FAST */
 
@@ -264,73 +186,39 @@
 
 /* these macros are for the slow executor: */
 
-/* on all hosts, this fetches a 16-bit unsigned value for the slow executor: */
-#undef _TME_M68K_EXECUTE_FETCH_U16
-#define _TME_M68K_EXECUTE_FETCH_U16(v) \
-  /* we update the instruction buffer fetch total and sizes values \
-     before we do the actual fetch, because we may transfer a few \
-     bytes and then fault.  without this, those few bytes wouldn't get \
-     saved in the exception stack frame by tme_m68k_insn_buffer_xfer(), \
-     because it wouldn't know about the fetch.  later, when the \
-     instruction would be resumed, tme_m68k_fetch16() won't refetch \
-     them, because it knows they've already been fetched and thinks \
-     they're still in the instruction buffer: */ \
-  ic->_tme_m68k_insn_buffer_fetch_total += sizeof(tme_uint16_t); \
-  ic->_tme_m68k_insn_buffer_fetch_sizes <<= 1; \
-  (v) = (tme_uint16_t) tme_m68k_fetch16(ic, linear_pc); \
+/* this fetches a 16-bit value for the slow executor: */
+#undef _TME_M68K_EXECUTE_FETCH_16
+#define _TME_M68K_EXECUTE_FETCH_16(type, v) \
+  /* macros for the slow executor are simple, because \
+     tme_m68k_fetch16() takes care of all endianness, alignment, \
+     and atomic issues, and also stores the fetched value in the \
+     instruction fetch buffer (if a previous fetch before a fault \
+     didn't store all or part of it there already): */ \
+  (v) = (type) tme_m68k_fetch16(ic, linear_pc); \
   linear_pc += sizeof(tme_uint16_t)
 
-/* on all hosts, this fetches a 16-bit signed value for the slow executor: */
-#undef _TME_M68K_EXECUTE_FETCH_S16
-#define _TME_M68K_EXECUTE_FETCH_S16(v) \
-  /* we update the instruction buffer fetch total and sizes values \
-     before we do the actual fetch, because we may transfer a few \
-     bytes and then fault.  without this, those few bytes wouldn't get \
-     saved in the exception stack frame by tme_m68k_insn_buffer_xfer(), \
-     because it wouldn't know about the fetch.  later, when the \
-     instruction would be resumed, tme_m68k_fetch16() won't refetch \
-     them, because it knows they've already been fetched and thinks \
-     they're still in the instruction buffer: */ \
-  ic->_tme_m68k_insn_buffer_fetch_total += sizeof(tme_int16_t); \
-  ic->_tme_m68k_insn_buffer_fetch_sizes <<= 1; \
-  (v) = (tme_int16_t) tme_m68k_fetch16(ic, linear_pc); \
-  linear_pc += sizeof(tme_int16_t)
+/* this fetches a 16-bit value at a fixed instruction position
+   for the slow executor: */
+#undef _TME_M68K_EXECUTE_FETCH_16_FIXED
+#define _TME_M68K_EXECUTE_FETCH_16_FIXED(type, v, field) \
+  assert(&((struct tme_m68k *) 0)->field \
+         == (type *) (((tme_uint8_t *) &((struct tme_m68k *) 0)->_tme_m68k_insn_fetch_buffer[0]) + ic->_tme_m68k_insn_fetch_slow_next)); \
+  _TME_M68K_EXECUTE_FETCH_16(type, v)
 
-/* on all hosts, this fetches a 32-bit unsigned value for the slow executor: */
-#undef _TME_M68K_EXECUTE_FETCH_U32
-#define _TME_M68K_EXECUTE_FETCH_U32(v) \
-  /* we update the instruction buffer fetch total and sizes values \
-     before we do the actual fetch, because we may transfer a few \
-     bytes and then fault.  without this, those few bytes wouldn't get \
-     saved in the exception stack frame by tme_m68k_insn_buffer_xfer(), \
-     because it wouldn't know about the fetch.  later, when the \
-     instruction would be resumed, tme_m68k_fetch32() won't refetch \
-     them, because it knows they've already been fetched and thinks \
-     they're still in the instruction buffer: */ \
-  ic->_tme_m68k_insn_buffer_fetch_total += sizeof(tme_uint32_t); \
-  ic->_tme_m68k_insn_buffer_fetch_sizes = (ic->_tme_m68k_insn_buffer_fetch_sizes << 1) | 1; \
-  (v) = (tme_uint32_t) tme_m68k_fetch32(ic, linear_pc); \
+/* this fetches a 32-bit value for the slow executor: */
+#undef _TME_M68K_EXECUTE_FETCH_32
+#define _TME_M68K_EXECUTE_FETCH_32(type, v) \
+  /* macros for the slow executor are simple, because \
+     tme_m68k_fetch32() takes care of all endianness, alignment, \
+     and atomic issues, and also stores the fetched value in the \
+     instruction fetch buffer (if a previous fetch before a fault \
+     didn't store all or part of it there already): */ \
+  (v) = (type) tme_m68k_fetch32(ic, linear_pc); \
   linear_pc += sizeof(tme_uint32_t)
-
-/* on all hosts, this fetches a 32-bit signed value for the slow executor: */
-#undef _TME_M68K_EXECUTE_FETCH_S32
-#define _TME_M68K_EXECUTE_FETCH_S32(v) \
-  /* we update the instruction buffer fetch total and sizes values \
-     before we do the actual fetch, because we may transfer a few \
-     bytes and then fault.  without this, those few bytes wouldn't get \
-     saved in the exception stack frame by tme_m68k_insn_buffer_xfer(), \
-     because it wouldn't know about the fetch.  later, when the \
-     instruction would be resumed, tme_m68k_fetch32() won't refetch \
-     them, because it knows they've already been fetched and thinks \
-     they're still in the instruction buffer: */ \
-  ic->_tme_m68k_insn_buffer_fetch_total += sizeof(tme_int32_t); \
-  ic->_tme_m68k_insn_buffer_fetch_sizes = (ic->_tme_m68k_insn_buffer_fetch_sizes << 1) | 1; \
-  (v) = (tme_int32_t) tme_m68k_fetch32(ic, linear_pc); \
-  linear_pc += sizeof(tme_int32_t)
 
 #endif /* !_TME_M68K_EXECUTE_FAST */
 /* automatically generated by m68k-insns-auto.sh, do not edit! */
-_TME_RCSID("$Id: m68k-insns-auto.sh,v 1.23 2005/03/10 13:26:23 fredette Exp $");
+_TME_RCSID("$Id: m68k-insns-auto.sh,v 1.25 2007/08/25 21:47:00 fredette Exp $");
 
 TME_M68K_INSN_DECL(tme_m68k_add8);
 TME_M68K_INSN_DECL(tme_m68k_sub8);
@@ -377,6 +265,8 @@ TME_M68K_INSN_DECL(tme_m68k_negx16);
 TME_M68K_INSN_DECL(tme_m68k_addx16);
 TME_M68K_INSN_DECL(tme_m68k_subx16);
 TME_M68K_INSN_DECL(tme_m68k_cmpm16);
+TME_M68K_INSN_DECL(tme_m68k_move_srpd16);
+TME_M68K_INSN_DECL(tme_m68k_move_srpi16);
 TME_M68K_INSN_DECL(tme_m68k_suba16);
 TME_M68K_INSN_DECL(tme_m68k_adda16);
 TME_M68K_INSN_DECL(tme_m68k_movea16);
@@ -412,6 +302,8 @@ TME_M68K_INSN_DECL(tme_m68k_negx32);
 TME_M68K_INSN_DECL(tme_m68k_addx32);
 TME_M68K_INSN_DECL(tme_m68k_subx32);
 TME_M68K_INSN_DECL(tme_m68k_cmpm32);
+TME_M68K_INSN_DECL(tme_m68k_move_srpd32);
+TME_M68K_INSN_DECL(tme_m68k_move_srpi32);
 TME_M68K_INSN_DECL(tme_m68k_suba32);
 TME_M68K_INSN_DECL(tme_m68k_adda32);
 TME_M68K_INSN_DECL(tme_m68k_movea32);

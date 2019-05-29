@@ -1,4 +1,4 @@
-/* $Id: emulexmt02.c,v 1.3 2005/02/17 13:42:44 fredette Exp $ */
+/* $Id: emulexmt02.c,v 1.4 2007/08/25 22:54:59 fredette Exp $ */
 
 /* scsi/emulexmt02.c - Emulex MT-02 SCSI tape emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: emulexmt02.c,v 1.3 2005/02/17 13:42:44 fredette Exp $");
+_TME_RCSID("$Id: emulexmt02.c,v 1.4 2007/08/25 22:54:59 fredette Exp $");
 
 /* includes: */
 #include <tme/scsi/scsi-tape.h>
@@ -207,7 +207,7 @@ static _TME_SCSI_DEVICE_CDB_DECL(_tme_emulexmt02_cdb_mode_sense)
   *(data++) = 0x05; /* QIC-24 */
 
   /* the Number of Blocks.  we assume a 60MB tape: */
-  block_size = 512;
+  block_size = TME_EMULEXMT02_BLOCK_SIZE;
   blocks = (60 * 1024 * 1024) / block_size;
   *(data++) = (blocks >> 16) & 0xff;
   *(data++) = (blocks >>  8) & 0xff;
@@ -253,8 +253,10 @@ static _TME_SCSI_DEVICE_CDB_DECL(_tme_emulexmt02_cdb_mode_select)
   
   /* read in the parameter list: */
   scsi_device->tme_scsi_device_dma.tme_scsi_dma_resid
-    = TME_MIN(sizeof(scsi_device->tme_scsi_device_data),
-	      scsi_device->tme_scsi_device_cdb[4]);
+    = scsi_device->tme_scsi_device_cdb[4];
+  scsi_device->tme_scsi_device_dma.tme_scsi_dma_resid
+    = TME_MIN(scsi_device->tme_scsi_device_dma.tme_scsi_dma_resid,
+	      sizeof(scsi_device->tme_scsi_device_data));
   scsi_device->tme_scsi_device_dma.tme_scsi_dma_in
     = &scsi_device->tme_scsi_device_data[0];
   scsi_device->tme_scsi_device_dma.tme_scsi_dma_out
@@ -361,6 +363,11 @@ tme_scsi_tape_emulexmt02_init(struct tme_scsi_tape *scsi_tape)
   /* our type-specific connection function: */
   scsi_tape->tme_scsi_tape_connected
     = _tme_emulexmt02_connected;
+
+  /* our block sizes: */
+  scsi_tape->tme_scsi_tape_block_size_min = TME_EMULEXMT02_BLOCK_SIZE;
+  scsi_tape->tme_scsi_tape_block_size_max = TME_EMULEXMT02_BLOCK_SIZE;
+  scsi_tape->tme_scsi_tape_block_size_current = TME_EMULEXMT02_BLOCK_SIZE;
 
   /* our type-specific CDB functions: */
   TME_SCSI_DEVICE_DO_CDB(scsi_device,

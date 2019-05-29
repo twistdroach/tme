@@ -1,4 +1,4 @@
-/* $Id: posix-serial.c,v 1.8 2003/07/29 18:20:30 fredette Exp $ */
+/* $Id: posix-serial.c,v 1.11 2007/08/24 00:57:01 fredette Exp $ */
 
 /* host/posix/posix-serial.c - implementation of serial ports on a POSIX system: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: posix-serial.c,v 1.8 2003/07/29 18:20:30 fredette Exp $");
+_TME_RCSID("$Id: posix-serial.c,v 1.11 2007/08/24 00:57:01 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/serial.h>
@@ -208,13 +208,17 @@ _tme_posix_serial_th_ctrl(struct tme_posix_serial *serial)
   for (;;) {
    
     /* get the modem state of the input device: */
-    ioctl(serial->tme_posix_serial_fd_in, TIOCMGET, &modem_state);
+    if (ioctl(serial->tme_posix_serial_fd_in, TIOCMGET, &modem_state) < 0) {
+      modem_state = 0;
+    }
 
     /* if the output device is different, get the modem state of the
        output device and merge it in: */
     if (serial->tme_posix_serial_fd_out
 	!= serial->tme_posix_serial_fd_in) {
-      ioctl(serial->tme_posix_serial_fd_in, TIOCMGET, &modem_state_out);
+      if (ioctl(serial->tme_posix_serial_fd_in, TIOCMGET, &modem_state_out) < 0) {
+	modem_state_out = 0;
+      }
       modem_state &= ~(TIOCM_DTR | TIOCM_RTS | TIOCM_CTS);
       modem_state |= modem_state_out & ~(TIOCM_CD | TIOCM_RI | TIOCM_DSR);
     }
@@ -335,9 +339,14 @@ _tme_posix_serial_th_reader(struct tme_posix_serial *serial)
 			       sizeof(buffer_input));
 
     /* if the read failed: */
-    if (rc <= 0) {
+    if (rc < 0) {
       /* XXX diagnostic */
       continue;
+    }
+
+    /* if we hit EOF: */
+    if (rc == 0) {
+      return;
     }
 
     /* lock the mutex: */
@@ -802,8 +811,7 @@ _tme_posix_serial_connections_new(struct tme_element *element,
   serial = (struct tme_posix_serial *) element->tme_element_private;
 
   /* if this serial is already connected, we can do nothing: */
-  if (TME_ATOMIC_READ(struct tme_serial_connection *,
-		      serial->tme_posix_serial_connection) != NULL) {
+  if (serial->tme_posix_serial_connection != NULL) {
     return (EISCONN);
   }
 

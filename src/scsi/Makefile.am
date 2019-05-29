@@ -14,8 +14,11 @@ tme_scsi_la_SOURCES = \
 	acb4000.c \
 	emulexmt02.c \
 	disk-tme.c \
+	tape-tme.c \
+	cdrom-tme.c \
 	scsi-disk.c \
 	scsi-tape.c \
+	scsi-cdrom.c \
 	scsi-cdb.c \
 	scsi-msg.c \
 	scsi-device.c \

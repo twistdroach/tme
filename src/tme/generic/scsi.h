@@ -1,4 +1,4 @@
-/* $Id: scsi.h,v 1.2 2005/02/18 03:05:49 fredette Exp $ */
+/* $Id: scsi.h,v 1.4 2007/01/07 23:59:59 fredette Exp $ */
 
 /* tme/generic/scsi.h - header file for generic SCSI support: */
 
@@ -37,10 +37,11 @@
 #define _TME_GENERIC_SCSI_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: scsi.h,v 1.2 2005/02/18 03:05:49 fredette Exp $");
+_TME_RCSID("$Id: scsi.h,v 1.4 2007/01/07 23:59:59 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
+#include <tme/memory.h>
 
 /* macros: */
 
@@ -129,15 +130,18 @@ _TME_RCSID("$Id: scsi.h,v 1.2 2005/02/18 03:05:49 fredette Exp $");
 #define  TME_SCSI_ACTION_ID_SELF_WHICH(actions)		(((actions) >> 0) & 0xf)
 #define  TME_SCSI_ACTION_ID_OTHER(id)			((id) << 4)
 #define  TME_SCSI_ACTION_ID_OTHER_WHICH(actions)	(((actions) >> 4) & 0xf)
-#define TME_SCSI_ACTION_DMA_INITIATOR			(TME_BIT(8))
-#define TME_SCSI_ACTION_DMA_TARGET			(TME_BIT(9))
-#define TME_SCSI_ACTION_RESPOND_SELECTED		(TME_BIT(10))
-#define TME_SCSI_ACTION_RESPOND_RESELECTED		(TME_BIT(11))
-#define TME_SCSI_ACTION_SELECT				(TME_BIT(12))
-#define TME_SCSI_ACTION_SELECT_SINGLE_INITIATOR		(TME_BIT(13) | TME_SCSI_ACTION_SELECT)
-#define TME_SCSI_ACTION_RESELECT			(TME_BIT(14))
-#define TME_SCSI_ACTION_ARBITRATE_HALF			(TME_BIT(15))
-#define TME_SCSI_ACTION_ARBITRATE_FULL			(TME_BIT(16) | TME_SCSI_ACTION_ARBITRATE_HALF)
+#define TME_SCSI_ACTION_CYCLE_MARKER			(TME_BIT(8))
+#define TME_SCSI_ACTION_DMA_INITIATOR			(TME_BIT(13))
+#define TME_SCSI_ACTION_DMA_INITIATOR_HOLD_ACK		(TME_BIT(14) | TME_SCSI_ACTION_DMA_INITIATOR)
+#define TME_SCSI_ACTION_DMA_TARGET			(TME_BIT(15))
+#define TME_SCSI_ACTION_RESPOND_SELECTED		(TME_BIT(16))
+#define TME_SCSI_ACTION_RESPOND_RESELECTED		(TME_BIT(17))
+#define TME_SCSI_ACTION_SELECT				(TME_BIT(18))
+#define TME_SCSI_ACTION_SELECT_WITH_ATN			(TME_BIT(19) | TME_SCSI_ACTION_SELECT)
+#define TME_SCSI_ACTION_SELECT_SINGLE_INITIATOR		(TME_BIT(20) | TME_SCSI_ACTION_SELECT)
+#define TME_SCSI_ACTION_RESELECT			(TME_BIT(21))
+#define TME_SCSI_ACTION_ARBITRATE_HALF			(TME_BIT(22))
+#define TME_SCSI_ACTION_ARBITRATE_FULL			(TME_BIT(23) | TME_SCSI_ACTION_ARBITRATE_HALF)
 
 /* this evaluates to nonzero if any of the actions in the mask are
    selected, and no more significant actions are also selected: */
@@ -196,5 +200,12 @@ struct tme_scsi_connection {
 int tme_scsi_connection_score _TME_P((struct tme_connection *, unsigned int *));
 int tme_scsi_id_parse _TME_P((const char *));
 #define tme_scsi_lun_parse tme_scsi_id_parse
+
+/* this implements state machines that determine the residual in a
+   SCSI command or message phase: */
+tme_uint32_t tme_scsi_phase_resid _TME_P((tme_scsi_control_t, 
+					  tme_uint32_t *,
+					  const tme_shared tme_uint8_t *bytes,
+					  unsigned long));
 
 #endif /* !_TME_GENERIC_SCSI_H */

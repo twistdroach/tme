@@ -1,4 +1,4 @@
-/* $Id: sun-si.c,v 1.1 2005/02/17 12:19:17 fredette Exp $ */
+/* $Id: sun-si.c,v 1.6 2007/02/21 01:34:02 fredette Exp $ */
 
 /* machine/sun/sun-si.c - Sun ncr5380-based SCSI implementation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun-si.c,v 1.1 2005/02/17 12:19:17 fredette Exp $");
+_TME_RCSID("$Id: sun-si.c,v 1.6 2007/02/21 01:34:02 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -475,7 +475,6 @@ _tme_sun_si_bus_cycle_regs(void *_sun_si,
   tme_uint32_t csr_old, csr_new, csr_diff, csr_mask;
   tme_bus_addr_t address;
   tme_uint8_t cycle_size;
-  tme_uint32_t csr;
   tme_uint32_t dma_count;
   int new_callouts;
 
@@ -561,7 +560,7 @@ _tme_sun_si_bus_cycle_regs(void *_sun_si,
       case TME_SUN_SI_TYPE_VME:
 	TME_SUN_SI_REG16_PUT(sun_si, TME_SUN_SI_REG_FIFO_COUNT_L, 0);
 	TME_SUN_SI_REG16_PUT(sun_si, TME_SUN_SI_REG_VME_FIFO_COUNT_H, 0);
-	csr &= ~TME_SUN_SI_CSR_VME_LOB_MASK;
+	csr_new &= ~TME_SUN_SI_CSR_VME_LOB_MASK;
 	break;
       case TME_SUN_SI_TYPE_COBRA:
 	abort();
@@ -630,8 +629,8 @@ _tme_sun_si_tlb_fill_regs(struct tme_bus_connection *conn_bus,
       tme_bus_tlb_initialize(tlb);
 
       /* this TLB entry covers this range: */
-      TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first, 0);
-      TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last, TME_SUN_SI_3E_SIZ_DMA - 1);
+      tlb->tme_bus_tlb_addr_first = 0;
+      tlb->tme_bus_tlb_addr_last = TME_SUN_SI_3E_SIZ_DMA - 1;
 
       /* this TLB entry allows fast reading and writing: */
       tlb->tme_bus_tlb_emulator_off_read = sun_si->tme_sun_si_3e_dma;
@@ -674,16 +673,12 @@ _tme_sun_si_tlb_fill_regs(struct tme_bus_connection *conn_bus,
     if (rc == TME_OK) {
       
       /* create the mapping TLB entry: */
-      TME_ATOMIC_WRITE(tme_bus_addr_t,
-		       tlb_mapping.tme_bus_tlb_addr_first,
-		       (address_regs
-			+ TME_SUN_SI_REG_NCR5380));
-      TME_ATOMIC_WRITE(tme_bus_addr_t,
-		       tlb_mapping.tme_bus_tlb_addr_last,
-		       (address_regs
-			+ TME_SUN_SI_REG_NCR5380
-			+ TME_SUN_SI_SIZ_NCR5380
-			- 1));
+      tlb_mapping.tme_bus_tlb_addr_first = (address_regs + TME_SUN_SI_REG_NCR5380);
+      tlb_mapping.tme_bus_tlb_addr_last
+	= (address_regs
+	   + TME_SUN_SI_REG_NCR5380
+	   + TME_SUN_SI_SIZ_NCR5380
+	   - 1);
       tlb_mapping.tme_bus_tlb_cycles_ok = TME_BUS_CYCLE_READ | TME_BUS_CYCLE_WRITE;
       
       /* map the filled TLB entry: */
@@ -697,19 +692,14 @@ _tme_sun_si_tlb_fill_regs(struct tme_bus_connection *conn_bus,
   tme_bus_tlb_initialize(tlb);
 
   /* this TLB entry covers this range: */
-  TME_ATOMIC_WRITE(tme_bus_addr_t,
-		   tlb->tme_bus_tlb_addr_first, 
-		   (address_regs
-		    + TME_SUN_SI_SIZ_NCR5380));
-  TME_ATOMIC_WRITE(tme_bus_addr_t,
-		   tlb->tme_bus_tlb_addr_last,
-		   (address_regs
-		    + TME_SUN_SI_SIZ_REGS
-		    - 1));
+  tlb->tme_bus_tlb_addr_first = (address_regs + TME_SUN_SI_SIZ_NCR5380);
+  tlb->tme_bus_tlb_addr_last = (address_regs + TME_SUN_SI_SIZ_REGS - 1);
 
-  /* our controller registers don't have read side-effects, so they
-     support fast reading: */
-  tlb->tme_bus_tlb_emulator_off_read = sun_si->tme_sun_si_regs - address_regs;
+  /* NB: even though our controller registers don't have read
+     side-effects, we can't support fast reading, because we have to
+     be able to fault a byte access to the DMA count register.  at
+     least, SunOS' sc probe routine seems to rely on this to
+     distinguish an si from an sc: */
 
   /* allow reading and writing: */
   tlb->tme_bus_tlb_cycles_ok = TME_BUS_CYCLE_READ | TME_BUS_CYCLE_WRITE;
@@ -845,8 +835,7 @@ _tme_sun_si_tlb_fill(struct tme_bus_connection *conn_bus,
   if (sun_si->tme_sun_si_ncr5380_tlb != NULL
       && (tlb == NULL
 	  || (sun_si->tme_sun_si_ncr5380_tlb 
-	      != TME_ATOMIC_READ(struct tme_bus_tlb *, 
-				 tlb->tme_bus_tlb_backing_reservation)))) {
+	      != tlb->tme_bus_tlb_global))) {
     tme_bus_tlb_invalidate(sun_si->tme_sun_si_ncr5380_tlb);
 
     /* the NCR 5380 doesn't have any outstanding TLB entry: */
@@ -918,12 +907,8 @@ _tme_sun_si_tlb_fill(struct tme_bus_connection *conn_bus,
     tme_bus_tlb_initialize(tlb);
 
     /* this TLB entry covers this range: */
-    TME_ATOMIC_WRITE(tme_bus_addr_t,
-		     tlb->tme_bus_tlb_addr_first, 
-		     0);
-    TME_ATOMIC_WRITE(tme_bus_addr_t,
-		     tlb->tme_bus_tlb_addr_last,
-		     dma_count - 1);
+    tlb->tme_bus_tlb_addr_first = 0;
+    tlb->tme_bus_tlb_addr_last = dma_count - 1;
 
     /* this TLB entry supports fast reading and writing: */
     tlb->tme_bus_tlb_emulator_off_read = sun_si->tme_sun_si_3e_dma + dma_address;
@@ -1046,9 +1031,10 @@ _tme_sun_si_tlb_fill(struct tme_bus_connection *conn_bus,
   /* if DMA is not ready for some reason: */
   if (rc == EAGAIN) {
 
-    /* invalidate any local TLB entry passed by the caller: */
+    /* initialize any local TLB entry passed by the caller.  this
+       will make it unusable: */
     if (tlb != NULL) {
-      tme_bus_tlb_invalidate(tlb);
+      tme_bus_tlb_initialize(tlb);
     }
 
     /* if DMA is enabled: */
@@ -1071,7 +1057,7 @@ _tme_sun_si_tlb_fill(struct tme_bus_connection *conn_bus,
 
     /* the NCR 5380 now has this outstanding TLB entry: */
     sun_si->tme_sun_si_ncr5380_tlb
-      = TME_ATOMIC_READ(struct tme_bus_tlb *, tlb->tme_bus_tlb_backing_reservation);
+      = tlb->tme_bus_tlb_global;
   }
 
   /* unlock our mutex: */
@@ -1111,13 +1097,8 @@ _tme_sun_si_tlb_fill(struct tme_bus_connection *conn_bus,
 #endif /* defined(TME_SUN_SI_STRICT_VME) || defined(TME_SUN_SI_STRICT_ONBOARD) || defined(TME_SUN_SI_STRICT_COBRA) */
 
       /* create the mapping TLB entry: */
-      TME_ATOMIC_WRITE(tme_bus_addr_t,
-		       tlb_mapping.tme_bus_tlb_addr_first,
-		       ncr5380_address);
-      TME_ATOMIC_WRITE(tme_bus_addr_t,
-		       tlb_mapping.tme_bus_tlb_addr_last,
-		       (dma_count
-			- 1));
+      tlb_mapping.tme_bus_tlb_addr_first = ncr5380_address;
+      tlb_mapping.tme_bus_tlb_addr_last = dma_count - 1;
       tlb_mapping.tme_bus_tlb_cycles_ok = cycles;
       
       /* map the filled TLB entry: */
@@ -1135,7 +1116,8 @@ _tme_sun_si_tlb_fill(struct tme_bus_connection *conn_bus,
 static int
 _tme_sun_si_tlb_set_allocate(struct tme_bus_connection *conn_bus,
 			     unsigned int count, unsigned int sizeof_one, 
-			     TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb *) _tlbs)
+			     struct tme_bus_tlb * tme_shared *_tlbs,
+			     tme_rwlock_t *_tlbs_rwlock)
 {
   struct tme_sun_si *sun_si;
 
@@ -1147,7 +1129,7 @@ _tme_sun_si_tlb_set_allocate(struct tme_bus_connection *conn_bus,
   return (conn_bus != NULL
 	  ? (*conn_bus->tme_bus_tlb_set_allocate)(conn_bus, 
 						  count, sizeof_one,
-						  _tlbs)
+						  _tlbs, _tlbs_rwlock)
 	  : ENXIO);
 }
 
@@ -1416,9 +1398,13 @@ tme_sun_si(struct tme_element *element, const char * const *args, char **_output
     }
   }
 
+  if (si_type == TME_SUN_SI_TYPE_NULL) {
+    usage = TRUE;
+  }
+
   if (usage) {
     tme_output_append_error(_output, 
-			    "%s %s type { vme | onboard | 3/E | cobra } [ size { 1600x1280 | 1152x900 | 1024x1024 | 1280x1024 | 1440x1440 | 640x480 } ]",
+			    "%s %s type { vme | onboard | 3/E | cobra }",
 			    _("usage:"),
 			    args[0]);
     return (EINVAL);
@@ -1428,7 +1414,7 @@ tme_sun_si(struct tme_element *element, const char * const *args, char **_output
   sun_si = tme_new0(struct tme_sun_si, 1);
   sun_si->tme_sun_si_type = si_type;
   sun_si->tme_sun_si_3e_dma = (si_type == TME_SUN_SI_TYPE_3E
-			       ? tme_new(char, TME_SUN_SI_3E_SIZ_DMA)
+			       ? tme_new(tme_uint8_t, TME_SUN_SI_3E_SIZ_DMA)
 			       : NULL);
   sun_si->tme_sun_si_element = element;
   TME_SUN_SI_CSR_PUT(sun_si,

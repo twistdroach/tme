@@ -1,4 +1,4 @@
-/* $Id: bus.h,v 1.12 2005/04/30 15:07:46 fredette Exp $ */
+/* $Id: bus.h,v 1.14 2006/11/15 23:01:11 fredette Exp $ */
 
 /* tme/generic/bus.h - header file for generic bus support: */
 
@@ -37,12 +37,12 @@
 #define _TME_GENERIC_BUS_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: bus.h,v 1.12 2005/04/30 15:07:46 fredette Exp $");
+_TME_RCSID("$Id: bus.h,v 1.14 2006/11/15 23:01:11 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
 #include <tme/threads.h>
-#include <tme/atomics.h>
+#include <tme/memory.h>
 
 /* macros: */
 
@@ -95,15 +95,77 @@ _TME_RCSID("$Id: bus.h,v 1.12 2005/04/30 15:07:46 fredette Exp $");
 #define TME_BUS_CYCLE_UNDEF	(0)
 #define TME_BUS_CYCLE_READ	TME_BIT(0)
 #define TME_BUS_CYCLE_WRITE	TME_BIT(1)
+#define TME_BUS_CYCLE_LOCK	TME_BIT(2)
+#define TME_BUS_CYCLE_UNLOCK	TME_BIT(3)
 
 /* the maximum number of fault handlers on a TLB entry: */
 #define TME_BUS_TLB_FAULT_HANDLERS	(4)
 
+/* this returns nonzero if a TLB entry is valid: */
+#define tme_bus_tlb_is_valid(tlb)					\
+  (__tme_predict_true(!tme_memory_atomic_read_flag(&(tlb)->tme_bus_tlb_invalid,\
+						   &(tlb)->tme_bus_tlb_invalid_rwlock)))
+
+/* this returns nonzero if a TLB entry is invalid: */
+#define tme_bus_tlb_is_invalid(tlb)					\
+  (__tme_predict_false(tme_memory_atomic_read_flag(&(tlb)->tme_bus_tlb_invalid,\
+					           &(tlb)->tme_bus_tlb_invalid_rwlock)))
+
+/* this internal macro busies or unbusies a TLB entry: */
+#if TME_THREADS_COOPERATIVE && defined(TME_NO_DEBUG_LOCKS)
+#define _tme_bus_tlb_busy_change(tlb, x)				\
+  do { } while (0 && _tme_audit_type(tlb, struct tme_bus_tlb *))
+#else /* !TME_THREADS_COOPERATIVE || !defined(TME_NO_DEBUG_LOCKS) */
+#define _tme_bus_tlb_busy_change(tlb, x)				\
+  do {									\
+    assert ((!tme_memory_atomic_read_flag(&(tlb)->tme_bus_tlb_busy,	\
+					  &(tlb)->tme_bus_tlb_busy_rwlock))\
+	    == (!!(x)));						\
+    tme_memory_atomic_write_flag(&(tlb)->tme_bus_tlb_busy,		\
+				 x,					\
+				 &(tlb)->tme_bus_tlb_busy_rwlock);	\
+    tme_memory_barrier(0, 0,						\
+		       (TME_MEMORY_BARRIER_WRITE_BEFORE_READ		\
+			| TME_MEMORY_BARRIER_WRITE_BEFORE_WRITE));	\
+  } while (/* CONSTCOND */ 0)
+#endif /* !TME_THREADS_COOPERATIVE || !defined(TME_NO_DEBUG_LOCKS) */
+
+/* this busies a TLB entry: */
+#define tme_bus_tlb_busy(tlb)		_tme_bus_tlb_busy_change(tlb, TRUE)
+
+/* this unbusies a TLB entry: */
+#define tme_bus_tlb_unbusy(tlb)		_tme_bus_tlb_busy_change(tlb, FALSE)
+
+/* this unbusies a TLB entry for filling: */
+/* NB: we write-lock tlb->tme_bus_tlb_invalid_rwlock to synchronize
+   with a spinning tme_bus_tlb_invalidate(), which also explicitly
+   write-locks tlb->tme_bus_tlb_invalid_rwlock.  this way,
+   tme_bus_tlb_invalidate() never misses the TLB entry going unbusy: */
+/* NB: we must mark a TLB entry valid before we fill it.  we can't
+   mark it valid after we fill it, because we will race with those who
+   want to invalidate it.  however, by marking it valid before we fill
+   it, we race with ourselves - before the TLB entry is filled, we may
+   run again and see a TLB entry that was actually invalidated, as
+   valid.  to avoid this case, we invalidate the TLB entry in another
+   way - we poison its first and last addresses to impossible values: */
+#define tme_bus_tlb_unbusy_fill(tlb)					\
+  do {									\
+    tme_bus_tlb_unbusy(tlb);						\
+    if (tme_bus_tlb_is_invalid(tlb)) {					\
+      (tlb)->tme_bus_tlb_addr_first = 1;				\
+      (tlb)->tme_bus_tlb_addr_last = 0;					\
+      tme_rwlock_wrlock(&(tlb)->tme_bus_tlb_invalid_rwlock);		\
+      (tlb)->tme_bus_tlb_invalid = FALSE;				\
+      tme_rwlock_unlock(&(tlb)->tme_bus_tlb_invalid_rwlock);		\
+    }									\
+  } while (/* CONSTCOND */ 0)
+
 /* given a TLB entry and an address range, this evaluates to nonzero
    iff the TLB entry is valid and covers the address range: */
 #define _TME_BUS_TLB_OK(tlb, address_first, address_last)				\
-  ((address_first) >= TME_ATOMIC_READ(tme_bus_addr_t, (tlb)->tme_bus_tlb_addr_first)	\
-   && (address_last) <= TME_ATOMIC_READ(tme_bus_addr_t, (tlb)->tme_bus_tlb_addr_last))
+  (tme_bus_tlb_is_valid(tlb)						\
+   && (address_first) >= (tlb)->tme_bus_tlb_addr_first			\
+   && (address_last) <= (tlb)->tme_bus_tlb_addr_last)
 
 /* given a TLB entry and an address range, this evaulates to nonzero
    iff the TLB entry is valid, covers the address range, and allows
@@ -180,6 +242,10 @@ do {							\
    initiator should handle: */
 #define TME_BUS_CYCLE_SYNCHRONOUS_EVENT		(EINTR)
 
+/* internal bus connection types: */
+#define TME_BUS_CONNECTION_INT_FLAG_ADDRESSABLE		TME_BIT(0)
+#define TME_BUS_CONNECTION_INT_FLAG_CONTROLLER		TME_BIT(1)
+
 /* types: */
 struct tme_bus_tlb;
 
@@ -241,8 +307,16 @@ typedef int (*tme_bus_fault_handler) _TME_P((void *, struct tme_bus_tlb *, struc
 struct tme_bus_tlb {
 
   /* the bus address region covered by this TLB entry: */
-  TME_ATOMIC(tme_bus_addr_t, tme_bus_tlb_addr_first);
-  TME_ATOMIC(tme_bus_addr_t, tme_bus_tlb_addr_last);
+  tme_bus_addr_t tme_bus_tlb_addr_first;
+  tme_bus_addr_t tme_bus_tlb_addr_last;
+
+  /* if this is nonzero, the TLB entry has been invalidated: */
+  tme_shared tme_memory_atomic_flag_t tme_bus_tlb_invalid;
+  tme_rwlock_t tme_bus_tlb_invalid_rwlock;
+
+  /* if this is nonzero, this TLB entry is busy: */
+  tme_shared tme_memory_atomic_flag_t tme_bus_tlb_busy;
+  tme_rwlock_t tme_bus_tlb_busy_rwlock;
 
   /* this TLB entry pointer is meant to make TLB filling more
      thread-safe.  since callers of TLB fill functions should release
@@ -259,26 +333,15 @@ struct tme_bus_tlb {
      on the stack.  however, since TLB entries may also be invalidated by
      the filler at some later time, the caller must provide a pointer to
      its "global" TLB entry that backs the local TLB entry filled.
-     this is that pointer.
-
-     additionally, this field is used in "global" backing TLB entries
-     as a sort of reservation field.  before a TLB fill callout is
-     made, the caller stores the pointer to the local TLB entry being
-     filled.  after the TLB fill returns and the caller relocks its
-     data structures, it can test to see if its reservation on the
-     global backing TLB entry has been broken or not.  it will only be
-     broken by a concurrent TLB fill by caller code, or by a regular
-     TLB invalidation (possibly an invalidation of the TLB entry just
-     filled!)  only if the reservation has not been broken will the
-     local TLB entry be copied back into the backing TLB entry: */
-  TME_ATOMIC(struct tme_bus_tlb *, tme_bus_tlb_backing_reservation);
+     this is that pointer: */
+  struct tme_bus_tlb *tme_bus_tlb_global;
 
   /* when one or both of these pointers are not TME_EMULATOR_OFF_UNDEF, 
      this TLB entry allows fast (memory) reads of and/or writes to the
      bus region.  adding an address in the bus region to one of these
      pointers yields the desired host memory address: */
-  _tme_const tme_uint8_t *tme_bus_tlb_emulator_off_read;
-  tme_uint8_t *tme_bus_tlb_emulator_off_write;
+  _tme_const tme_shared tme_uint8_t *tme_bus_tlb_emulator_off_read;
+  tme_shared tme_uint8_t *tme_bus_tlb_emulator_off_write;
 
   /* fast (memory) reads and writes are protected by this rwlock: */
   tme_rwlock_t *tme_bus_tlb_rwlock;
@@ -353,7 +416,7 @@ struct tme_bus_connection {
   int (*tme_bus_intack) _TME_P((struct tme_bus_connection *, unsigned int, int *));
 
   /* the bus TLB set allocator: */
-  int (*tme_bus_tlb_set_allocate) _TME_P((struct tme_bus_connection *, unsigned int, unsigned int, TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb *)));
+  int (*tme_bus_tlb_set_allocate) _TME_P((struct tme_bus_connection *, unsigned int, unsigned int, struct tme_bus_tlb * tme_shared *, tme_rwlock_t *));
 
   /* the bus TLB entry filler: */
   int (*tme_bus_tlb_fill) _TME_P((struct tme_bus_connection *, struct tme_bus_tlb *,
@@ -366,8 +429,8 @@ struct tme_bus_connection_int {
   /* the external bus connection: */
   struct tme_bus_connection tme_bus_connection_int;
 
-  /* this is nonzero iff the bus connection is addressable: */
-  int tme_bus_connection_int_addressable;
+  /* flags on the bus connection: */
+  int tme_bus_connection_int_flags;
 
   /* the first and last addresses of this connection.  most code
      should never use the last-address value, and instead should honor
@@ -393,6 +456,20 @@ struct tme_bus_connection_int {
   /* the current status of the bus signals for this connection: */
   tme_uint8_t *tme_bus_connection_int_signals;
 };
+
+/* a generic bus slot: */
+struct tme_bus_slot {
+
+  /* generic bus slots are kept on a list: */
+  struct tme_bus_slot *tme_bus_slot_next;
+
+  /* the name of this bus slot: */
+  char *tme_bus_slot_name;
+
+  /* the address and size of this bus slot: */
+  tme_bus_addr_t tme_bus_slot_address;
+  tme_bus_addr_t tme_bus_slot_size;
+};  
 
 /* a generic bus: */
 struct tme_bus {
@@ -424,6 +501,12 @@ struct tme_bus {
 
   /* the number of devices asserting the various bus signals: */
   unsigned int *tme_bus_signal_asserts;
+
+  /* any bus slots: */
+  struct tme_bus_slot *tme_bus_slots;
+
+  /* any bus controller connection: */
+  struct tme_bus_connection_int *tme_bus_controller;
 };
 
 /* prototypes: */
@@ -443,10 +526,11 @@ int tme_bus_tlb_set_allocate _TME_P((struct tme_bus *,
 				     struct tme_bus_connection_int *,
 				     unsigned int,
 				     unsigned int, 
-				     TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb *)));
+				     struct tme_bus_tlb * tme_shared *,
+				     tme_rwlock_t *));
 void tme_bus_tlb_map _TME_P((struct tme_bus_tlb *, tme_bus_addr_t, _tme_const struct tme_bus_tlb *, tme_bus_addr_t));
-void tme_bus_tlb_reserve _TME_P((struct tme_bus_tlb *, struct tme_bus_tlb *));
 void tme_bus_tlb_back _TME_P((_tme_const struct tme_bus_tlb *));
+void tme_bus_tlb_construct _TME_P((struct tme_bus_tlb *));
 void tme_bus_tlb_invalidate _TME_P((struct tme_bus_tlb *));
 void tme_bus_tlb_initialize _TME_P((struct tme_bus_tlb *));
 int tme_bus_tlb_fault _TME_P((struct tme_bus_tlb *, struct tme_bus_cycle *, int));

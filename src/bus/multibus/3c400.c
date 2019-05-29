@@ -1,4 +1,4 @@
-/* $Id: 3c400.c,v 1.8 2004/04/30 11:51:29 fredette Exp $ */
+/* $Id: 3c400.c,v 1.9 2006/09/30 12:43:31 fredette Exp $ */
 
 /* bus/multibus/3c400.c - implementation of the Multibus 3c400 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: 3c400.c,v 1.8 2004/04/30 11:51:29 fredette Exp $");
+_TME_RCSID("$Id: 3c400.c,v 1.9 2006/09/30 12:43:31 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -430,8 +430,9 @@ _tme_3c400_callout(struct tme_3c400 *_3c400, int new_callouts)
 	tme_mutex_unlock(&_3c400->tme_3c400_mutex);
 	
 	/* get our bus connection: */
-	conn_bus = TME_ATOMIC_READ(struct tme_bus_connection *,
-				   _3c400->tme_3c400_device.tme_bus_device_connection);
+	conn_bus = tme_memory_atomic_pointer_read(struct tme_bus_connection *,
+						  _3c400->tme_3c400_device.tme_bus_device_connection,
+						  &_3c400->tme_3c400_device.tme_bus_device_connection_rwlock);
 	
 	/* call out the bus interrupt signal edge: */
 	rc = (*conn_bus->tme_bus_signal)
@@ -697,8 +698,8 @@ _tme_3c400_tlb_fill(void *__3c400, struct tme_bus_tlb *tlb,
       && address < TME_3C400_REG_AROM) {
 
     /* this TLB entry covers this range: */
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first, TME_3C400_REG_CSR);
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last, TME_3C400_REG_AROM - 1);
+    tlb->tme_bus_tlb_addr_first = TME_3C400_REG_CSR;
+    tlb->tme_bus_tlb_addr_last = TME_3C400_REG_AROM - 1;
   }
 
   /* if this address falls from the address ROM to the address RAM: */
@@ -706,16 +707,16 @@ _tme_3c400_tlb_fill(void *__3c400, struct tme_bus_tlb *tlb,
 	   && address < TME_3C400_REG_ARAM) {
 
     /* this TLB entry covers this range: */
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first, TME_3C400_REG_AROM);
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last, TME_3C400_REG_ARAM - 1);
+    tlb->tme_bus_tlb_addr_first = TME_3C400_REG_AROM;
+    tlb->tme_bus_tlb_addr_last = TME_3C400_REG_ARAM - 1;
   }
 
   /* anything else covers the remainder of the device: */
   else {
 
     /* this TLB entry can cover from the address RAM to the end of the card: */
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_first, TME_3C400_REG_ARAM);
-    TME_ATOMIC_WRITE(tme_bus_addr_t, tlb->tme_bus_tlb_addr_last, TME_3C400_SIZ_CARD - 1);
+    tlb->tme_bus_tlb_addr_first = TME_3C400_REG_ARAM;
+    tlb->tme_bus_tlb_addr_last = TME_3C400_SIZ_CARD - 1;
 
     /* this TLB entry allows fast writing: */
     tlb->tme_bus_tlb_emulator_off_write = &_3c400->tme_3c400_card[0];

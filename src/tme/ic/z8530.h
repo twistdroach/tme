@@ -1,4 +1,4 @@
-/* $Id: z8530.h,v 1.3 2003/05/16 21:48:15 fredette Exp $ */
+/* $Id: z8530.h,v 1.4 2007/08/24 01:09:06 fredette Exp $ */
 
 /* tme/ic/z8530.h - public header file for Zilog 8530 emulation */
 
@@ -37,7 +37,7 @@
 #define _TME_IC_Z8530_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: z8530.h,v 1.3 2003/05/16 21:48:15 fredette Exp $");
+_TME_RCSID("$Id: z8530.h,v 1.4 2007/08/24 01:09:06 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -46,11 +46,17 @@ _TME_RCSID("$Id: z8530.h,v 1.3 2003/05/16 21:48:15 fredette Exp $");
 /* macros: */
 #define TME_Z8530_SOCKET_0	(0)
 
+/* socket flags: */
+#define TME_Z8530_SOCKET_FLAG_IEI_TIED_LOW	(1 << 0)
+
 /* structures: */
 struct tme_z8530_socket {
   
   /* the version number of this structure: */
   unsigned int tme_z8530_socket_version;
+
+  /* flags: */
+  unsigned int tme_z8530_socket_flags;
 
   /* the bus address of channel A: */
   tme_bus_addr_t tme_z8530_socket_address_chan_a;

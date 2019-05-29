@@ -5,7 +5,7 @@ AUTOMAKE_OPTIONS = 1.4 gnu
 
 SUBDIRS = generic ic machine scsi
 
-pkginclude_HEADERS = atomics.h \
+pkginclude_HEADERS = memory.h \
 	common.h \
 	connection.h \
 	element.h \

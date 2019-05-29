@@ -1,4 +1,4 @@
-/* $Id: scsi-cdb.c,v 1.4 2003/10/16 02:48:25 fredette Exp $ */
+/* $Id: scsi-cdb.c,v 1.5 2007/08/25 22:52:18 fredette Exp $ */
 
 /* scsi/scsi-cdb.c - implementation of generic SCSI device CDB support: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: scsi-cdb.c,v 1.4 2003/10/16 02:48:25 fredette Exp $");
+_TME_RCSID("$Id: scsi-cdb.c,v 1.5 2007/08/25 22:52:18 fredette Exp $");
 
 /* includes: */
 #include <tme/scsi/scsi-cdb.h>
@@ -184,10 +184,140 @@ _TME_SCSI_DEVICE_CDB_DECL(tme_scsi_device_cdb_request_sense)
 				 TME_SCSI_MSG_CMD_COMPLETE);
 }
 
+/* this processes the parameter list from a MODE SELECT command: */
+void
+tme_scsi_device_mode_select_data(struct tme_scsi_device *scsi_device,
+				 int (*do_mode_select_blocks) _TME_P((struct tme_scsi_device *,
+								      const struct tme_scsi_device_mode_blocks *)),
+				 int (*do_mode_select_page) _TME_P((struct tme_scsi_device *,
+								    const tme_uint8_t *)))
+{
+  const tme_uint8_t *data;
+  const tme_uint8_t *data_end;
+  tme_uint32_t length;
+  tme_uint32_t block_descriptor_length;
+  struct tme_scsi_device_mode_blocks blocks_buffer;
+  int is_group0_cmd;
+  
+  /* see if this is a Group 0 MODE SELECT: */
+  is_group0_cmd
+    = ((scsi_device->tme_scsi_device_cdb[0]
+	& TME_SCSI_CDB_GROUP_MASK)
+       == TME_SCSI_CDB_GROUP_0);
+
+  /* "A parameter list length of zero indicates that no data shall be
+     transferred.  This condition shall not be considered as an error." */
+  if (scsi_device->tme_scsi_device_cdb[4] == 0) {
+    tme_scsi_device_target_do_smf(scsi_device,
+				  TME_SCSI_STATUS_GOOD,
+				  TME_SCSI_MSG_CMD_COMPLETE);
+    return;
+  }
+
+  /* get a pointer to the first byte of data, and a pointer past the
+     last byte of data: */
+  data = &scsi_device->tme_scsi_device_data[0];
+  length = scsi_device->tme_scsi_device_cdb[4];
+  data_end = (data
+	      + TME_MIN(sizeof(scsi_device->tme_scsi_device_data),
+			length));
+
+  /* "A parameter list length that results in the truncation of any
+     descriptor, header or page of parameters shall cause the target
+     to terminate the command with CHECK CONDITION status.  The sense
+     key shall be set to ILLEGAL REQUEST, and the additional sense
+     code shall be set to PARAMETER LIST LENGTH ERROR. " */
+
+  /* process the mode data: */
+  do {
+
+    /* skip a reserved byte (in a MODE SENSE command, this byte would
+       be the Mode Data Length): */
+    data++;
+
+    /* skip the Medium Type and the Device Specific Parameter: */
+    if ((data_end - data) < 2) break;
+    data += 2;
+
+    /* if this is not the Group 0 command, skip two reserved bytes: */
+    if (!is_group0_cmd) {
+      if ((data_end - data) < 2) break;
+      data += 2;
+    }
+
+    /* get the Block Descriptor Length: */
+    if (data == data_end) break;
+    block_descriptor_length = *(data++);
+    if (!is_group0_cmd) {
+      if (data == data_end) break;
+      block_descriptor_length = (block_descriptor_length << 8) + *(data++);
+    }
+
+    /* check the Block Descriptors: */
+    if (((unsigned long) (data_end - data)) < block_descriptor_length
+	|| (block_descriptor_length % 8) != 0) {
+      break;
+    }
+    for (;
+	 block_descriptor_length >= 8;
+	 block_descriptor_length -= 8) {
+
+      /* get the density code: */
+      blocks_buffer.tme_scsi_device_mode_blocks_density_code = *(data++);
+
+      /* get the number of blocks: */
+      blocks_buffer.tme_scsi_device_mode_blocks_number
+	= ((((tme_uint32_t) data[0]) << 16)
+	   | (((tme_uint32_t) data[1]) << 8)
+	   | ((tme_uint32_t) data[2]));
+      data += 3;
+
+      /* skip the reserved byte: */
+      data++;
+
+      /* get the block length: */
+      blocks_buffer.tme_scsi_device_mode_blocks_length
+	= ((((tme_uint32_t) data[0]) << 16)
+	   | (((tme_uint32_t) data[1]) << 8)
+	   | ((tme_uint32_t) data[2]));
+      data += 3;
+
+      /* call back for this blocks descriptor: */
+      if ((*do_mode_select_blocks)(scsi_device, &blocks_buffer)) {
+	return;
+      }
+    }
+
+    /* check the Mode Pages: */
+    for (;
+	 ((data_end - data) >= 2
+	  && (data_end - data) >= (2 + data[1]));
+	 data += (2 + data[1])) {
+
+      /* call back for this Mode Page: */
+      if ((*do_mode_select_page)(scsi_device, data)) {
+	return;
+      }
+    }
+
+    /* terminate the command with GOOD status: */
+    tme_scsi_device_target_do_smf(scsi_device,
+				  TME_SCSI_STATUS_GOOD,
+				  TME_SCSI_MSG_CMD_COMPLETE);
+    return;
+  
+  } while (/* CONSTCOND */ 0);
+
+  /* terminate the command with CHECK CONDITION status: */
+  tme_scsi_device_check_condition(scsi_device, 
+				  TME_SCSI_SENSE_EXT_KEY_ILLEGAL_REQUEST,
+				  TME_SCSI_SENSE_EXT_ASC_ASCQ_PARAMETER_LIST_LENGTH_ERROR);
+}
+
 /* this adds one of the inquiry strings to the data: */
 static tme_uint8_t *
 _tme_scsi_device_make_inquiry_string(tme_uint8_t *data,
-				     const tme_uint8_t *string,
+				     const char *string,
 				     unsigned int size)
 {
   tme_uint8_t c;

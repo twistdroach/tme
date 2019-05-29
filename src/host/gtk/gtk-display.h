@@ -1,4 +1,4 @@
-/* $Id: gtk-display.h,v 1.6 2005/04/30 15:20:26 fredette Exp $ */
+/* $Id: gtk-display.h,v 1.9 2007/08/25 19:52:23 fredette Exp $ */
 
 /* host/gtk/gtk-display.h - header file for GTK display support: */
 
@@ -37,7 +37,7 @@
 #define _HOST_GTK_GTK_DISPLAY_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: gtk-display.h,v 1.6 2005/04/30 15:20:26 fredette Exp $");
+_TME_RCSID("$Id: gtk-display.h,v 1.9 2007/08/25 19:52:23 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/fb.h>
@@ -80,6 +80,9 @@ struct tme_gtk_screen {
      given scaling yet: */
   int tme_gtk_screen_fb_scale;
 
+  /* any colorset signature: */
+  tme_uint32_t tme_gtk_screen_colorset;
+
   /* the top-level window: */
   GtkWidget *tme_gtk_screen_window;
   
@@ -116,8 +119,8 @@ struct tme_gtk_screen {
   GdkEventMask tme_gtk_screen_mouse_events_old;
 
   /* when mouse mode is on, this is the warp center: */
-  guint tme_gtk_screen_mouse_warp_x;
-  guint tme_gtk_screen_mouse_warp_y;
+  gint tme_gtk_screen_mouse_warp_x;
+  gint tme_gtk_screen_mouse_warp_y;
 
   /* when mouse mode is on, the last tme buttons state: */
   unsigned int tme_gtk_screen_mouse_buttons_last;
@@ -162,6 +165,9 @@ struct tme_gtk_display {
   /* our keysym to keycode hash: */
   tme_hash_t tme_gtk_display_keyboard_keysym_to_keycode;
 
+  /* the next keysym to allocate for an unknown keysym string: */
+  guint tme_gtk_display_keyboard_keysym_alloc_next;
+
   /* our mouse connection: */
   struct tme_mouse_connection *tme_gtk_display_mouse_connection;
 
@@ -181,6 +187,22 @@ struct tme_gtk_display {
   GtkTooltips *tme_gtk_display_tooltips;
 };
 
+/* a menu item: */
+struct tme_gtk_display_menu_item {
+
+  /* which menu item this is: */
+  unsigned int tme_gtk_display_menu_item_which;
+
+  /* where to save the menu item widget: */
+  GtkWidget **tme_gtk_display_menu_item_widget;
+
+  /* the string for the menu item label: */
+  const char *tme_gtk_display_menu_item_string;
+};
+
+/* this generates menu items: */
+typedef GtkSignalFunc (*tme_gtk_display_menu_items_t) _TME_P((void *, struct tme_gtk_display_menu_item *));
+
 /* prototypes: */
 struct tme_gtk_screen *_tme_gtk_screen_new _TME_P((struct tme_gtk_display *));
 int _tme_gtk_screen_connections_new _TME_P((struct tme_gtk_display *, 
@@ -198,6 +220,7 @@ void _tme_gtk_screen_th_update _TME_P((struct tme_gtk_display *));
 void _tme_gtk_display_callout _TME_P((struct tme_gtk_display *,
 				      int));
 gint _tme_gtk_display_enter_focus _TME_P((GtkWidget *, GdkEvent *, gpointer));
+GtkWidget *_tme_gtk_display_menu_radio _TME_P((void *, tme_gtk_display_menu_items_t));
 
 #endif /* _HOST_GTK_GTK_DISPLAY_H */
 

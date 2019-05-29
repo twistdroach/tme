@@ -1,4 +1,4 @@
-/* $Id: fb.h,v 1.2 2005/04/30 15:07:05 fredette Exp $ */
+/* $Id: fb.h,v 1.3 2007/08/25 22:45:51 fredette Exp $ */
 
 /* tme/generic/fb.h - header file for generic framebuffer support: */
 
@@ -37,7 +37,7 @@
 #define _TME_GENERIC_FB_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: fb.h,v 1.2 2005/04/30 15:07:05 fredette Exp $");
+_TME_RCSID("$Id: fb.h,v 1.3 2007/08/25 22:45:51 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -83,6 +83,16 @@ _TME_RCSID("$Id: fb.h,v 1.2 2005/04/30 15:07:05 fredette Exp $");
    least significant zero bits: */
 #define TME_FB_XLAT_MAP_BASE_MASK(mask)			\
   ((mask) / _TME_FIELD_MASK_FACTOR(mask))
+
+/* the return value of tme_fb_xlat_colors_get() is a colorset
+   signature.  if TME_FB_COLORSET_NONE, the colorset is tied, at least
+   in part, to the source framebuffer characteristics.  otherwise, the
+   colorset is only tied to the destination framebuffer
+   characteristics - and two such colorsets, with the same signature
+   and with the same destination framebuffer characteristics, will
+   always be identical.  this allows the caller to avoid unnecessary
+   color reallocation: */
+#define TME_FB_COLORSET_NONE		(0)
 
 /* types: */
 

@@ -1,4 +1,4 @@
-/* $Id: sun2-mainbus.c,v 1.16 2005/02/17 13:32:05 fredette Exp $ */
+/* $Id: sun2-mainbus.c,v 1.17 2007/08/24 01:19:01 fredette Exp $ */
 
 /* machine/sun2/sun2-mainbus.c - implementation of Sun 2 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun2-mainbus.c,v 1.16 2005/02/17 13:32:05 fredette Exp $");
+_TME_RCSID("$Id: sun2-mainbus.c,v 1.17 2007/08/24 01:19:01 fredette Exp $");
 
 /* includes: */
 #include "sun2-impl.h"
@@ -731,6 +731,9 @@ TME_ELEMENT_SUB_NEW_DECL(tme_machine_sun2,zs) {
 
   /* override the least lane in the z8530 socket: */
   socket.tme_z8530_socket_port_least_lane = 1; /* D15-D8 */
+
+  /* override the socket flags: */
+  socket.tme_z8530_socket_flags |= TME_Z8530_SOCKET_FLAG_IEI_TIED_LOW;
 
   /* create the z8530: */
   sub_args[0] = "tme/ic/z8530";

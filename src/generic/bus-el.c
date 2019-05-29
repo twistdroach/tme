@@ -1,4 +1,4 @@
-/* $Id: bus-el.c,v 1.13 2005/02/17 12:37:24 fredette Exp $ */
+/* $Id: bus-el.c,v 1.17 2007/03/25 21:17:01 fredette Exp $ */
 
 /* generic/bus-el.c - a real generic bus element: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: bus-el.c,v 1.13 2005/02/17 12:37:24 fredette Exp $");
+_TME_RCSID("$Id: bus-el.c,v 1.17 2007/03/25 21:17:01 fredette Exp $");
 
 /* includes: */
 #define TME_BUS_VERSION TME_X_VERSION(0, 0)
@@ -405,6 +405,9 @@ _tme_bus_intack(struct tme_bus_connection *conn_bus_acker, unsigned int signal, 
     if (conn_bus_int->tme_bus_connection_int_signals[signal_index]
 	& signal_mask) {
 
+      /* unlock the bus: */
+      tme_rwlock_unlock(&bus->tme_bus_rwlock);
+
       /* if this device doesn't acknowledge interrupts, return any
 	 user-specified vector or TME_BUS_INTERRUPT_VECTOR_UNDEF: */
       if (conn_bus_other->tme_bus_intack == NULL) {
@@ -417,8 +420,8 @@ _tme_bus_intack(struct tme_bus_connection *conn_bus_acker, unsigned int signal, 
 	rc = (*conn_bus_other->tme_bus_intack)(conn_bus_other, signal, vector);
       }
 
-      /* stop: */
-      break;
+      /* done: */
+      return (rc);
     }
   }
 
@@ -476,7 +479,8 @@ _tme_bus_tlb_fill(struct tme_bus_connection *conn_bus_asker,
 static int
 _tme_bus_tlb_set_allocate(struct tme_bus_connection *conn_bus_asker,
 			  unsigned int count, unsigned int sizeof_one, 
-			  TME_ATOMIC_POINTER_TYPE(struct tme_bus_tlb *) _tlbs)
+			  struct tme_bus_tlb * tme_shared *_tlbs,
+			  tme_rwlock_t *_tlbs_rwlock)
 {
   struct tme_bus *bus;
   struct tme_bus_connection_int *conn_int;
@@ -496,7 +500,8 @@ _tme_bus_tlb_set_allocate(struct tme_bus_connection *conn_bus_asker,
   rc = tme_bus_tlb_set_allocate(bus,
 				conn_int,
 				count, sizeof_one, 
-				_tlbs);
+				_tlbs,
+				_tlbs_rwlock);
 
   /* unlock the bus: */
   tme_rwlock_unlock(&bus->tme_bus_rwlock);
@@ -603,6 +608,7 @@ _tme_bus_connections_new(struct tme_element *element,
   struct tme_connection *conn;
   int ipl;
   int vector;
+  const struct tme_bus_slot *bus_slot;
   int arg_i;
   int usage;
 
@@ -619,11 +625,12 @@ _tme_bus_connections_new(struct tme_element *element,
   usage = FALSE;
   arg_i = 1;
   conn_int->tme_bus_connection_int_vector_int = TME_BUS_INTERRUPT_VECTOR_UNDEF;
+  bus_slot = NULL;
   for (;;) {
 
     /* the address of this connection: */
     if (TME_ARG_IS(args[arg_i + 0], "addr")) {
-      conn_int->tme_bus_connection_int_addressable = TRUE;
+      conn_int->tme_bus_connection_int_flags |= TME_BUS_CONNECTION_INT_FLAG_ADDRESSABLE;
       conn_int->tme_bus_connection_int_address = tme_bus_addr_parse_any(args[arg_i + 1], &usage);
       if (usage
 	  || (conn_int->tme_bus_connection_int_address
@@ -650,6 +657,84 @@ _tme_bus_connections_new(struct tme_element *element,
       arg_i += 2;
     }      
 
+    /* the slot for this connection: */
+    else if (TME_ARG_IS(args[arg_i + 0], "slot")
+	     && args[arg_i + 1] != NULL) {
+
+      /* you can't give more than one slot for a connection: */
+      if (bus_slot != NULL) {
+	tme_output_append_error(_output,
+				"slot %s %s, ",
+				args[arg_i + 1],
+				_("redefined"));
+	usage = TRUE;
+	break;
+      }
+
+      /* make sure this slot has been defined: */
+      for (bus_slot = bus->tme_bus_slots;
+	   bus_slot != NULL;
+	   bus_slot = bus_slot->tme_bus_slot_next) {
+	if (strcmp(bus_slot->tme_bus_slot_name,
+		   args[arg_i + 1]) == 0) {
+	  break;
+	}
+      }
+      if (bus_slot == NULL) {
+	tme_output_append_error(_output,
+				"slot %s %s, ",
+				args[arg_i + 1],
+				_("unknown"));
+	usage = TRUE;
+	break;
+      }
+      arg_i += 2;
+    }
+
+    /* the slot offset for this connection: */
+    else if (TME_ARG_IS(args[arg_i + 0], "offset")) {
+      if (bus_slot == NULL) {
+	tme_output_append_error(_output,
+				"slot %s, ",
+				_("unknown"));
+	usage = TRUE;
+	break;
+      }
+      conn_int->tme_bus_connection_int_flags |= TME_BUS_CONNECTION_INT_FLAG_ADDRESSABLE;
+      conn_int->tme_bus_connection_int_address
+	= (bus_slot->tme_bus_slot_address
+	   + tme_bus_addr_parse_any(args[arg_i + 1], &usage));
+      if (usage
+	  || (conn_int->tme_bus_connection_int_address
+	      > bus->tme_bus_address_mask)) {
+	usage = TRUE;
+	break;
+      }
+      arg_i += 2;
+    }
+
+    /* if this connection is for a slot controller: */
+    else if (TME_ARG_IS(args[arg_i + 0], "controller")) {
+      if (bus->tme_bus_controller != NULL) {
+	tme_free(conn_int);
+	return (EEXIST);
+      }
+      conn_int->tme_bus_connection_int_flags |= TME_BUS_CONNECTION_INT_FLAG_CONTROLLER;
+      arg_i++;
+    }
+
+    /* if this connection has an automatic DMA offset: */
+    else if (TME_ARG_IS(args[arg_i + 0], "dma-offset")) {
+      conn_int->tme_bus_connection_int_sourced = tme_bus_addr_parse_any(args[arg_i + 1], &usage);
+      if (usage
+	  || (conn_int->tme_bus_connection_int_sourced
+	      > bus->tme_bus_address_mask)) {
+	usage = TRUE;
+	break;
+      }
+      arg_i += 2;
+    }
+
     /* if we've run out of arguments: */
     else if (args[arg_i + 0] == NULL) {
       break;
@@ -668,10 +753,13 @@ _tme_bus_connections_new(struct tme_element *element,
 
   if (usage) {
     tme_output_append_error(_output, 
-			    "%s %s [ addr %s ] [ ipl %s ] [ vector %s ]",
+			    "%s %s [ controller ] [ addr %s ] [ slot %s offset %s ] [ dma-offset %s ] [ ipl %s ] [ vector %s ]",
 			    _("usage:"),
 			    args[0],
 			    _("BUS-ADDRESS"),
+			    _("SLOT"),
+			    _("OFFSET"),
+			    _("OFFSET"),
 			    _("INTERRUPT-LEVEL"),
 			    _("INTERRUPT-VECTOR"));
     tme_free(conn_int);
@@ -706,39 +794,147 @@ _tme_bus_connections_new(struct tme_element *element,
 /* this creates a new bus element: */
 TME_ELEMENT_SUB_NEW_DECL(tme_generic,bus) {
   struct tme_bus *bus;
-  tme_bus_addr_t bus_size;
+  tme_bus_addr_t bus_size_mask;
+  tme_bus_addr_t bus_slot_size;
+  tme_bus_addr_t bus_slot_addr;
+  int bus_slot_addr_defined;
+  struct tme_bus_slot *bus_slot;
+  struct tme_bus_slot *bus_slots;
+  int arg_i;
   int failed;
 
   /* our arguments must include the bus size, and the
      bus size must be a power of two: */
-  failed = TRUE;
-  bus_size = 0;
-  if (TME_ARG_IS(args[1], "size")) {
-    /* XXX FIXME - this is a hack: */
-    if (sizeof(bus_size) == sizeof(tme_uint32_t) &&
-	TME_ARG_IS(args[1], "4GB")) {
-      bus_size = 0;
+  failed = FALSE;
+  arg_i = 1;
+  bus_size_mask = 0;
+  bus_slot_size = 0;
+  bus_slot_addr_defined = FALSE;
+  bus_slot_addr = 0;
+  bus_slots = NULL;
+  for (; !failed; ) {
+
+    /* the bus size: */
+    if (TME_ARG_IS(args[arg_i + 0], "size")) {
+      /* XXX FIXME - this is a hack: */
+      if (sizeof(bus_size_mask) == sizeof(tme_uint32_t) &&
+	  TME_ARG_IS(args[arg_i + 1], "4GB")) {
+	bus_size_mask = ((tme_bus_addr_t) 0) - 1;
+      }
+      else {
+	bus_size_mask = tme_bus_addr_parse_any(args[arg_i + 1], &failed);
+	if (!failed
+	    && bus_size_mask < 2) {
+	  failed = TRUE;
+	}
+	else {
+	  bus_size_mask -= 1;
+	}
+      }
+      if (bus_size_mask & (bus_size_mask + 1)) {
+	failed = TRUE;
+      }
+      arg_i += 2;
     }
+
+    /* the address for the next slots: */
+    else if (TME_ARG_IS(args[arg_i + 0], "slot-addr")) {
+      bus_slot_addr = tme_bus_addr_parse_any(args[arg_i + 1], &failed);
+      bus_slot_addr_defined = TRUE;
+      arg_i += 2;
+    }
+
+    /* the size for the next slots: */
+    else if (TME_ARG_IS(args[arg_i + 0], "slot-size")) {
+      bus_slot_size = tme_bus_addr_parse_any(args[arg_i + 1], &failed);
+      if (bus_slot_size < 1) {
+	failed = TRUE;
+      }
+      arg_i += 2;
+    }
+
+    /* a slot definition: */
+    else if (TME_ARG_IS(args[arg_i + 0], "slot")) {
+      if (args[arg_i + 1] == NULL) {
+	failed = TRUE;
+	break;
+      }
+      if (!bus_slot_addr_defined) {
+	failed = TRUE;
+	break;
+      }
+      if (bus_slot_size == 0) {
+	failed = TRUE;
+	break;
+      }
+
+      /* make sure this slot hasn't already been defined: */
+      for (bus_slot = bus_slots;
+	   bus_slot != NULL;
+	   bus_slot = bus_slot->tme_bus_slot_next) {
+	if (strcmp(bus_slot->tme_bus_slot_name,
+		   args[arg_i + 1]) == 0) {
+	  tme_output_append_error(_output,
+				  "slot %s %s",
+				  args[arg_i + 1],
+				  _("redefined"));
+	  failed = TRUE;
+	  break;
+	}
+      }
+      if (failed) {
+	break;
+      }
+
+      /* add this slot: */
+      bus_slot = tme_new0(struct tme_bus_slot, 1);
+      bus_slot->tme_bus_slot_next = bus_slots;
+      bus_slots = bus_slot;
+      bus_slot->tme_bus_slot_name = tme_strdup(args[arg_i + 1]);
+      bus_slot->tme_bus_slot_address = bus_slot_addr;
+      bus_slot->tme_bus_slot_size = bus_slot_size;
+
+      /* advance for the next slot: */
+      bus_slot_addr += bus_slot_size;
+      arg_i += 2;
+    }
+
+    /* if we've run out of arguments: */
+    else if (args[arg_i + 0] == NULL) {
+      break;
+    }
+
+    /* an unknown argument: */
     else {
-      bus_size = tme_bus_addr_parse_any(args[2], &failed);
-    }
-    if (bus_size & (bus_size - 1)) {
+      tme_output_append_error(_output,
+			      "%s %s, ",
+			      args[arg_i],
+			      _("unexpected"));
       failed = TRUE;
     }
   }
   if (failed) {
     tme_output_append_error(_output,
-			    "%s %s size %s",
+			    "%s %s size %s [ slot-addr %s slot-size %s slot %s0 .. slot %sN ]",
 			    _("usage:"),
 			    args[0],
-			    _("SIZE"));
+			    _("SIZE"),
+			    _("ADDRESS"),
+			    _("SIZE"),
+			    _("SLOT-NAME"),
+			    _("SLOT-NAME"));
+    for (; (bus_slot = bus_slots) != NULL; ) {
+      bus_slots = bus_slots->tme_bus_slot_next;
+      tme_free(bus_slot->tme_bus_slot_name);
+      tme_free(bus_slot);
+    }
     return (EINVAL);
   }
 
   /* allocate and initialize the new bus: */
   bus = tme_new0(struct tme_bus, 1);
   tme_rwlock_init(&bus->tme_bus_rwlock);
-  bus->tme_bus_address_mask = bus_size - 1;
+  bus->tme_bus_address_mask = bus_size_mask;
   bus->tme_bus_addressables_count = 0;
   bus->tme_bus_addressables_size = 1;
   bus->tme_bus_addressables = tme_new(struct tme_bus_addressable,
@@ -749,6 +945,7 @@ TME_ELEMENT_SUB_NEW_DECL(tme_generic,bus) {
 				 TME_ARRAY_ELS(_tme_bus_signals_default));
   bus->tme_bus_signal_asserts = tme_new0(unsigned int,
 					 _tme_bus_signals_default[0].tme_bus_signals_count);
+  bus->tme_bus_slots = bus_slots;
 
   /* fill the element: */
   element->tme_element_private = bus;

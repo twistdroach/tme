@@ -1,4 +1,4 @@
-/* $Id: hash.h,v 1.1 2003/06/27 21:06:55 fredette Exp $ */
+/* $Id: hash.h,v 1.2 2007/02/15 01:25:29 fredette Exp $ */
 
 /* tme/hash.h - public header file for hashes: */
 
@@ -37,12 +37,25 @@
 #define _TME_HASH_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: hash.h,v 1.1 2003/06/27 21:06:55 fredette Exp $");
+_TME_RCSID("$Id: hash.h,v 1.2 2007/02/15 01:25:29 fredette Exp $");
 
 /* macros: */
 
 /* the NULL hash data type value: */
 #define TME_HASH_DATA_NULL	(NULL)
+
+/* these convert between the hash data type and various integral
+   types: */
+/* NB: these assume that an unsigned long can be cast to void *, and
+   vice versa: */
+#define tme_hash_data_from_ulong(x)	((tme_hash_data_t) (x))
+#define tme_hash_data_from_long(x)	tme_hash_data_from_ulong((unsigned long) (x))
+#define tme_hash_data_from_uint32(x)	tme_hash_data_from_ulong((unsigned long) (x))
+#define tme_hash_data_from_int32(x)	tme_hash_data_from_uint32((tme_uint32_t) (x))
+#define tme_hash_data_to_ulong(x)	((unsigned long) (x))
+#define tme_hash_data_to_long(x)	((long) tme_hash_data_to_ulong(x))
+#define tme_hash_data_to_uint32(x)	((tme_uint32_t) tme_hash_data_to_ulong(x))
+#define tme_hash_data_to_int32(x)	((tme_int32_t) tme_hash_data_to_uint32(x))
 
 /* types: */
 

@@ -1,4 +1,4 @@
-/* $Id: gtk-screen.c,v 1.7 2005/05/14 22:12:48 fredette Exp $ */
+/* $Id: gtk-screen.c,v 1.9 2007/08/25 20:09:13 fredette Exp $ */
 
 /* host/gtk/gtk-screen.c - GTK screen support: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: gtk-screen.c,v 1.7 2005/05/14 22:12:48 fredette Exp $");
+_TME_RCSID("$Id: gtk-screen.c,v 1.9 2007/08/25 20:09:13 fredette Exp $");
 
 /* we are aware of the problems with gdk_image_new_bitmap, and we cope
    with them, so we define GDK_ENABLE_BROKEN to get its prototype
@@ -145,9 +145,7 @@ _tme_gtk_gdkimage_scanline_pad(GdkImage *image)
   if ((image->bpl % sizeof(tme_uint16_t)) == 0) {
     return (16);
   }
-  if ((image->bpl % sizeof(tme_uint8_t)) == 0) {
-    return (8);
-  }
+  return (8);
 }
 
 /* this is called for a mode change: */
@@ -162,9 +160,18 @@ _tme_gtk_screen_mode_change(struct tme_fb_connection *conn_fb)
   int scale;
   unsigned long fb_area, avail_area, percentage;
   gint width, height;
+  gint height_extra;
+  const void *map_g_old;
+  const void *map_r_old;
+  const void *map_b_old;
+  const tme_uint32_t *map_pixel_old;
+  tme_uint32_t map_pixel_count_old;  
+  tme_uint32_t colorset;
   GdkImage *gdkimage;
   GdkVisual *visual;
   tme_uint32_t color_count, color_i;
+  tme_uint32_t color_count_distinct;
+  tme_uint32_t color_j;
   struct tme_fb_color *colors_tme;
   GdkColor *colors_gdk;
   gboolean *success;
@@ -217,63 +224,51 @@ _tme_gtk_screen_mode_change(struct tme_fb_connection *conn_fb)
   /* get the system's default visual: */
   visual = gdk_visual_get_system();
 
-  /* create the new GdkImage for the screen: */
+  /* get the required dimensions for the GdkImage: */
   width = ((conn_fb_other->tme_fb_connection_width
 	    * scale)
 	   / TME_FB_XLAT_SCALE_NONE);
   height = ((conn_fb_other->tme_fb_connection_height
 	     * scale)
 	    / TME_FB_XLAT_SCALE_NONE);
-  gdkimage = gdk_image_new(GDK_IMAGE_FASTEST,
-			   visual,
-			   width,
-			   height
-			   /* NB: we need to allocate an extra scanline's worth
-			      (or, if we're doubling, an extra two scanlines' 
-			      worth) of image, because the framebuffer translation 
-			      functions can sometimes overtranslate (see the 
-			      explanation of TME_FB_XLAT_RUN in fb-xlat-auto.sh): */
-			   + (scale == TME_FB_XLAT_SCALE_DOUBLE
-			      ? 2
-			      : 1));
+  /* NB: we need to allocate an extra scanline's worth (or, if we're
+     doubling, an extra two scanlines' worth) of image, because the
+     framebuffer translation functions can sometimes overtranslate
+     (see the explanation of TME_FB_XLAT_RUN in fb-xlat-auto.sh): */
+  height_extra
+    = (scale == TME_FB_XLAT_SCALE_DOUBLE
+       ? 2
+       : 1);
 
-  /* set the new image on the image widget: */
-  gtk_image_set(GTK_IMAGE(screen->tme_gtk_screen_gtkimage),
-		gdkimage,
-		NULL);
+  /* if the previous gdkimage isn't the right size: */
+  gdkimage = screen->tme_gtk_screen_gdkimage;
+  if (gdkimage->width != width
+      || gdkimage->height != (height + height_extra)) {
 
-  /* destroy the previous gdkimage and remember the new one: */
-  gdk_image_destroy(screen->tme_gtk_screen_gdkimage);
-  screen->tme_gtk_screen_gdkimage = gdkimage;
+    /* allocate a new gdkimage: */
+    gdkimage = gdk_image_new(GDK_IMAGE_FASTEST,
+			     visual,
+			     width,
+			     height
+			     + height_extra);
 
-  /* free any previously allocated maps and colors: */
-  if (conn_fb->tme_fb_connection_map_g != NULL) {
-    tme_free((void *) conn_fb->tme_fb_connection_map_g);
-  }
-  if (conn_fb->tme_fb_connection_map_r != NULL) {
-    tme_free((void *) conn_fb->tme_fb_connection_map_r);
-  }
-  if (conn_fb->tme_fb_connection_map_b != NULL) {
-    tme_free((void *) conn_fb->tme_fb_connection_map_b);
-  }
-  if (conn_fb->tme_fb_connection_map_pixel != NULL) {
+    /* set the new image on the image widget: */
+    gtk_image_set(GTK_IMAGE(screen->tme_gtk_screen_gtkimage),
+		  gdkimage,
+		  NULL);
 
-    /* recreate the array of GdkColor: */
-    color_count = conn_fb->tme_fb_connection_map_pixel_count;
-    colors_gdk = tme_new(GdkColor, color_count);
-    for (color_i = 0;
-	 color_i < color_count;
-	 color_i++) {
-      colors_gdk[color_i].pixel = conn_fb->tme_fb_connection_map_pixel[color_i];
-    }
-    
-    /* free the colors: */
-    gdk_colormap_free_colors(gdk_colormap_get_system(),
-			     colors_gdk,
-			     color_count);
-    tme_free(colors_gdk);
-    tme_free((void *) conn_fb->tme_fb_connection_map_pixel);
+    /* destroy the previous gdkimage and remember the new one: */
+    gdk_image_destroy(screen->tme_gtk_screen_gdkimage);
+    screen->tme_gtk_screen_gdkimage = gdkimage;
   }
+
+  /* remember all previously allocated maps and colors, but otherwise
+     remove them from our framebuffer structure: */
+  map_g_old = conn_fb->tme_fb_connection_map_g;
+  map_r_old = conn_fb->tme_fb_connection_map_r;
+  map_b_old = conn_fb->tme_fb_connection_map_b;
+  map_pixel_old = conn_fb->tme_fb_connection_map_pixel;
+  map_pixel_count_old = conn_fb->tme_fb_connection_map_pixel_count;
   conn_fb->tme_fb_connection_map_g = NULL;
   conn_fb->tme_fb_connection_map_r = NULL;
   conn_fb->tme_fb_connection_map_b = NULL;
@@ -327,45 +322,114 @@ _tme_gtk_screen_mode_change(struct tme_fb_connection *conn_fb)
   }
 
   /* get the needed colors: */
-  color_count = tme_fb_xlat_colors_get(conn_fb_other, scale, conn_fb, &colors_tme);
-  
-  /* if we need to allocate colors, do so: */
-  if (color_count > 0) {
-    colors_gdk = tme_new(GdkColor, color_count);
-    for (color_i = 0; color_i < color_count; color_i++) {
-      colors_gdk[color_i].green = colors_tme[color_i].tme_fb_color_value_g;
-      colors_gdk[color_i].red   = colors_tme[color_i].tme_fb_color_value_r;
-      colors_gdk[color_i].blue  = colors_tme[color_i].tme_fb_color_value_b;
+  colorset = tme_fb_xlat_colors_get(conn_fb_other, scale, conn_fb, &colors_tme);
+  color_count = conn_fb->tme_fb_connection_map_pixel_count;
+
+  /* if we need to allocate colors, but the colorset is not tied to
+     the source framebuffer characteristics, and is identical to the
+     currently allocated colorset, we can reuse the previously
+     allocated maps and colors: */
+  if (color_count > 0
+      && colorset != TME_FB_COLORSET_NONE
+      && colorset == screen->tme_gtk_screen_colorset) {
+
+    /* free the requested color array: */
+    tme_free(colors_tme);
+
+    /* restore the previously allocated maps and colors: */
+    conn_fb->tme_fb_connection_map_g = map_g_old;
+    conn_fb->tme_fb_connection_map_r = map_r_old;
+    conn_fb->tme_fb_connection_map_b = map_b_old;
+    conn_fb->tme_fb_connection_map_pixel = map_pixel_old;
+    conn_fb->tme_fb_connection_map_pixel_count = map_pixel_count_old;
+  }
+
+  /* otherwise, we may need to free and/or allocate colors: */
+  else {
+
+    /* save the colorset signature: */
+    screen->tme_gtk_screen_colorset = colorset;
+
+    /* free any previously allocated maps and colors: */
+    if (map_g_old != NULL) {
+      tme_free((void *) map_g_old);
     }
-    success = tme_new(gboolean, color_count);
-    gdk_colormap_alloc_colors(gdk_colormap_get_system(),
-			      colors_gdk,
-			      color_count,
-			      FALSE,
-			      FALSE,
-			      success);
-    warned_color_alloc = FALSE;
-    for (color_i = 0; color_i < color_count; color_i++) {
-      if (!success[color_i]) {
-	if (!gdk_colormap_alloc_color(gdk_colormap_get_system(),
-				      &colors_gdk[color_i],
-				      FALSE,
-				      TRUE)) {
-	  if (!warned_color_alloc) {
-	    warned_color_alloc = TRUE;
-	    tme_log(&display->tme_gtk_display_element->tme_element_log_handle, 0, ENOMEM,
-		    (&display->tme_gtk_display_element->tme_element_log_handle,
-		     _("could not allocate all colors")));
-	  }
+    if (map_r_old != NULL) {
+      tme_free((void *) map_r_old);
+    }
+    if (map_b_old != NULL) {
+      tme_free((void *) map_b_old);
+    }
+    if (map_pixel_old != NULL) {
+
+      /* recreate the array of GdkColor: */
+      colors_gdk = tme_new(GdkColor, map_pixel_count_old);
+      color_i = 0;
+      do {
+	colors_gdk[color_i].pixel = map_pixel_old[color_i];
+      } while (++color_i < map_pixel_count_old);
+
+      /* free the colors: */
+      gdk_colormap_free_colors(gdk_colormap_get_system(),
+			       colors_gdk,
+			       map_pixel_count_old);
+      tme_free(colors_gdk);
+      tme_free((void *) map_pixel_old);
+    }
+
+    /* if we need to allocate colors: */
+    if (color_count > 0) {
+
+      /* make the GdkColor array, and count the number of distinct colors: */
+      colors_gdk = tme_new(GdkColor, color_count * 2);
+      color_count_distinct = 0;
+      for (color_i = 0; color_i < color_count; color_i++) {
+	color_j = colors_tme[color_i].tme_fb_color_pixel;
+	colors_gdk[color_j].green = colors_tme[color_i].tme_fb_color_value_g;
+	colors_gdk[color_j].red   = colors_tme[color_i].tme_fb_color_value_r;
+	colors_gdk[color_j].blue  = colors_tme[color_i].tme_fb_color_value_b;
+	if (color_j >= color_count_distinct) {
+	  color_count_distinct = color_j + 1;
 	}
       }
-      colors_tme[color_i].tme_fb_color_pixel = colors_gdk[color_i].pixel;
+      success = tme_new(gboolean, color_count_distinct);
+
+      /* allocate exact matches for as many colors as possible: */
+      gdk_colormap_alloc_colors(gdk_colormap_get_system(),
+				colors_gdk,
+				color_count_distinct,
+				FALSE,
+				FALSE,
+				success);
+
+      /* allocate read-only best matches for any colors we failed to
+	 allocate exactly: */
+      warned_color_alloc = FALSE;
+      for (color_i = 0; color_i < color_count; color_i++) {
+	color_j = colors_tme[color_i].tme_fb_color_pixel;
+	if (!success[color_j]) {
+	  if (!gdk_colormap_alloc_color(gdk_colormap_get_system(),
+					&colors_gdk[color_j],
+					FALSE,
+					TRUE)) {
+	    if (!warned_color_alloc) {
+	      warned_color_alloc = TRUE;
+	      tme_log(&display->tme_gtk_display_element->tme_element_log_handle, 0, ENOMEM,
+		      (&display->tme_gtk_display_element->tme_element_log_handle,
+		       _("could not allocate all colors")));
+	    }
+	  }
+	}
+	colors_tme[color_i].tme_fb_color_pixel = colors_gdk[color_j].pixel;
+      }
+
+      /* free the arrays used with gdk_colormap_alloc_colors(): */
+      tme_free(success);
+      tme_free(colors_gdk);
+
+      /* set the needed colors: */
+      tme_fb_xlat_colors_set(conn_fb_other, scale, conn_fb, colors_tme);
     }
-    tme_free(success);
-    tme_free(colors_gdk);
-  
-    /* set the needed colors: */
-    tme_fb_xlat_colors_set(conn_fb_other, scale, conn_fb, colors_tme);
   }
 
   /* compose the framebuffer translation question: */
@@ -499,6 +563,36 @@ _tme_gtk_screen_scale_double(GtkWidget *widget,
 			    TME_FB_XLAT_SCALE_DOUBLE);
 }
 
+/* this creates the Screen scaling submenu: */
+static GtkSignalFunc
+_tme_gtk_screen_submenu_scaling(void *_screen,
+				struct tme_gtk_display_menu_item *menu_item)
+{
+  struct tme_gtk_screen *screen;
+
+  screen = (struct tme_gtk_screen *) _screen;
+  menu_item->tme_gtk_display_menu_item_widget = NULL;
+  switch (menu_item->tme_gtk_display_menu_item_which) {
+  case 0:
+    menu_item->tme_gtk_display_menu_item_string = _("Default");
+    menu_item->tme_gtk_display_menu_item_widget = &screen->tme_gtk_screen_scale_default;
+    return (GTK_SIGNAL_FUNC(_tme_gtk_screen_scale_default));
+  case 1:
+    menu_item->tme_gtk_display_menu_item_string = _("Half");
+    menu_item->tme_gtk_display_menu_item_widget = &screen->tme_gtk_screen_scale_half;
+    return (GTK_SIGNAL_FUNC(_tme_gtk_screen_scale_half));
+  case 2:
+    menu_item->tme_gtk_display_menu_item_string = _("Full");
+    return (GTK_SIGNAL_FUNC(_tme_gtk_screen_scale_none));
+  case 3:
+    menu_item->tme_gtk_display_menu_item_string = _("Double");
+    return (GTK_SIGNAL_FUNC(_tme_gtk_screen_scale_double));
+  default:
+    break;
+  }
+  return (NULL);
+}
+
 /* this makes a new screen: */
 struct tme_gtk_screen *
 _tme_gtk_screen_new(struct tme_gtk_display *display)
@@ -508,13 +602,8 @@ _tme_gtk_screen_new(struct tme_gtk_display *display)
   GtkWidget *menu;
   GtkWidget *submenu;
   GtkWidget *menu_item;
-  GtkWidget **_menu_item;
-  GSList *menu_group;
   tme_uint8_t *bitmap_data;
   unsigned int y;
-  const char *menu_label;
-  GtkSignalFunc menu_func;
-  int i;
 #define BLANK_SIDE (16 * 8)
 
   /* create the new screen and link it in: */
@@ -532,6 +621,9 @@ _tme_gtk_screen_new(struct tme_gtk_display *display)
   /* the user hasn't specified a scaling yet: */
   screen->tme_gtk_screen_fb_scale
     = -TME_FB_XLAT_SCALE_NONE;
+
+  /* we have no colorset: */
+  screen->tme_gtk_screen_colorset = TME_FB_COLORSET_NONE;
 
   /* create the top-level window, and allow it to shrink, grow,
      and auto-shrink: */
@@ -560,49 +652,9 @@ _tme_gtk_screen_new(struct tme_gtk_display *display)
   menu = gtk_menu_new();
 
   /* create the Screen scaling submenu: */
-  submenu = gtk_menu_new();
-
-  /* create the Screen scaling submenu options: */
-  menu_group = NULL;
-  for (i = 0;; i++) {
-    if (i == 0) {
-      menu_label = _("Default");
-      _menu_item = &screen->tme_gtk_screen_scale_default;
-      menu_func = GTK_SIGNAL_FUNC(_tme_gtk_screen_scale_default);
-    }
-    else if (i == 1) {
-      menu_label = _("Half");
-      _menu_item = &screen->tme_gtk_screen_scale_half;
-      menu_func = GTK_SIGNAL_FUNC(_tme_gtk_screen_scale_half);
-    }
-    else if (i == 2) {
-      menu_label = _("Full");
-      _menu_item = NULL;
-      menu_func = GTK_SIGNAL_FUNC(_tme_gtk_screen_scale_none);
-    }
-    else if (i == 3) {
-      menu_label = _("Double");
-      _menu_item = NULL;
-      menu_func = GTK_SIGNAL_FUNC(_tme_gtk_screen_scale_double);
-    }
-    else {
-      break;
-    }
-    menu_item
-      = gtk_radio_menu_item_new_with_label(menu_group,
-					   menu_label);
-    if (_menu_item != NULL) {
-      *_menu_item = menu_item;
-    }
-    menu_group
-      = gtk_radio_menu_item_group(GTK_RADIO_MENU_ITEM(menu_item));
-    gtk_signal_connect(GTK_OBJECT(menu_item), 
-		       "activate",
-		       menu_func,
-		       (gpointer) screen);
-    gtk_menu_append(GTK_MENU(submenu), menu_item);
-    gtk_widget_show(menu_item);
-  }
+  submenu
+    = _tme_gtk_display_menu_radio(screen,
+				  _tme_gtk_screen_submenu_scaling);
 
   /* create the Screen scaling submenu item: */
   menu_item = gtk_menu_item_new_with_label(_("Scale"));
