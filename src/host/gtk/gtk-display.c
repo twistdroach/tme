@@ -1,4 +1,4 @@
-/* $Id: gtk-display.c,v 1.3 2007/08/25 20:09:32 fredette Exp $ */
+/* $Id: gtk-display.c,v 1.4 2010/06/05 14:28:17 fredette Exp $ */
 
 /* host/gtk/gtk-display.c - GTK display support: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: gtk-display.c,v 1.3 2007/08/25 20:09:32 fredette Exp $");
+_TME_RCSID("$Id: gtk-display.c,v 1.4 2010/06/05 14:28:17 fredette Exp $");
 
 /* includes: */
 #include "gtk-display.h"
@@ -148,6 +148,9 @@ _tme_gtk_display_callout(struct tme_gtk_display *display,
   
   /* put in any later callouts, and clear that callouts are running: */
   display->tme_gtk_display_callout_flags = later_callouts;
+
+  /* yield to GTK: */
+  tme_threads_gtk_yield();
 }
 
 /* this is a GTK callback for an enter notify event, that has the

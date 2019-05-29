@@ -1,4 +1,4 @@
-/* $Id: sun-fbs4.c,v 1.1 2007/01/07 23:22:21 fredette Exp $ */
+/* $Id: sun-fbs4.c,v 1.2 2009/08/29 21:27:00 fredette Exp $ */
 
 /* bus/sbus/sun-fbs4.c - Sun SBus S4 framebuffer emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun-fbs4.c,v 1.1 2007/01/07 23:22:21 fredette Exp $");
+_TME_RCSID("$Id: sun-fbs4.c,v 1.2 2009/08/29 21:27:00 fredette Exp $");
 
 /* includes: */
 #include <tme/machine/sun.h>
@@ -65,4 +65,9 @@ TME_ELEMENT_SUB_NEW_DECL(tme_bus_sbus,bwtwo) {
 /* this creates a new Sbus cgthree: */
 TME_ELEMENT_SUB_NEW_DECL(tme_bus_sbus,cgthree) {
   return (tme_sun_cgthree(element, args, _output));
+}
+
+/* this creates a new Sbus cgsix: */
+TME_ELEMENT_SUB_NEW_DECL(tme_bus_sbus,cgsix) {
+  return (tme_sun_cgsix(element, args, _output));
 }

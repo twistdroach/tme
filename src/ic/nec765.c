@@ -1,4 +1,4 @@
-/* $Id: nec765.c,v 1.2 2007/01/07 23:31:17 fredette Exp $ */
+/* $Id: nec765.c,v 1.3 2009/08/29 21:12:47 fredette Exp $ */
 
 /* ic/nec765.c - NEC 765 (and Intel 8207x) implementation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: nec765.c,v 1.2 2007/01/07 23:31:17 fredette Exp $");
+_TME_RCSID("$Id: nec765.c,v 1.3 2009/08/29 21:12:47 fredette Exp $");
 
 /* includes: */
 #undef TME_NEC765_VERSION
@@ -61,6 +61,10 @@ _TME_RCSID("$Id: nec765.c,v 1.2 2007/01/07 23:31:17 fredette Exp $");
 #define TME_NEC765_SIZ_REG_NEC765	(2)
 #define TME_NEC765_SIZ_REG_I82072	(4)
 #define TME_NEC765_SIZ_REG_I82077	(8)
+
+/* the DOR register: */
+#define TME_NEC765_I82077_DOR_REST	TME_BIT(2)
+#define TME_NEC765_I82077_DOR_DMA	TME_BIT(3)
 
 /* the MSR register: */
 #define TME_NEC765_MSR_ACTIVE_A		TME_BIT(0)	/* drive A is active */
@@ -89,10 +93,14 @@ _TME_RCSID("$Id: nec765.c,v 1.2 2007/01/07 23:31:17 fredette Exp $");
 #define  TME_NEC765_ST0_IC_INVALID	 (0x80)
 #define  TME_NEC765_ST0_IC_ABNORMAL_POLL (0xc0)
 
+/* the ST3 register: */
+#define TME_NEC765_ST3_RDY		TME_BIT(5)
+
 /* commands: */
 #define _TME_NEC765_CMD(nec765, mask, cmd) (((nec765)->tme_nec765_data_fifo[0] & (mask)) == (cmd))
 #define TME_NEC765_CMD_TRACK_READ(nec765)	_TME_NEC765_CMD(nec765, 0x9f, 0x02)
 #define TME_NEC765_CMD_FIX_DRIVE_DATA(nec765)	_TME_NEC765_CMD(nec765, 0xff, 0x03)
+#define TME_NEC765_CMD_CALIBRATE(nec765)	_TME_NEC765_CMD(nec765, 0xff, 0x07)
 #define TME_NEC765_CMD_CHECK_INTS(nec765)	_TME_NEC765_CMD(nec765, 0xff, 0x08)
 #define TME_NEC765_CMD_I82072_CONFIG(nec765)	_TME_NEC765_CMD(nec765, 0xff, 0x13)
 /* XXX FIXME - is this right? */
@@ -152,11 +160,14 @@ struct tme_nec765 {
   tme_uint8_t tme_nec765_status_fifo[16];
   unsigned int tme_nec765_status_fifo_head;
   unsigned int tme_nec765_status_fifo_tail;
+
+  /* the i82077 DOR: */
+  tme_uint8_t tme_nec765_i82077_dor;
 };
 
 /* this resets the NEC765: */
 static void
-_tme_nec765_reset(struct tme_nec765 *nec765, int soft)
+_tme_nec765_reset(struct tme_nec765 *nec765, int hard)
 {
 
   /* reset the data FIFO: */
@@ -253,6 +264,7 @@ _tme_nec765_bus_cycle(void *_nec765,
 	    else {
 	      TME_NEC765_STATUS(nec765, 0, TME_NEC765_ST0_IC_INVALID);
 	    }
+	    TME_NEC765_STATUS(nec765, 1, 0x00); /* current cylinder */
 	  }
 	}
 
@@ -275,6 +287,20 @@ _tme_nec765_bus_cycle(void *_nec765,
 
 	    /* return a unit check, drive not ready ST0: */
 	    TME_NEC765_STATUS(nec765, 0, (TME_NEC765_ST0_UC | TME_NEC765_ST0_NR));
+	  }
+	}
+
+	/* the calibrate command: */
+	else if (TME_NEC765_CMD_CALIBRATE(nec765)) {
+
+	  /* the calibrate command is a two-byte command: */
+	  if (fifo_head == (sizeof(tme_uint8_t) * 2)) {
+
+	    /* return an ST3: */
+	    TME_NEC765_STATUS(nec765, 0,
+			      (TME_NEC765_IS_NEC765(nec765)
+			       ? TME_NEC765_ST3_RDY
+			       : !TME_NEC765_ST3_RDY));
 	  }
 	}
 
@@ -310,6 +336,14 @@ _tme_nec765_bus_cycle(void *_nec765,
       }
 
       reg = "FIFO";
+      break;
+
+    case TME_NEC765_I82077_REG_DOR:
+      if ((value & TME_NEC765_I82077_DOR_REST) == 0) {
+	abort();
+      }
+      nec765->tme_nec765_i82077_dor = value;
+      reg = "DOR";
       break;
 
     default:
@@ -348,8 +382,7 @@ _tme_nec765_bus_cycle(void *_nec765,
 	/* if we still have status to return: */
 	if (nec765->tme_nec765_status_fifo_tail
 	    < nec765->tme_nec765_status_fifo_head) {
-	  value |= (TME_NEC765_MSR_DIO
-		    | TME_NEC765_MSR_CB);
+	  value |= TME_NEC765_MSR_DIO;
 	}
       }
 
@@ -371,6 +404,11 @@ _tme_nec765_bus_cycle(void *_nec765,
 	abort();
       }
 
+      break;
+
+    case TME_NEC765_I82077_REG_DOR:
+      value = nec765->tme_nec765_i82077_dor;
+      reg = "DOR";
       break;
 
     default:
@@ -517,4 +555,8 @@ _tme_nec765_new(struct tme_element *element,
 
 TME_ELEMENT_X_NEW_DECL(tme_ic_,nec765,i82072) {
   return (_tme_nec765_new(element, args, extra, _output, TME_NEC765_PART_I82072));
+}
+
+TME_ELEMENT_X_NEW_DECL(tme_ic_,nec765,i82077) {
+  return (_tme_nec765_new(element, args, extra, _output, TME_NEC765_PART_I82077));
 }

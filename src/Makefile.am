@@ -9,4 +9,5 @@ pkglib_DATA = tmeconfig.h
 # target to hook into the distribution:
 #
 dist-hook:
+	rm -f ${distdir}/libtme/recode-host.c
 	find $(distdir)/dist -name CVS -a -exec rm -r {} ';' -a -prune

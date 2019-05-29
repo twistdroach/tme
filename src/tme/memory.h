@@ -1,4 +1,4 @@
-/* $Id: memory.h,v 1.3 2007/02/21 01:35:44 fredette Exp $ */
+/* $Id: memory.h,v 1.5 2010/06/05 19:35:38 fredette Exp $ */
 
 /* tme/memory.h - header file for memory functions: */
 
@@ -37,7 +37,7 @@
 #define _TME_MEMORY_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: memory.h,v 1.3 2007/02/21 01:35:44 fredette Exp $");
+_TME_RCSID("$Id: memory.h,v 1.5 2010/06/05 19:35:38 fredette Exp $");
 
 /* includes: */
 #include <tme/threads.h>
@@ -85,20 +85,19 @@ _tme_audit_pointer_const(_tme_const void *pointer)
 #define _tme_cast_pointer_const(type_cast, type_expected, e)	\
   ((_tme_const type_cast) (e) + (0 && _tme_audit_pointer_const(_tme_audit_type(e, type_expected))))
 
-/* NB: the default memory access macros assume that it is always
-   possible and atomic to dereference a pointer to an integral value
-   of any size, as long as the pointer is size-aligned.
-
-   this means that the default 8-bit memory access macros never do any
-   locking, and we default to tme_uint8_t for the smallest atomic
-   type, usable for an atomic flag.  when threads are not cooperative,
-   the host CPU-specific memory header file may need to override these
-   defaults: */
-#define tme_memory_atomic_flag_t tme_uint8_t
-#define tme_memory_atomic_read_flag(mem, lock)				\
-  tme_memory_atomic_read8(mem, lock, sizeof(tme_memory_atomic_flag_t))
-#define tme_memory_atomic_write_flag(mem, x, lock)			\
-  tme_memory_atomic_write8(mem, x, lock, sizeof(tme_memory_atomic_flag_t))
+/* NB: by default, we use tme_uint8_t for the atomic flag type and
+   just pass the NULL rwlock pointer to tme_memory_atomic_read8() and
+   tme_memory_atomic_write8().  when threads are not cooperative and
+   the host CPU needs synchronization for atomic reads and writes of
+   tme_uint8_t, the host CPU-specific memory header file must override
+   this default: */
+#define tme_memory_atomic_flag_t tme_shared tme_uint8_t
+#define tme_memory_atomic_read_flag(flag)				\
+  tme_memory_atomic_read8(flag, (tme_rwlock_t *) 0, sizeof(tme_memory_atomic_flag_t))
+#define tme_memory_atomic_write_flag(flag, x)				\
+  tme_memory_atomic_write8(flag, x, (tme_rwlock_t *) 0, sizeof(tme_memory_atomic_flag_t))
+#define tme_memory_atomic_init_flag(flag, x)				\
+  tme_memory_atomic_write_flag(flag, x)
 
 /* the default 8-bit memory access macros: */
 #define tme_memory_read8(mem, align_min)				\
@@ -134,7 +133,8 @@ _tme_audit_pointer_const(_tme_const void *pointer)
    this header file must define TME_MEMORY_ALIGNMENT_ATOMIC(type),
    which evaluates to zero if an object of the given type can never be
    accessed atomically no matter what the alignment, otherwise it
-   evaluates to the minimum alignment needed for an atomic access.
+   evaluates to the minimum alignment needed to guarantee an atomic
+   access.
 
    this header file must define TME_MEMORY_BUS_BOUNDARY, which is the
    host CPU's bus boundary.  for most CPUs, this will be the size of
@@ -198,7 +198,7 @@ _tme_audit_pointer_const(_tme_const void *pointer)
 #define TME_MEMORY_BARRIER_WRITE_BEFORE_WRITE	(0)
 #define TME_MEMORY_BARRIER_READ_BEFORE_WRITE	(0)
 #define TME_MEMORY_BARRIER_WRITE_BEFORE_READ	(0)
-#define tme_memory_barrier(address, size, barrier) do { } while (/* CONSTCOND */ 0 && (address) && (size) && (barrier))
+#define tme_memory_barrier(address, size, barrier) do { } while (/* CONSTCOND */ 0 && ((address) + 1) && (size) && (barrier))
 
 #endif /* TME_THREADS_COOPERATIVE */
 

@@ -1,3 +1,2322 @@
+Sun Jun 06 20:52:27 2010  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* Release 0.8 out.
+
+Sat Jun 05 19:56:37 2010  Matt Fredette  <fredette@alum.mit.edu>
+
+	* TODO: Updated. 
+
+	* configure.in: Bumped version to 0.8. 
+
+	* ic/ncr5380.c: Changed or cast various tme_bus_addr_t to
+	tme_bus_addr32_t.  In struct tme_ncr5380, store an actual TLB entry
+	instead of a pointer to an allocated entry. 
+	(_tme_ncr5380_bus_tlb_fill): Replaced the call to tme_bus_tlb_back()
+	with a plain structure copy. 
+	(_tme_ncr5380_connection_make_bus): Call tme_bus_device_tlb_set_add()
+	to add the TLB entry to the connection. 
+
+	* ic/ncr53c9x.c: Changed or cast various tme_bus_addr_t to
+	tme_bus_addr32_t.  In struct tme_ncr53c9x, store an actual TLB entry
+	instead of a pointer to an allocated entry.  Added
+	tme_ncr53c9x_detected_scsi_reset. 
+	(_tme_ncr53c9x_update): When SCSI RST is first detected, issue a SCSI
+	reset interrupt if it hasn't been disabled.  In
+	TME_NCR53C9X_CMD_RESET_BUS, no longer signal a SCSI reset interrupt. 
+	This will be done when the SCSI RST is detected. 
+	(_tme_ncr53c9x_callout): Fixed bugs where we wouldn't always wrap the
+	FIFO head and tail. 
+	Replaced the call to tme_bus_tlb_back() with a plain structure copy. 
+	When a SCSI DMA cycle is transferring out to the SCSI bus, only
+	initially clear the SCSI DMA buffer if DMA is not running - if DMA is
+	running, and the data FIFO is empty, and the TLB entry doesn't support
+	fast reading, the code that sets up a transfer into the data FIFO
+	needs to know how much space is available in the data FIFO starting at
+	the tail, until the end of the data FIFO.  Also call
+	_tme_ncr53c9x_fifo_data_update() to update the Current FIFO register. 
+	(_tme_ncr53c9x_connection_make_bus): Call tme_bus_device_tlb_set_add()
+	to add the TLB entry to the connection. 
+
+	* ic/z8530.c (_tme_z8530_rr2_update): Now take the single RR3
+	interrupt bit, or zero, to use for the modified interrupt vector in
+	RR2. 
+	(_tme_z8530_int_pending): Now call _tme_z8530_rr2_update() to update
+	the modified interrupt vector in RR2. 
+	(_tme_z8530_intack): Fixed a bug where we would accept an interrupt
+	acknowledge even if the IEI pin was tied low.  Get the vector directly
+	from the channel B RR2. 
+	(_tme_z8530_bus_cycle): In TME_Z8530_WR0_CMD_RESET_IUS, no longer call
+	_tme_z8530_rr2_update().  The eventual interrupt check for
+	TME_Z8530_CALLOUT_INT will update RR2. 
+
+	* ic/sparc/sparc-fpu.c (tme_sparc_fpu_exception_check): On sparc64,
+	when the exception is not an ieee754 exception, use the
+	fp_exception_other trap. 
+
+	* ic/sparc/sparc-impl.h [_TME_SPARC_STATS] [TME_HAVE_RECODE]: Track
+	the number of recode source hash misses. 
+	Declare tme_sparc32_recode_insn_current() and
+	tme_sparc64_recode_insn_current(). 
+	[!_TME_SPARC_RECODE_VERIFY] tme_sparc_recode_verify_reg_tick_now():
+	Silence a possible known-nonzero warning. 
+
+	* ic/sparc/sparc-insns-auto.sh: Fixed some comments. 
+
+	* ic/sparc/sparc-misc.c (_tme_sparc_runlength): Added. 
+	(_tme_sparc_command): Added the run-length and prom-delay-factor
+	commands. 
+	(tme_sparc_new): Removed the prom-delay-factor option.  Now call
+	_tme_sparc_runlength() to set the initial run length. 
+	(tme_sparc32_external_check): 32-bit SPARCs default to no interrupt
+	acknowledge cycle. 
+	(tme_sparc_itlb_current): Fixed pointer arithmetic bugs in the
+	no-recode case. 
+
+	* ic/sparc/sparc-rc-insns.c: TME_SPARC_RECODE_INSN_LD and
+	TME_SPARC_RECODE_INSN_ST instructions no longer update the instruction
+	register.  mulscc only needs the simplest assist. 
+	(tme_sparc_recode_insn_current): Added. 
+	(tme_sparc_recode_insn_assist_redispatch): Added a comment about the
+	PC we check.  Rewritten to prepare for future additional redispatch
+	conditions. 
+	(_tme_sparc_recode_insn_assist_full): Fixed a bug where we wouldn't
+	use TME_SPARC_G0_OFFSET(ic) to find the %g0 to zero. 
+	(_tme_sparc_recode_recode): Fixed bugs in checking the immediate ASI
+	of a v9 ld*a instruction for the default unrestricted ASI with the
+	right endianness. 
+	Fixed a bug where we would test for the branch target being near or
+	far after we had possibly updated the displacement.  Fixed various
+	other bugs in testing control transfer targets for near or far. 
+	If the second source operand is an immediate zero, make a
+	TME_RECODE_OPERAND_ZERO instead of a TME_RECODE_OPERAND_IMM. 
+
+	* ic/sparc/sparc-rc-ls.c (_tme_sparc_recode_ls_assist_check): Get the
+	instruction from ic->_tme_sparc_insn, since the instruction register
+	isn't updated for assisted loads and stores. 
+	(_tme_sparc_recode_ls_assist_ld): Use tme_sparc_recode_insn_current()
+	to get the instruction, and check that the instruction is a load. 
+	Decode rd from the current instruction, in case it's not the original
+	recoded instruction.  Zero %g0, in case the load changed it.  Do any
+	required redispatch after we assisted a nonoriginal load instruction
+	(or a load instruction that otherwise requires a redispatch). 
+	(_tme_sparc_recode_ls_assist_st): Use tme_sparc_recode_insn_current()
+	to get the instruction, and check that the instruction is a store. 
+
+	* ic/sparc/sparc-rc-verify.c (tme_sparc_recode_verify_begin): When
+	verifying is being turned on, return immediately after calling
+	tme_sparc_recode_invalidate_all(), since it will leave the current
+	instructions thunk unrunnable.  Remember the current instruction TLB
+	token. 
+	(tme_sparc_recode_verify_end): Unbusy any current instruction TLB
+	token used by the normal execution.  Before the replay begins,
+	validate the replay instruction TLB entry When the replay ends, unbusy
+	and invalidate the current instruction TLB token. 
+	Added more structure members to ignore.  Before returning to normal
+	post instructions thunk handling, rebusy any current instruction TLB
+	entry. 
+	(_tme_sparc_recode_verify_init): Initialize the replay TLB tokens as
+	invalid. 
+
+	* ic/sparc/sparc-recode.c (TME_SPARC_RECODE_RW_THUNK_INDEX): Added
+	missing parentheses around all of the sparc64 load/store features. 
+	(tme_sparc_recode): Count recode source hash misses. 
+	(tme_sparc_recode_init): Mark the temporary registers as temporary. 
+	Increase the size of the thunks memory. 
+
+	* ic/sparc/stp103x.c (_tme_stp103x_rdasr):
+	(_tme_stp103x_wrasr): Don't return the result of a function that
+	returns void. 
+	(_tme_stp103x_ls_address_map_phys): Fixed a bug where we wouldn't map
+	a bypass ASI as usable by nonprivileged code. 
+	(_tme_stp103x_ls_address_map): Fixeds where we wouldn't map an address
+	when the MMU is disabled, or when the mapping is unprivileged, as
+	usable by both nonprivileged and privileged code. 
+	(_tme_stp103x_ls_asi_tlb_data_access): Catch an atomic access to a TLB
+	data access register.  Invalidate any sparc TLB entries when a stp103x
+	TLB entry is written. 
+	(_tme_stp103x_tick_compare_th): Now use tme_gettimeofday(). 
+
+	* ic/stp22xx/stp220x.c:
+	* ic/stp22xx/stp222x-iommu.c:
+	* ic/stp22xx/stp222x-mdu.c:
+	* ic/stp22xx/stp222x-stc.c: Silence some unused value warnings. 
+
+	* libtme/misc.c (_tme_misc_number_parse): Fixed a bug where simple
+	conversion failure wouldn't return an error. 
+	(tme_misc_cycles_per_ms): Don't sleep while getting the cycle counter
+	rate, because the cycle counter may run at a different rate when we're
+	sleeping than when we're running. 
+
+	* libtme/module.c: Undefine lt_preloaded_symbols, in an attempt to be
+	forward-compatible with newer libltdls than our libtool knows about. 
+
+	* libtme/recode-impl.h: Declare tme_recode_regs_src_notify(). 
+
+	* libtme/recode-regs.c (_tme_recode_regs_src_load):
+	(tme_recode_regs_src_specific): Check that a reserved host register
+	doesn't have a guest temporary register.  After loading a guest
+	temporary register, forget that it's in the host register. 
+	(tme_recode_regs_src_notify): Added. 
+
+	* libtme/threads-sjlj.c: Renamed _tme_sjlj_gtk_yield() to
+	tme_sjlj_threads_gtk_yield(). 
+
+	* libtme/host/x86/rc-x86-insns.c (_tme_recode_x86_insn_rw): Call
+	tme_recode_regs_src_notify() to notify about a possible temporary
+	register operand for the address, before calling
+	tme_recode_regs_host_clean_all(). 
+
+	* libtme/host/x86/rc-x86-rws.c (_tme_recode_x86_rw_tlb_ref): Removed. 
+	(tme_recode_host_rw_thunk_new): Now use the generic support for recode
+	reads and writes, and the x86 generic TLB support. 
+
+	* machine/sun/sun-cgsix.c (_tme_suncg6_bus_cycle_alt): Fixed a bug
+	where we wouldn't complete the cycle. 
+	(tme_sun_cgsix): Added parentheses to silence a paranoid gcc warning
+	about programmer operator precedence mistakes. 
+
+	* machine/sun/sun-cgtwo.c: Changed or cast various tme_bus_addr_t to
+	tme_bus_addr32_t.  Now track tokens from TLB entries instead of TLB
+	entries. 
+
+	* machine/sun/sun-fb.c (tme_sunfb_bus_cycle_transition) [NDEBUG]:
+	Catch cycle handlers that don't complete the cycle. 
+
+	* machine/sun/sun-obie.c (TME_SUN_OBIE_CSR_GET):
+	(TME_SUN_OBIE_CSR_PUT): Rewritten to avoid a pointer cast, to silence
+	strict aliasing warnings. 
+	(_tme_sun_obie_tlb_set_allocate): Removed. 
+	(_tme_sun_obie_tlb_set_add): Added. 
+	(_tme_sun_obie_connections_new): Provide _tme_sun_obie_tlb_set_add()
+	instead of _tme_sun_obie_tlb_set_allocate(). 
+
+	* machine/sun/sun-si.c: Changed or cast various tme_bus_addr_t to
+	tme_bus_addr32_t.  Now track tokens from TLB entries instead of TLB
+	entries. 
+	(_tme_sun_si_tlb_set_allocate): Removed. 
+	(_tme_sun_si_tlb_set_add): Added. 
+	(_tme_sun_si_connections_new): Provide _tme_sun_si_tlb_set_add()
+	instead of _tme_sun_si_tlb_set_allocate(). 
+
+	* machine/sun4/SUN4-75: Bumped the default idle-type for more recent
+	NetBSD. 
+
+	* machine/sun4/sun44c-memerr.c (_tme_sun44c_memerr_cycle_control):
+	(_tme_sun44c_memerr_cycle_bus): Changes to remove aliasing. 
+
+	* machine/sun4u/SUN-ULTRA-1: Bumped the revision of the ledma to 2. 
+	Moved sd0 to id 0. 
+
+	* tme/memory.h (tme_memory_barrier) [TME_THREADS_COOPERATIVE]: Silence
+	a possible known-nonzero warning. 
+
+	* tme/threads.h: Declare tme_sjlj_threads_gtk_yield(), and make a
+	tme_threads_gtk_yield alias. 
+
+	* tme/token.h (_tme_token_busy_change) [TME_THREADS_COOPERATIVE &&
+	defined(TME_NO_DEBUG_LOCKS)]: Silenced a possible known-unzero
+	warning. 
+
+	* tme/ic/sparc.h: Define TME_SPARC64_ASI_MASK_USER and
+	TME_SPARC64_ASI_MASK_PRIV. 
+
+Sat Jun 05 14:54:10 2010  Matt Fredette  <fredette@alum.mit.edu>
+
+	* configure.in: Added a linux x86/mmap recode target.  Fixed a bug in
+	defining TME_HAVE_RECODE. 
+
+	* bus/multibus/3c400.c (TME_3C400_CSR_GET):
+	(TME_3C400_CSR_PUT): Rewritten to avoid a pointer cast, to silence
+	strict aliasing warnings. 
+
+	* bus/multibus/sun-mie.c (_tme_sun_mie_bus_cycle_regs): Switched to
+	invalidating tokens from TLB entries. 
+	(_tme_sun_mie_tlb_set_allocate): Removed. 
+	(_tme_sun_mie_tlb_set_add): Added. 
+	(_tme_sun_mie_tlb_fill): Truncate the address to 32 bits.  Switched to
+	tracking tokens from TLB entries. 
+	(_tme_sun_mie_tlb_fill_regs): Truncate the address to 32 bits. 
+	(_tme_sun_mie_connections_new): Provide _tme_sun_mie_tlb_set_add()
+	instead of _tme_sun_mie_tlb_set_allocate(). 
+
+	* bus/multibus/sun-sc.c: In struct tme_sun_sc, store an actual TLB
+	entry instead of a pointer to an allocated entry. 
+	(_tme_sun_sc_bus_cycle_dma): Now take a tme_bus_addr32_t instead of a
+	tme_bus_addr_t. 
+	(_tme_sun_sc_callout): Replaced some tme_bus_addr_t with
+	tme_bus_addr32_t.  Replaced the call to tme_bus_tlb_back() with a
+	plain structure copy. 
+	(_tme_sun_sc_tlb_fill): Truncate the address to 32 bits. 
+	(_tme_sun_sc_connection_make_bus): Call tme_bus_device_tlb_set_add()
+	to add the TLB entry to the connection. 
+
+	* generic/keyboard.c (_tme_keyboard_buffer_out1_bottom):
+	(_tme_keyboard_buffer_out0): Silence some uninitialized structure
+	variable warnings. 
+
+	* host/gtk/gtk-display.c (_tme_gtk_display_callout): Call
+	tme_threads_gtk_yield(), to make sure that the GTK timeout and idle
+	callback are set as needed. 
+
+	* host/posix/posix-disk.c: Define _FILE_OFFSET_BITS to 64 to try to
+	enable large-file support. 
+
+	* ic/am7990.c: Replaced various tme_bus_addr_t with tme_bus_addr32_t. 
+	In struct tme_am7990, store actual TLB entries instead of a pointer to
+	allocated entries. 
+	(_tme_am7990_connection_make_bus): Call tme_bus_device_tlb_set_add()
+	to add the TLB entries to the connection. 
+
+	* ic/am9513.c (_tme_am9513_th_timer): Cast what might be a 64-bit
+	time_t difference to unsigned long, to match the printf format. 
+
+	* ic/i825x6.c: Replaced various tme_bus_addr_t with tme_bus_addr32_t. 
+	In struct tme_i825x6, store actual TLB entries instead of a pointer to
+	allocated entries. 
+	(_tme_i825x6_rx_buffers_add): Replaced the call to tme_bus_tlb_back()
+	with a plain structure copy. 
+	(_tme_i825x6_connection_make_bus): Call tme_bus_device_tlb_set_add()
+	to add the TLB entries to the connection. 
+
+	* ic/isil7170.c (_tme_isil7170_th_timer): Cast what might be a 64-bit
+	time_t difference to unsigned long, to match the printf format. 
+
+	* ic/lsi64854.c: Replaced various tme_bus_addr_t with
+	tme_bus_addr32_t.  Added support for the ethernet and parallel
+	channels. 
+	(_tme_lsi64854_bus_cycle_regs): Added some support for 8- and 16-bit
+	accesses, for the parallel channel. 
+	(_tme_lsi64854_tlb_set_allocate): Removed. 
+	(_tme_lsi64854_tlb_set_add): Added. 
+
+	* ic/mk48txx.c (_tme_mk48txx_reset): Fixed a bug where we used
+	TME_MK48TXX_SEC_STOP as a register index. 
+
+	* ic/stp22xx/stp222x-timer.c (_tme_stp222x_timer_update): Cast what
+	might be a 64-bit time_t difference to unsigned long, to match the
+	printf format. 
+
+	* machine/sun4/sun4-timer.c (_tme_sun4_timer_update): Cast what might
+	be a 64-bit time_t difference to unsigned long, to match the printf
+	format. 
+
+Sun Mar 07 16:29:27 2010  Matt Fredette  <fredette@alum.mit.edu>
+
+	* tme/recode.h: Define TME_RECODE_REGINFO_TYPE_TEMPORARY. 
+
+Sun Feb 21 15:49:42 2010  Matt Fredette  <fredette@alum.mit.edu>
+
+	* TODO: Updated. 
+
+Sat Feb 20 22:01:40 2010  Matt Fredette  <fredette@alum.mit.edu>
+
+	* ic/sparc/sparc-execute.c: After the last replay instruction, make
+	sure that the replay current instruction tlb token isn't the invalid
+	token. 
+
+	* ic/sparc/sparc-impl.h: Removed an old comment. 
+
+	* ic/sparc/sparc-rc-insns.c: Commented the TME_SPARC_RECODE_INSN_
+	values. 
+
+	* ic/sparc/sparc-recode.c (tme_sparc_recode_invalidate_all): Fixed a
+	bug where we wouldn't clear the return address stack after
+	invalidating all instructions thunks. 
+	(tme_sparc_recode): When we can't recode, instead of calling only
+	_tme_sparc_recode_src_hash_invalidate(), call
+	tme_sparc_recode_invalidate_all() to do everything needed when all
+	instructions thunks are invalidated. 
+
+	* ic/sparc/sparc-vis-auto.sh (tme_sparc${arch}_vis_ls_asi_pst): Fixed
+	a bug where we wouldn't unbusy the TLB entry before trapping for an
+	illegal instruction.  Any ASI handler that traps directly on its own,
+	must do this. 
+
+	* tme/recode.h: Removed the unused tme_recode_reginfo_type macro. 
+
+Sat Feb 20 18:35:47 2010  Matt Fredette  <fredette@alum.mit.edu>
+
+	* ic/sparc/sparc-insns-auto.sh (tme_sparc64_casa):
+	(tme_sparc64_casxa): Fixed a bug where we would use
+	TME_SPARC_FORMAT3_RS2, even if the i bit is set, instead of always
+	decoding rs2 like tme_sparc64_atomic() does. 
+
+	* ic/sparc/sparc-misc.c (tme_sparc64_trap): Removed some old debugging
+	code. 
+
+Thu Feb 18 02:01:33 2010  Matt Fredette  <fredette@alum.mit.edu>
+
+	* TODO: Updated. 
+
+	* ic/sparc/sparc-misc.c (tme_sparc_nnpc_trap): Make a more complete
+	dummy load/store structure. 
+
+	* tme/common.h: Fixed old bugs where tme_value64_uint32_lo and
+	tme_value64_uint32_hi were defined to be signed. 
+	Define tme_value64_cmp(). 
+
+Mon Feb 15 22:23:15 2010  Matt Fredette  <fredette@alum.mit.edu>
+
+	* libtme/recode-regs.c (tme_recode_regs_host_clean_all): Now that a
+	host register can be clean at any size, instead of freeing a host
+	register that was dirty not at the full guest register size, just mark
+	it as clean. 
+	(_tme_recode_regs_src_load): As an optimization, if the read-uses
+	count for the guest register is only one, only load the size that this
+	instruction needs. 
+	(tme_recode_regs_dst_any):
+	(tme_recode_regs_dst_specific): Replaced
+	TME_RECODE_REGINFO_TAGS_DIRTY_SIZE() with
+	TME_RECODE_REGINFO_TAGS_VALID_SIZE(). 
+
+	* libtme/host/x86/rc-x86-chain.c (_tme_recode_x86_chain_subs): Use
+	TME_RECODE_REGINFO_TAGS_VALID_SIZE() and TME_RECODE_REGINFO_TAGS_CLEAN
+	in the fake register information for loading the guest PC. 
+
+	* libtme/host/x86/rc-x86-flags.c (tme_recode_host_flags_thunk_add):
+	Use TME_RECODE_REGINFO_TAGS_VALID_SIZE() in the fake register
+	information for the subs operands. 
+
+	* libtme/host/x86/rc-x86-regs.c (tme_recode_host_reg_move): For both
+	loading and storing, get the size to move using
+	TME_RECODE_REGINFO_TAGS_WHICH_VALID_SIZE(). 
+	(tme_recode_host_reg_imm): As an optimization, only make as big an
+	immediate as the instruction needs. 
+
+	* machine/sun/sun-mmu.c: Define TME_SUN_MMU_CONTEXT_TLBS.  In struct
+	tme_sun_mmu_tlb_set, replaced the TLB set information with a struct
+	tme_bus_tlb_set_info. 
+	In struct tme_sun_mmu, track a set of TLBs that must be invalidated
+	when the context changes. 
+	Changed from tracking pointers to TLB entries to tracking pointers to
+	their tokens. 
+	(tme_sun_mmu_tlbs_invalidate): Use tme_bus_tlb_set_invalidate() to
+	invalidate a TLB set. 
+	(tme_sun_mmu_tlbs_context_set):
+	(tme_sun_mmu_tlb_set_allocate): Removed. 
+	(tme_sun_mmu_context_add):
+	(tme_sun_mmu_context_switched):
+	(tme_sun_mmu_tlb_set_add): Added. 
+
+	* tme/recode.h: Replaced TME_RECODE_REGINFO_TAGS_DIRTY_SIZE_MASK,
+	which was nonzero iff the host register was dirty, with
+	TME_RECODE_REGINFO_TAGS_VALID_SIZE_MASK, which is nonzero iff the tags
+	are valid. 
+	Changed the value of TME_RECODE_REGINFO_TAGS_CLEAN to be right before
+	TME_RECODE_REGINFO_TAGS_VALID_SIZE_MASK, to enable the changed
+	TME_RECODE_REGINFO_TAGS_WHICH_DIRTY_SIZE().  Renamed
+	TME_RECODE_REGINFO_TAGS_VALID_SIZE() to
+	TME_RECODE_REGINFO_TAGS_ARE_VALID_SIZE(), all callers changed.  Added
+	TME_RECODE_REGINFO_TAGS_WHICH_VALID_SIZE().  Changed
+	TME_RECODE_REGINFO_TAGS_WHICH_DIRTY_SIZE() and
+	TME_RECODE_REGINFO_TAGS_ARE_DIRTY() to use the new
+	TME_RECODE_REGINFO_TAGS_VALID_SIZE_MASK and
+	TME_RECODE_REGINFO_TAGS_CLEAN.  Added the new
+	TME_RECODE_REGINFO_TAGS_VALID_SIZE(). 
+
+Mon Feb 15 16:57:13 2010  Matt Fredette  <fredette@alum.mit.edu>
+
+	* ic/stp22xx/stp222x-mdu.c (tme_stp222x_mdu_regs_clear): Added a
+	performance hack to dispatch any waiting interrupt to the CPU clearing
+	an interrupt's pending state. 
+
+	* libtme/memory-auto.sh (_tme_memory_write): Added an explicit cast to
+	type_part, to silence compiler warnings when we're writing a constant
+	wider than type_part. 
+	(tme_memory_bus_${op}_buffer): Fixed some ${op_const} to
+	${op_const_mem}, to silence lost-qualifier warnings. 
+	(tme_memory_atomic_${op}${size}): When threads are cooperative, do the
+	read or write using the plain macro. 
+
+	* libtme/recode-rws.c (tme_recode_rw_thunk): Many address type values
+	that used to be plain in the read/write structure moved to an address
+	type structure.  Use tme_recode_address_type_check() to check the
+	read/write address type, and tme_recode_address_type_compare() to
+	compare it to an existing thunk's address type. 
+
+	* libtme/threads-sjlj.c: Removed TME_SJLJ_DISPATCHER_FALSE and
+	TME_SJLJ_DISPATCHER_TRUE, since the thread dispatcher no longer
+	returns any value.  In struct tme_sjlj_thread, added the last dispatch
+	number for a thread, and under HAVE_GTK, no longer track timeout
+	handles.  Removed tme_sjlj_thread_dispatched_timeout.  Define globals
+	for the global dispatch number, the reasonably current time, and the
+	short thread flag.  Under HAVE_GTK, define globals for the timeout
+	source ID and the current timeout time. 
+	(tme_sjlj_gettimeofday): Added. 
+	(_tme_sjlj_change_state): Add a not-blocked thread next on the
+	dispatching list if threads are being dispatched, and this thread
+	wasn't already in this dispatch. 
+	(_tme_sjlj_threads_dispatching_runnable):
+	(_tme_sjlj_threads_dispatching_timeout):
+	(_tme_sjlj_timeout_time): Added. 
+	(tme_sjlj_dispatch_fd): Removed. 
+	(_tme_sjlj_threads_dispatching_fd): Added to replace
+	tme_sjlj_dispatch_fd(). 
+	(tme_sjlj_dispatch): Return no value, and don't expect
+	tme_sjlj_yield() to return any value via longjmp().  Before
+	dispatching a thread, remove it from the timeout list if needed, and
+	set its dispatch number.  After a dispatch, increment the global
+	dispatch number. 
+	(_tme_sjlj_gtk_callback_timeout):
+	(_tme_sjlj_gtk_callback_fd):
+	(_tme_sjlj_gtk_callback_idle):
+	(_tme_sjlj_gtk_yield): Added. 
+	(tme_sjlj_threads_run): If we're using the GTK main loop, do an
+	initial _tme_sjlj_gtk_yield() instead of adding an idle directly.  In
+	our main loop, removed the code that sorted the timeout list, now that
+	tme_sjlj_yield() inserts a thread at the right place on the list.  Use
+	_tme_sjlj_timeout_time() to get the timeout time.  After the select(),
+	use _tme_sjlj_threads_dispatching_runnable(),
+	_tme_sjlj_threads_dispatching_timeout() and
+	_tme_sjlj_threads_dispatching_fd() to build the dispatching list, and
+	tme_sjlj_dispatch() to dispatch them all. 
+	(tme_sjlj_thread_create): Initialize the thread's dispatch number. 
+	(tme_sjlj_cond_notify): Always call _tme_sjlj_change_state with
+	TME_SJLJ_THREAD_STATE_RUNNING (only the dispatch functions can use
+	TME_SJLJ_THREAD_STATE_DISPATCHING). 
+	(tme_sjlj_yield): Don't return any value through longjmp().  Under
+	HAVE_GTK, don't do any GTK timeout allocation.  Insert a thread with a
+	timeout at the right spot on the timeout list. 
+	(tme_sjlj_sleep): Use tme_thread_long() to mark long runs, and
+	tme_gettimeofday() to get the current time.  Fixed a bug where the
+	first timeout would be undefined. 
+	(tme_sjlj_select_yield): Use tme_thread_long() to mark a long run. 
+
+	* libtme/host/x86/rc-x86-insns.c (_tme_recode_x86_insn_guest): Added
+	support for TME_RECODE_OPERAND_UNDEF source operands.  Fixed a bug in
+	the x86-64 double-host-size where we would load the first source
+	operand for the second. 
+
+	* libtme/host/x86/rc-x86-rws.c (tme_recode_host_rw_thunk_new): Get
+	parameters from the new address type structure in the read/write
+	structure, instead of directly from the read/write structure or the ic
+	structure. 
+
+Mon Feb 15 14:58:58 2010  Matt Fredette  <fredette@alum.mit.edu>
+
+	* acinclude.m4: Quote all of the AC_DEFUN macro names. 
+	* configure.in: When long is 64 bits, check for the maximum shift of a
+	64-bit value, whether or not right shifts of signed 64-bit values are
+	arithmetic, and for bswap64(). 
+	Updated to the AM_PATH_GTK_2_0() macro.  When long is 64 bits or the
+	compiler is gcc, add sunultra1 to the systems list. 
+	Define bus_size_max and recode_size_guest_max from values from each
+	system to build. 
+	Added sunultra1. 
+	Added some missing $srcdir to paths.  Added the --enable-recode
+	option, and configure recode support.  Configure miscellaneous target
+	support.  Generate tme/recode-host.h, libtme/recode-host.c, and
+	libtme/misc-host.c.  Added more Makefiles to the AC_OUTPUT(). 
+
+Sun Feb 14 20:17:12 2010  Matt Fredette  <fredette@alum.mit.edu>
+
+	* ic/sparc/sparc-execute.c:
+	* ic/sparc/sparc-rc-ls.c: Switched from the old TME_RECODE_RW_FLAG and
+	TME_SPARC_RECODE_RW_FLAG_ names to the new TME_RECODE_TLB_FLAG and
+	TME_SPARC_RECODE_TLB_FLAG_ names. 
+
+	* ic/sparc/sparc-fpu.c [TME_HAVE_INT64_T]: Include sparc-vis-auto.c. 
+	(tme_sparc_fpu_exception_check): Use the per-architecture fp_exception
+	trap. 
+	(tme_sparc32_stdfq): Use TME_SPARC_INSN_FPU_ENABLED() instead of
+	TME_SPARC_INSN_FPU_STORE(), which might mem_address_not_aligned trap
+	before the fp_exception, which is the wrong order on a v9 CPU.  This
+	function needs to be corrected for any CPU that actually implements
+	the FQ. 
+	(tme_sparc_fpu_fpreg_aligned): Removed. 
+	(tme_sparc_fpu_fpreg_decode): Added, as a replacement for
+	tme_sparc_fpu_fpreg_aligned(). 
+	(tme_sparc_fpu_fpreg_format): Our caller is now expected to make sure
+	the register is aligned. 
+	(tme_sparc_fpu_fpreg_read): Don't use TME_FIELD_MASK_EXTRACTU with a
+	variable mask.  Use tme_sparc_fpu_fpreg_decode() to decode the
+	register number. 
+
+	* ic/sparc/sparc-impl.h: Switched from the old TME_RECODE_RW_FLAG()
+	and TME_SPARC_RECODE_RW_FLAG_ names to the new TME_RECODE_TLB_FLAG()
+	and TME_SPARC_RECODE_TLB_FLAG_ names. 
+
+	* ic/sparc/sparc-misc.c:
+	* ic/sparc/sparc-rc-verify.c: Switched from the old
+	tme_sparc_dtlb_recode_tlb names to the new tme_sparc_recode_tlb names. 
+
+	* ic/sparc/sparc-rc-ls.c (tme_sparc_recode_ls_tlb_update): The DTLB
+	array is really a single TLB array with the ITLB entries.  The recode
+	TLB entries' read/write flags were renamed to just (TLB) flags. 
+	(_tme_sparc_recode_ls_init): Set the members of the new address type
+	structure in the read/write structure.  Many of them used to be plain
+	in the read/write structure. 
+
+Sun Feb 14 18:08:02 2010  Matt Fredette  <fredette@alum.mit.edu>
+
+	* ic/sparc/cy7c601.c (tme_ic_,sparc,cy7c601): Call
+	tme_sparc_sync_init() and set the tme_sparc_timing_loop_cycles_each
+	value. 
+
+	* ic/sparc/mb86900.c (tme_ic_,sparc,mb86900): Call
+	tme_sparc_sync_init() and set the tme_sparc_timing_loop_cycles_each
+	value. 
+
+	* ic/sparc/sparc-execute.c: Set the recode chain TLB flags mask. 
+	Manage a pointer to the token for current instruction TLB entry,
+	instead of the current instruction TLB entry itself, because that's
+	what the recode instruction thunks do.  On a branch to ., truncate the
+	instruction burst to get to the code that handles a branch to .  as a
+	timing loop or an idle.  At the end of an instruction burst, possibly
+	update the instruction burst runlength, and if the next instruction
+	will be annulled, loop to handle it now.  Clear the instruction burst
+	other flag if this will be a normal burst, otherwise set it for an
+	idle burst.  When updating PC_next_next on a v9 CPU, mask it with the
+	address mask. 
+	[TME_SPARC_HAVE_RECODE()]: Removed the source key offset. 
+	tme_recode_insns_thunk_run() now takes a chain thunk.  When recode
+	thunks return, switch to the invalid instruction TLB entry. 
+
+	* ic/sparc/sparc-impl.h: Include <tme/runlength.h>. 
+	Define TME_SPARC64_TICK_NPT and TME_SPARC64_TICK_COUNTER.  Added
+	support for the sunos64-type-0 idle type. 
+	(TME_SPARC_IDLE_MARK): Flag the instruction burst as shortened. 
+	Define TME_SPARC_MODE_TIMING_LOOP. 
+	[!TME_HAVE_RECODE]: Removed old arguments from
+	_TME_SPARC_RECODE_CWP_UPDATE. 
+	Define different versions of TME_SPARC_HAVE_RECODE() that avoid using
+	TME_SPARC_VERSION(ic) whenever possible.  Define
+	TME_SPARC_RECODE_TLB_FLAG_CHAIN_USER() and
+	TME_SPARC_RECODE_TLB_FLAG_CHAIN_PRIV().  Define the
+	TME_SPARC_EXTERNAL_CHECK_ macros.  Define tme_sparc_ireg_umax_t. 
+	In struct tme_sparc, added the number of scaled cycles per
+	microsecond, the runlength state and its update state, get the
+	instruciton burst from the runlength state, track the token of any
+	currently busy instruction TLB entry, added the address mask, added
+	the timing information, the current chain TLB flags, the chain return
+	address stack, removed the chain cacheable and source key offset,
+	added the instructions group structure.  Declare
+	tme_sparc_sync_init(), tme_sparc_itlb_current(),
+	tme_sparc_insn_peek(), the timing support functions, the chain TLB
+	update functions, and tme_sparc_recode_verify_end_preinstruction(). 
+	Now define the verify no-operation macros even if TME_HAVE_RECODE is
+	zero. 
+
+	* ic/sparc/sparc-insns-auto.sh: Instead of testing for PSTATE.AM,
+	always mask sparc64 addresses with ic->tme_sparc_address_mask. 
+	(tme_sparc${arch}_${slow}): Set ic->_tme_sparc_instruction_burst_other
+	to flag the shortened burst. 
+	(tme_sparc${arch}_ls): Even when the ASI has not been specified, the
+	instruction may provide ASI flags, so add them in.  Call
+	tme_sparc${arch}_recode_chain_tlb_update() to update a recode
+	instruction TLB entry. 
+	Don't assert that the mapping made a mapping until after checking
+	whether or not it completed the transfer. 
+
+	* ic/sparc/sparc-insns.c (tme_sparc32_wrpsr): Set
+	ic->_tme_sparc_instruction_burst_other to flag the shortened
+	instruction burst. 
+	(tme_sparc64_return):
+	(tme_sparc64_done_retry): Instead of testing for PSTATE.AM, always
+	mask sparc64 addresses with ic->tme_sparc_address_mask. 
+	(tme_sparc64_rdpr):
+	(tme_sparc64_rdasr): Mask the scaled cycles counter to fit in
+	TICK.COUNTER, and or in TICK.NPT if needed. 
+	(_tme_sparc64_idle_type_sunos64_type_0_splhigh): Added. 
+	(tme_sparc64_wrpr): Handle TICK.NPT and the TICK.COUNTER offset
+	separately. 
+	Fixed a bug where we wouldn't redispatch after a write to PSTATE.  To
+	improve interrupt latency, do an interrupt check before raising PIL,
+	and after lowering it. 
+	Added support for detecting the sunos64-type-0 idle type. 
+
+	* ic/sparc/sparc-misc.c: Replaced uses of the _tme_sparc_itlb_busy
+	member with either _tme_sparc_itlb_current_token and the token
+	functions, or a call to tme_sparc_itlb_current(). 
+	(tme_sparc_idle): Call the external check function with
+	TME_SPARC_EXTERNAL_CHECK_MUTEX_LOCKED. 
+	(tme_sparc_thread): When entering execution mode, if this instruction
+	burst will be used to update the runlength, note its start time. 
+	Added support for the timing loop mode. 
+	(_tme_sparc_command): Added the sunos64-type-0 idle type. 
+	(tme_sparc_sync_init): Added. 
+	(tme_sparc_new): For the timing loop code, initialize
+	ic->tme_sparc_cycles_unscaling.  Initialize the instruction burst
+	runlength state. 
+	(tme_sparc_do_idle): Set ic->_tme_sparc_instruction_burst_other to
+	flag the shortened instruction burst. 
+	(tme_sparc32_external_check): Now take flags instead of a boolean. 
+	(tme_sparc64_trap): Reset TICK.NPT and TICK.counter separately.  Also
+	reset TICK.counter on an XIR. 
+	(tme_sparc_itlb_current):
+	(tme_sparc_insn_peek): Added. 
+	(tme_sparc_fetch_nearby): Call tme_sparc_insn_peek() to do the peek. 
+	(tme_sparc_callout_relock): If we need to do an external check,
+	shorten the current instruction burst to do one immediately. 
+
+	* ic/sparc/sparc-rc-chain.c: Removed some accidentally committed
+	AUDITs. 
+
+	* ic/sparc/sparc-rc-insns.c: Replaced the TME_SPARC_RECODE_INSN_JUMP_
+	macros with TME_SPARC_RECODE_CHAIN_INFO() used with the
+	TME_RECODE_CHAIN_INFO_ macros. 
+	(tme_sparc_recode_insn_assist_redispatch): Use
+	_tme_sparc_recode_chain_src_key() to check if the current PC is still
+	cache-valid. 
+	(_tme_sparc_recode_insn_assist_jmpl): Added. 
+	(_tme_sparc_recode_recode): Added support for PSTATE.AM, mostly by
+	doing PC calculations in that address size.  Be sure to not recode the
+	last instruction before tme_sparc_ireg_t wraps to zero. 
+	Fixed jmpl recoding to call the assist function to check for traps, to
+	try to characterize a jmpl as a call or a return, and to better write
+	the PC of the jmpl into any destination register.  Mark each chain
+	jump as either near or far.  When recoding a call instruction, if the
+	PC is not the guest size, zero-extend r[15] after the PC has been
+	copied into it.  Also use r[15] as the source for advancing PC to the
+	branch delay slot, for better host register allocation.  Mark each
+	chain call as either near or far. 
+	When an instruction needs a full assist, the source operands aren't
+	used, so make them the recode %undef.  If there is no chain
+	information at the end of an instructions group, make unconditional
+	jump information.  If the chain information is conditional, mark the
+	alternate as either near or far.  Store the end of the instructions
+	and the chain information in the instructions group. 
+
+	* ic/sparc/sparc-rc-verify.c: Removed
+	_tme_sparc_recode_verify_ic_replay_token. 
+	(_tme_sparc_recode_verify_change): Renamed the read/write flags to
+	just TLB flags. 
+	(tme_sparc_recode_verify_begin): Use tme_sparc_itlb_current() to get
+	the current TLB entry.  Preserve the token pointer when initializing
+	the current TLB entry in the replay state.  Fix
+	_tme_sparc_itlb_current_token in the saved in state.  Force the
+	instruction burst size to two in the in state. 
+	(tme_sparc_recode_verify_end): Use tme_sparc_itlb_current() to get the
+	current TLB entry.  Set _tme_sparc_itlb_current_token instead of
+	_tme_sparc_itlb_busy. 
+	(tme_sparc_recode_insns_dump): Check _tme_sparc_itlb_current_token
+	instead of _tme_sparc_itlb_busy.  Call
+	_tme_sparc_recode_chain_src_key() to get the source key. 
+	(_tme_sparc_recode_verify_init): Initialize and set tokens on all
+	replay TLB entries. 
+
+	* ic/sparc/sparc-recode.c: Define TME_SPARC_RECODE_SRC_KEY_UNDEF,
+	TME_SPARC64_RECODE_SRC_KEY_FLAG_AM and
+	TME_SPARC64_RECODE_SRC_KEY_FLAG_CLE.  Include sparc-rc-chain.c for
+	each architecture. 
+	(_tme_sparc_recode_src_hash_invalidate): Use
+	TME_SPARC_RECODE_SRC_KEY_UNDEF for an invalidated source key.  If an
+	invalidated source key has an instructions thunk, invalidate it, to
+	make sure that no other instruction thunk can chain to it. 
+	(_tme_sparc_recode_jump_chain): Removed. 
+	(tme_sparc_recode): Set the instructions group host source address. 
+	On a v9 CPU, add PSTATE.AM and PSTATE.CLE to the source address key. 
+	Set the instructions group valid byte and mask.  Check for
+	TME_SPARC_RECODE_SRC_KEY_UNDEF for an invalidated source key, since
+	valid source keys may now be nonzero mod sizeof(tme_uint32_t). 
+	(tme_sparc_recode_dump_insns): Don't take the recode instructions
+	array, since it can be found in the struct tme_sparc recode
+	instructions group.  Replaced the TME_RECODE_OPCODE_JUMP dump with a
+	TME_RECODE_CHAIN_INFO_ dump.  Added support for
+	TME_RECODE_OPERAND_UNDEF. 
+	(tme_sparc_recode_init): Removed address translation and jump chain
+	member initialization.  These are now given in address type structures
+	by _tme_sparc_recode_ls_init() and _tme_sparc_recode_chain_init(). 
+	Set the first instruction in the instructions group.  Call the
+	_tme_sparc_recode_chain_init() for this architecture. 
+
+	* ic/sparc/sparc-timing.c: Replaced uses of the _tme_sparc_itlb_busy
+	member with _tme_sparc_itlb_current_token and the token functions. 
+	(tme_sparc_timing_loop_finish): Flag the shortened instruction burst. 
+
+	* ic/sparc/stp103x.c: Define TME_STP103X_TCR_INT_DIS and
+	TME_STP103X_TCR_TICK_CMPR.  In struct tme_stp103x, added the tick
+	compare condition and time. 
+	(tme_misc_timeval_never): Added, although this should be moved. 
+	(_tme_stp103x_interrupt_check): Take a mask of flags, instead of a
+	boolean.  All callers changed.  Added support for
+	TME_SPARC_EXTERNAL_CHECK_PCS_UPDATED. 
+	(_tme_stp103x_update_sir): Now take and-not and or masks for SIR.  All
+	callers changed. 
+	Before clearing SIR.TICK_INT, to help TICK interrupt latency, do an
+	interrupt check, backing up the PCs to the previous instruction if a
+	tick interrupt should have been delivered. 
+	(_tme_stp103x_update_pstate): Make sure %g0 is zero in both the normal
+	global register set and the current global register set.  When there
+	is recode support, if PSTATE.AM and/or PSTATE.CLE are changing, clear
+	the return address stack.  Update the address mask according to
+	PSTATE.AM, and mask the new PCs with it. 
+	(_tme_stp103x_rdpr): Use tme_sparc_itlb_current() instead of
+	ic->_tme_sparc_itlb_busy.  Don't use return() with a void value. 
+	(_tme_stp103x_wrasr): Update the tick compare thread on a write to
+	TCR. 
+	(_tme_stp103x_flush): Always mask the address.  Since the default ASI
+	may not be the unrestricted ASI, and the nucleus ASI can't be modified
+	with ASI flags, instead of giving an explicit ASI, specify the
+	no-fault ASI flag in the load/store information. 
+	(_tme_stp103x_ls_trap): Added support for TME_SPARC_LSINFO_NO_FAULT. 
+	(_tme_stp103x_ls_address_map): If _tme_stp103x_ls_trap() ever returns,
+	check for TME_SPARC_LSINFO_NO_FAULT and return, instead of aborting. 
+	(_tme_stp103x_tick_compare_th): Added. 
+	(_tme_stp103x_external_check): Take a mask of flags, instead of a
+	boolean.  All callers changed. 
+	(_tme_stp103x_interrupt): Added a missed wakeup on the external
+	condition. 
+	(_tme_stp103x_new): Call tme_sparc_sync_init().  Initialize the tick
+	compare thread state, and start the tick compare thread.  Initialize
+	ic->tme_sparc_timing_loop_cycles_each. 
+
+Sun Feb 14 00:48:04 2010  Matt Fredette  <fredette@alum.mit.edu>
+
+	* ic/sparc/sparc-misc-auto.sh: Renamed tme_sparc64_ireg_tick to
+	tme_sparc64_ireg_tick_offset, and added the separate
+	tme_sparc64_ireg_tick_npt. 
+
+	* serial/ms-mssystems.c (_tme_serial_ms_mssystems5_init): Set the
+	rate-limiting based on the baud rate and the packet size. 
+
+	* serial/serial-ms.c: _tme_serial_ms_callout): Added support for
+	rate-limiting reading events. 
+	(_tme_serial_ms_th_rate): Added. 
+	(tme_serial_,kb,mouse): Start the rate-limiting thread. 
+
+	* serial/serial-ms.h: In struct tme_serial_ms, added members for
+	rate-limiting serial data. 
+
+Thu Feb 11 00:15:55 2010  Matt Fredette  <fredette@alum.mit.edu>
+
+	* tme/recode.h: Define TME_RECODE_OPERAND_UNDEF. 
+
+Wed Feb 10 00:34:26 2010  Matt Fredette  <fredette@alum.mit.edu>
+
+	* libtme/host/x86/rc-x86-regs.c (tme_recode_host_reg_imm): When the
+	most significant half of a double-host-size immediate is zero, emit an
+	xorl to clear the second register, instead of a mov of zero. 
+
+Tue Feb 09 01:27:56 2010  Matt Fredette  <fredette@alum.mit.edu>
+
+	* libtme/recode-regs.c (tme_recode_regs_host_reserve): Assert that
+	there is a reservation array entry free. 
+	(_tme_recode_regs_src_load): Fixed a bug where we didn't handle the
+	case where the host register was already reserved, and would instead
+	decrement the reserved read-uses count. 
+
+Sun Feb 07 17:32:01 2010  Matt Fredette  <fredette@alum.mit.edu>
+
+	* libtme/recode-impl.h: Define struct tme_recode_tlb_type. 
+	tme_recode_host_insns_thunk_new() now takes an instructions group,
+	instead of pointers to the array of instructions.  Declare
+	tme_recode_address_type_check(), tme_recode_address_type_compare(),
+	and tme_recode_address_type_tlb_type(). 
+
+	* libtme/recode-insns.c (tme_recode_insns_thunk): Now take a
+	instructions group structure, instead of pointers to the instructions
+	array.  All callers changed.  Removed the TME_RECODE_OPCODE_JUMP
+	support. 
+
+	* libtme/host/x86/rc-x86-insns.c (_tme_recode_x86_insn_jump):
+	(tme_recode_insn_jump_chain): Removed. 
+	(_tme_recode_x86_insn_emit): When emitting an extension instruction,
+	fixed a performance bug where we would load the source operand at the
+	destination size, instead of at the extension's source operand size. 
+	Removed the TME_RECODE_OPCODE_JUMP support. 
+	(tme_recode_insns_thunk_invalidate): Added. 
+	(tme_recode_host_insns_thunk_new): Call _tme_recode_x86_chain_in() and
+	_tme_recode_x86_chain_out() to emit the chain in and chain out
+	instructions, instead of emitting a jump to the instructions prologue. 
+	Get the instructions array from the instructions group structure. 
+
+	* libtme/host/x86/recode-x86.c: Define TME_RECODE_X86_OPCODE_PUSH_Ib
+	and TME_RECODE_X86_OPCODE_BINOP_Iz_A.  Define
+	TME_RECODE_X86_EA_BASE_IP.  Remove
+	TME_RECODE_X86_OFFSET_JUMP_CHAIN_DIRECT. 
+	(_tme_recode_x86_emit_jmp):
+	(_tme_recode_x86_fixup_jmp): Added. 
+	(tme_recode_host_ic_new): Removed the code that emitted the
+	instructions thunk prologue, epilogue, jump subs and jump chain subs. 
+	Call _tme_recode_x86_chain_epilogue() to make the instructions thunk
+	epilogue. 
+
+	* tme/Makefile.am: Added runlength.h to pkginclude_HEADERS. 
+
+	* tme/recode.h: Removed TME_RECODE_OPCODE_JUMP.  Replaced the
+	TME_RECODE_JUMP_ macros with the TME_RECODE_CHAIN_INFO_ macros. 
+	(TME_RECODE_INSNS_THUNK_INSNS_MAX): Account for
+	TME_RECODE_HOST_INSN_THUNK_OVERHEAD.  In the TLB entry structures,
+	renamed all of the read/write flags to just (TLB) flags. 
+	Define struct tme_recode_address_type.  In struct tme_recode_rw,
+	replaced the address type members with an address type structure. 
+	Define struct tme_recode_chain_thunk.  Define struct
+	tme_recode_insns_group.  In struct tme_recode_ic, removed the members
+	that are now included in the address type structure in a struct
+	tme_recode_rw.  Replaced the tme_recode_ic_jump_chain member with the
+	tme_recode_ic_chain_fixup member.  Renamed tme_recode_ic_jump_counter
+	to tme_recode_ic_chain_counter_offset.  Added members for the chain
+	return address stack and the current instruction TLB entry token
+	offset.  Declare tme_recode_chain_ras_clear(),
+	tme_recode_chain_thunk(), tme_recode_chain_fixup(), and
+	tme_recode_insns_thunk_invalidate().  tme_recode_insns_thunk() now
+	takes an instructions group, instead of pointers to the array of
+	instructions. 
+	[TME_RECODE_DEBUG]: Declare tme_recode_chain_thunk_dump(). 
+
+	* tme/threads.h: Declare tme_sjlj_gettimeofday(), and alias
+	tme_gettimeofday to it.  Declare tme_sjlj_thread_short.  Define
+	tme_thread_long(). 
+
+	* tme/host/recode-x86.h: Define TME_RECODE_X86_CHAIN_IN_SIZE_MAX and
+	TME_RECODE_X86_CHAIN_OUT_SIZE_MAX, and use them to define
+	TME_RECODE_HOST_INSN_THUNK_OVERHEAD.  Define
+	TME_RECODE_HOST_CHAIN_THUNK.  In TME_RECODE_X86_IC, renamed
+	tme_recode_x86_ic_insns_prologue to tme_recode_x86_ic_chain_epilogue. 
+	Removed tme_recode_x86_ic_insns_epilogue, tme_recode_x86_ic_subs_jump,
+	and tme_recode_x86_ic_subs_jump_chain.  Added
+	tme_recode_x86_ic_chain_fixup_target. 
+	(tme_recode_insns_thunk_run): Now takes a chain thunk instead of the
+	recode IC, all callers changed.  Renamed the TME_RECODE_RW_FLAG macros
+	to TME_RECODE_TLB_FLAG macros.  Define the tme_recode_ras_entry_t
+	type. 
+
+Sun Feb 07 16:51:53 2010  Matt Fredette  <fredette@alum.mit.edu>
+
+	* generic/mouse.c (_tme_mouse_deltas_opposite): Added. 
+	(tme_mouse_buffer_copyin): If the new event can be merged with the
+	previous new event, merge them. 
+
+	* libtme/Makefile.am: Added SUBDIRS. 
+	In libtme_la_SOURCES, replaced misc.c with misc-host.c, and added the
+	machine independent recode sources and token.c and runlength.c. 
+	Added misc.c to EXTRA_DIST. 
+
+	* libtme/kgdb.c libtme/recode-address.c libtme/runlength.c
+	  tme/runlength.h tools/stp103x-tlbs.pl tools/sun4u_58-find-module.pl
+	  tools/tme-log-binary-dump-calls-traps.pl
+	  tools/tme-toolchain-wrapper.pl:
+
+	  Added. 
+
+	* libtme/recode-ic.c (tme_recode_opcode_dump): Removed
+	TME_RECODE_OPCODE_JUMP. 
+
+	* libtme/host/x86/Makefile.am: Added rc-x86-tlb.c and rc-x86-chain.c
+	to EXTRA_DIST. 
+
+	* libtme/host/x86/rc-x86-chain.c: Fixed many bugs where
+	TME_RECODE_X86_MOD_RM_EA_DISP32() was used with
+	TME_RECODE_X86_EA_BASE_IP. 
+	Split TME_RECODE_X86_CHAIN_RETURN_ADDRESS() into separate definitions
+	for ia32 and x86-64 hosts, because the ia32 expression gets a pointer
+	cast size warning on x86-64. 
+	(_tme_recode_x86_chain_in): Explicitly cast a value being stored into
+	a tme_uint8_t, to tme_uint8_t, to avoid a warning when this value is a
+	16-bit constant.  Fixed a bug where we added two rex prefixes
+	together. 
+	(_tme_recode_x86_chain_prologue): Fixed an assert. 
+
+Fri Feb 05 01:06:01 2010  Matt Fredette  <fredette@alum.mit.edu>
+
+	* ic/sparc/Makefile.am: Added sparc-rc-chain.c to EXTRA_DIST. 
+	* ic/sparc/sparc-rc-chain.c: Added. 
+
+Fri Jan 15 03:05:59 2010  Matt Fredette  <fredette@alum.mit.edu>
+
+	* libtme/host/x86/rc-x86-chain.c:
+	* libtme/host/x86/rc-x86-tlb.c: Added. 
+
+Sun Nov 08 17:35:49 2009  Matt Fredette  <fredette@alum.mit.edu>
+
+	* host/posix/posix-disk.c (_tme_posix_disk_buffer_free):
+	(_tme_posix_disk_open):
+	(_tme_posix_disk_close):
+	(__tme_posix_disk_command):
+	(_tme_posix_disk_command): Added. 
+	(_tme_posix_disk_buffer_get): Now use _tme_posix_disk_buffer_free() to
+	free a buffer. 
+	(tme_host_posix,disk): Now use _tme_posix_disk_open() to open the disk
+	image and set our command function on the element. 
+
+	* ic/stp2024.c: Corrected all of the audio codec and DMA register
+	offsets. 
+
+	* ic/sparc/Makefile.am: Added sparc-timing.c to
+	tme_ic_sparc_la_SOURCES. 
+
+	* ic/sparc/sparc-fpu-auto.sh: Fixed a bug where FsMULd was doing a
+	single-precision multiply. 
+
+	* ic/sparc/sparc-rc-ls.c (_tme_sparc_recode_ls_assist_check): On a v9
+	CPU, mask the addresses. 
+
+	* ic/sparc/sparc-rc-verify.c (tme_sparc_recode_verify_end_preinstruction):
+	Added. 
+	(tme_sparc_recode_verify_end): Added support for
+	TME_SPARC_RECODE_VERIFY_PC_NONE. 
+	(tme_sparc_recode_insns_dump): Fixed the suggested prints for the case
+	where TME_SPARC_RECODE_SRC_HASH_SIZE_ELEMENT is not one. 
+
+	* ic/sparc/sparc-timing.c (_tme_sparc_timing_loop_start): Corrected
+	the comment about the state of the PCs. 
+	(tme_sparc_timing_loop_assist): Now call
+	tme_sparc_recode_verify_end_preinstruction(). 
+
+	* ic/sparc/sparc-vis-auto.sh: Added support for the
+	FCMP{GT,LE,NE,EQ}{16,32} instructions. 
+
+	* ic/stp22xx/stp220x.c (_tme_stp220x_ebus_cycle): Fixed a bug where we
+	wouldn't update the read/write bits in the control register. 
+
+	* ic/stp22xx/stp222x-impl.h: Added tme_stp2220_mdu_idi_zs0_zs1_active
+	to struct tme_stp222x. 
+
+	* ic/stp22xx/stp222x-mdu.c (tme_stp222x_mdu_intcon): Now mimic how the
+	zs0 and zs1 interrupt signals are wired together somewhere. 
+
+	* ic/stp22xx/stp222x-stc.c (tme_stp222x_stc_flush): The stp2220 flush
+	writeback actually only writes back four bytes, not eight. 
+	(tme_stp222x_stc_regs_diag): Added minimal emulation of reads of the
+	diagnostic registers, always returning zero. 
+
+	* libtme/misc.c (tme_misc_cycles_scaled): Now take an optional pointer
+	to an unscaled cycles counter, and do the scaling as a simple
+	floating-point multiply.  Added support for hosts that don't have a
+	64-bit integral type. 
+	(tme_misc_cycles_scaling): Now make the scaling with a simple
+	floating-point division. 
+	[!TME_HAVE_MISC_CYCLES_PER_MS] (tme_misc_cycles_per_ms): Added support
+	for hosts that don't have a 64-bit integral type. 
+	[!TME_HAVE_MISC_CYCLES] (tme_misc_cycles): Added support for hosts
+	that don't have a 64-bit integral type. 
+	(tme_misc_cycles_spin_until):
+	(tme_value64_add):
+	(tme_value64_sub): Added. 
+
+	* libtme/threads-sjlj.c (tme_sjlj_dispatch): Fixed a bug where we
+	would call gtk_idle_add_priority() when we weren't using GTK. 
+
+	* libtme/host/x86/misc-x86.c: Define tme_misc_cycles() with inline. 
+
+	* machine/sun/sun-bwtwo.c (_tme_sunbw2_type_set): Now define the
+	interrupt bus signal. 
+
+	* machine/sun/sun-cgsix.c (_tme_suncg6_type_set): Now define the
+	interrupt bus signal. 
+
+	* machine/sun/sun-fb.c: Now define TME_SUNFB_UPDATE_SIZE.  Changed
+	various tme_bus_addr_t to tme_bus_addr32_t. 
+	(_tme_sunfb_callout): Now call out the framebuffer-specific interrupt
+	bus signal, instead of always using the unspecified one, and mark the
+	signal callout as an edge. 
+	(tme_sunfb_memory_update): Pass and reset the first and last bytes
+	updated, if any, in the real framebuffer memory, and invalidate any
+	outstanding write TLB entries. 
+	(tme_sunfb_bus_cycle_bt458): Now tolerate reads and writes to invalid
+	addresses. 
+	(_tme_sunfb_tlb_fill): Track one outstanding writable TLB entry, and
+	the minimum and maximum possible bytes that any writable TLB entry
+	could have written since the last framebuffer update. 
+	[TME_SUNFB_BUS_TRANSITION] (tme_sunfb_bus_cycle_transition): Added. 
+	(tme_sunfb_new): Make sure that the interrupt bus signal is defined. 
+	(tme_sun_cgthree): Define the interrupt bus signal. 
+
+	* machine/sun/sun-fb.h: Now include <tme/completion.h>.  Now define
+	TME_SUNFB_LOG_HANDLE().  Temporarily define TME_SUNFB_BUS_TRANSITION. 
+	Changed some tme_bus_addr_t to tme_bus_addr32_t.  In struct tme_sunfb,
+	added members for one outstanding writable TLB entry, the offsets of
+	the first and last bytes updated in the real framebuffer memory, and
+	the interrupt bus signal. 
+	Added prototypes for tme_sunfb_bus_cycle_bt458 and
+	tme_sunfb_bus_cycle_transition. 
+
+	* scsi/scsi-device.c (_tme_scsi_device_cycle): If the device does not
+	define a handler for a command, use the illegal command handler. 
+
+	* tme/misc.h: Changed tme_misc_cycles_scaling_t to be the widest
+	available floating-point type. 
+	Updated the tme_misc_cycles_scaled() prototype.  Added a prototype for
+	tme_misc_cycles_spin_until(). 
+
+Tue Oct 27 00:45:16 2009  Matt Fredette  <fredette@alum.mit.edu>
+
+	* ic/sparc/sparc-rc-insns.c (_tme_sparc_recode_recode): When recoding
+	branches, now get the raw branch displacement as a signed 32 bits,
+	doing the full sign-extension to guest width in one place. 
+	Added support for branch to .  timing loops.  When the PCs are not
+	updated, in addition to checking that the PC advance is zero, check
+	that the PC is in the guest PC register. 
+
+	* ic/sparc/sparc-timing.c: Added. 
+
+Tue Oct 13 22:40:10 2009  Matt Fredette  <fredette@alum.mit.edu>
+
+	* tools/tme-log-binary-dump.pl:
+	* tools/tme-log-binary-udiff.pl:
+	* tools/tme-log-binary.pl: Added. 
+
+Sat Sep 26 14:55:25 2009  Matt Fredette  <fredette@alum.mit.edu>
+
+	* ic/sparc/sparc-execute.c: Now define tme_sparc_idle_pcs, instead of
+	tme_sparc_idle_type_pc.  Now use TME_SPARC_HAVE_RECODE() to test for
+	recode support.  Reworked idle handling.  Now, an idle type must mark
+	two consecutive idles without a trap before we go idle.  This
+	eliminates the race condition where we would trap, then resume in the
+	idle loop past the point of no return of our going idle (i.e., before
+	looping to check the possibly updated scheduler state again).  Also
+	added support for marking idles in a true idle loop.  No longer go
+	idle for the netbsd32-type-0 idle type in an annulled branch delay
+	slot. 
+	When recode is supported, before checking for a recode thunk, detect a
+	control transfer target that is an idle PC, and mark the idle.  When
+	recode is not supported, in the control transfer instruction handling,
+	detect a control transfer target that is an idle PC, and mark the
+	idle. 
+
+	* ic/sparc/sparc-impl.h: Added macros for the new idle types, and
+	macros for sets of idle types with common characteristics. 
+	Replaced TME_SPARC_IDLE_TYPES_SUPPORTED() with
+	TME_SPARC_IDLE_TYPE_IS_SUPPORTED().  Added TME_SPARC_IDLE_MARK() and
+	TME_SPARC_IDLE_STOP().  Added TME_SPARC_HAVE_RECODE().  In struct
+	tme_sparc, added an instruction burst count for when idle.  Now track
+	the number of idle marks made since the last trap, and multiple idle
+	PCs. 
+
+	* ic/sparc/sparc-insns.c: Now include <tme/misc.h>. 
+	Now define a constant TME_SPARC_VERSION() around the instructions for
+	the different architectures. 
+	In all of the sparc32 instructions, renamed TME_SPARC_TRAP_ to
+	TME_SPARC32_TRAP_. 
+	(tme_sparc32_rdpsr): Removed the sunos32-type-0 idle type detection. 
+	This idle type is now detected only in tme_sparc32_wrpsr(). 
+	(tme_sparc32_wrpsr): Reworked all sparc32 idle type detection that
+	keys off of a wrpsr.  Now use TME_SPARC32_CWP_UPDATE(). 
+	(tme_sparc32_rett):
+	(tme_sparc32_save_restore): Now use TME_SPARC32_CWP_UPDATE(). 
+	[TME_HAVE_INT64_T]: Added the sparc64 instructions. 
+
+	* ic/sparc/sparc-misc.c (_tme_sparc_idle_reset): Added.  All functions
+	that reset the idle state now call here. 
+	(tme_sparc_thread): Added support for the new idle types. 
+	(tme_sparc_new): Initialize the idle instruction burst size. 
+	(tme_sparc32_trap):
+	(tme_sparc64_trap): Traps always do a TME_SPARC_IDLE_STOP(). 
+	(tme_sparc_ls_bus_fault): Fixed a bug where we wouldn't advance the
+	cycle to get past the fault under TME_SPARC_LSINFO_NO_FAULT.  This
+	caused fetches of annulled instructions that fault to loop forever. 
+	(tme_sparc_fetch_nearby): Cleaned up the code that gets the current PC
+	and the nearby PC, especially making sure that the offset remains
+	signed after multiplying it by a sizeof(), and truncating the result
+	to the correct address size.  Fixed a bug where we would assert() that
+	the ITLB entry applies without checking if it's valid - for various
+	reasons the ITLB might be the execute loop's itlb_invalid. 
+
+	* ic/sparc/sparc-rc-insns.c (_tme_sparc_recode_recode): No longer
+	check for the netbsd32-type-0 idle PC in a branch delay slot.  This
+	idle type is now handled as a true idle loop in the execute loop. 
+
+	* scsi/scsi-cdrom.c: Now handle
+	TME_SCSI_CDB_CDROM_READ_DISC_INFORMATION and
+	TME_SCSI_CDB_CDROM_CACHE_SYNC as illegal. 
+
+	* tme/scsi/scsi-cdrom.h: Now define
+	TME_SCSI_CDB_CDROM_READ_DISC_INFORMATION. 
+
+Tue Sep 08 23:15:20 2009  Matt Fredette  <fredette@alum.mit.edu>
+
+	* machine/sun4u/Makefile.am:
+	* machine/sun4u/SUN-ULTRA-1: Added. 
+
+Mon Sep 07 15:42:24 2009  Matt Fredette  <fredette@alum.mit.edu>
+
+	* ic/stp22xx/stp222x-main.c (_tme_stp222x_run): Fixed a bug where we
+	would request the UPA bus for an interrupt dispatch even when we
+	weren't ready to retry the dispatch. 
+
+	* ic/stp22xx/stp22xx.c (tme_stp22xx_cond_sleep_yield): Fixed a bug
+	where we wouldn't mark the condition as running under NDEBUG, before
+	calling the run function.  If the condition was notified before the
+	sleep, since it was still marked idle, it wouldn't be marked as
+	notified, and the notify would be lost. 
+
+	* libtme/host/x86/rc-x86-conds.c (tme_recode_host_conds_thunk_new):
+	Use the new TME_SHIFT() macro when doing host-size shifts of a
+	tme_recode_uguest_t, which may be smaller than host-size.  Fixed a bug
+	emitting an %rip EA on an x86-64 host. 
+
+	* libtme/host/x86/rc-x86-flags.c (tme_recode_host_flags_thunk_new):
+	Use the new TME_SHIFT() macro when doing host-size shifts of a
+	tme_recode_uguest_t, which may be smaller than host-size.  Fixed a bug
+	where the test subs wasn't chaining to the main flags subs. 
+
+	* libtme/host/x86/rc-x86-insns.c (_tme_recode_x86_insn_guest): Fixed a
+	bad double-host-size guest check. 
+
+	* libtme/host/x86/rc-x86-rws.c (tme_recode_host_rw_thunk_new): When
+	converting the guest address into the TLB entry page offset, do it at
+	the smaller of the host size and the guest read/write address size. 
+	(tme_recode_host_rw_thunk_dup): The sign-extension instruction can be
+	four bytes, not only less. 
+
+	* libtme/host/x86/rc-x86-subs-asm.S (tme_recode_x86_shift): We need to
+	extend for all right shifts less than host size, not just those less
+	than 32 bits, because the common shra-all code assumes that the
+	destination is host-size.  This change only affected x86-64 hosts,
+	which also had a REX bug. 
+
+	* libtme/host/x86/recode-x86.c (_tme_recode_x86_emit_adjust_sp): Fixed
+	a bug where we would overwrite the REX prefix on an x86-64 host. 
+	(_tme_recode_x86_raw_reg_binop): Fixed another bug where we used
+	addition instead of binary-OR to combine two overlapping values. 
+	(tme_recode_host_ic_new): Fixed a TME_RECODE_REG_C inside a REX prefix
+	macro. 
+	Fixed a REX.B macro for an address that had a size.  When emitting the
+	jump chain adjust of the c register, advance thunk_bytes normally,
+	then assert that the value of TME_RECODE_X86_OFFSET_JUMP_CHAIN_DIRECT
+	is correct, instead of using it to advance thunk_bytes.  Fixed another
+	bug where we used addition instead of binary-OR to combine two
+	overlapping values. 
+
+	* tme/common.h (TME_SHIFT): Added. 
+
+	* tme/host/recode-x86.h: An x86-64 host needs a larger value of
+	TME_RECODE_HOST_INSN_SIZE_MAX. 
+
+Tue Sep 01 00:54:01 2009  Matt Fredette  <fredette@alum.mit.edu>
+
+	* ic/sparc/Makefile.am: Added sparc-recode.c and stp103x.c to
+	tme_ic_sparc_la_SOURCES.  Added sparc-vis-auto.c to BUILT_SOURCES. 
+	Added sparc-vis-auto.sh and the sparc recode parts to EXTRA_DIST. 
+	Added a target to make sparc-vis-auto.c. 
+
+	* ic/sparc/cy7c601.c (tme_ic_,sparc,cy7c601): Initialize many new
+	struct tme_sparc members with cy7c601-specific values. 
+
+	* ic/sparc/mb86900.c (tme_ic_,sparc,mb86900): Initialize many new
+	struct tme_sparc members with mb86900-specific values. 
+
+	* ic/sparc/sparc-recode.c: Removed TME_SPARC_RECODE_PAGE_SIZE_LOG2 and
+	TME_SPARC_RECODE_PAGE_SIZE.  We now use the ic's actual page size
+	everywhere, instead of a fixed sparc recode page size.  The fixed
+	sparc recode page size of 4KB forced writes to always be assisted when
+	the ic had a larger page size, because DTLB entries for writing were
+	never for a full page (since we made the fixed sparc recode page size
+	the validity size for cacheable memory, DTLB entries were never bigger
+	than that).  All users changed.  Moved _tme_sparc_recode_verify_on
+	from sparc-rc-verify.c, and added _tme_sparc_recode_off. 
+	Added sparc-rc-ls.c to the set of recode parts included for each
+	architecture. 
+	Now define TME_SPARC_RECODE_RW_THUNK_INDEX(). 
+	(tme_sparc_recode): If recode is off, return immediately. 
+	(tme_sparc_recode_dump_insns): Added support for read/write
+	instructions. 
+	(tme_sparc_recode_init): Allocate and initialize the read-uses
+	records.  On a v9 CPU, %r1 through %r7 are addressed through recode
+	register window two.  Set all of the recode TLB entry information for
+	read/write instructions.  Call the architecture-specific
+	initialization for loads and stores. 
+
+	* ic/sparc/stp103x.c: Now define TME_STP103X_ICACHE_BLOCK_SIZE. 
+	Reorganized struct tme_stp103x slightly, to put everything that is
+	recode-verifiable first, and everything that is accessed by loads and
+	stores last. 
+	(_tme_stp103x_interrupt_check):
+	(_tme_stp103x_flush): If we're replaying instructions, return
+	immediately. 
+	(_tme_stp103x_update_pstate): Fixed a bug where we wouldn't update the
+	recode register window offsets. 
+	(_tme_stp103x_rdpr): Added. 
+	(_TME_SPARC_EXECUTE_OPMAP): Now use _tme_stp103x_rdpr. 
+	(_tme_stp103x_ls_cycle_block_ld):
+	(_tme_stp103x_ls_cycle_block_st): Save the block for verification. 
+	(_tme_stp103x_new): Fixed a bug where we were only allocating a struct
+	tme_sparc, and not the larger struct tme_stp103x.  Initialize
+	_tme_sparc_ls_asi_misaligned.  Under _TME_SPARC_RECODE_VERIFY,
+	initialize the recode verify sizes. 
+
+	* ic/stp22xx/stp220x.c:
+	* ic/stp22xx/stp222x-main.c: Removed some AUDITs. 
+
+	* libtme/host/x86/rc-x86-rws.c: Fixed various bugs where we used a
+	size with a TME_RECODE_X86_REX_B() that is for addressing. 
+	(_tme_recode_x86_rw_tlb_ref): Fixed a bad assert(). 
+	(tme_recode_host_rw_thunk_new): Added support for recode TLB entries
+	with a 16-bit context. 
+	Added support for offsetting the address when making the TLB entry
+	index. 
+	The recode TLB entries are now a found directly in the ic structure,
+	not found through a pointer. 
+	Now emit instructions to check a recode TLB entry's context.  Fixed
+	bugs where we would emit a displacement-less EA when the lone base
+	register is %bp or %r13. 
+	In the double-host-size most-signficant write, we know that its size
+	is TME_RECODE_SIZE_HOST. 
+	Fixed a bug where we wouldn't do the double-host-size most-significant
+	read first, before we destroy the host memory address register.  Fixed
+	bugs where we would lose instructions because we forgot to finish and
+	restart the thunk, or forgot to advance thunk_bytes. 
+
+Mon Aug 31 02:23:41 2009  Matt Fredette  <fredette@alum.mit.edu>
+
+	* ic/sparc/sparc-rc-ls.c (TME_SPARC_RECODE_RW_FLAG): Removed. 
+	(_tme_sparc_recode_ls_assist_check): Added. 
+	(_tme_sparc_recode_ls_assist_ld) [_TME_SPARC_RECODE_VERIFY]:
+	(_tme_sparc_recode_ls_assist_st) [_TME_SPARC_RECODE_VERIFY]: Call
+	_tme_sparc_recode_ls_assist_check(). 
+	(tme_sparc_recode_ls_tlb_update): Now take the struct tme_sparc_ls *,
+	so we can get the DTLB entry directly.  Added tme_sparc_ireg_t casts
+	to the DTLB address check, to avoid doing math in a wider
+	tme_bus_addr_t. 
+	Force assists for a DTLB entry if it uses special ASIs. 
+	Improved the recode TLB entry read/write flags, including handling
+	DTLB entries for no-fault loads, addresses with side-effects, and
+	endianness changes.  Also, no longer check for DTLB entries that
+	support the secondary address space, because we can't assist them
+	(mostly because recode read/write instructions only have a single
+	default context). 
+	All sparc recode TLB entries have a 16-bit context, and update the
+	context and the context mismatch read/write flag as needed. 
+	(_tme_sparc_recode_ls_init): Improved how the read/write thunks are
+	generated, and especially their read/write flags masks.  No longer
+	make read/write thunks for accesses to secondary address spaces.  Make
+	read/write thunks for no-fault loads. 
+
+	* ic/sparc/sparc-rc-verify.c: Define a token for the replay ITLB
+	entry. 
+	(tme_sparc_recode_verify_begin): Set the token on the replay ITLB
+	entry. 
+	(_tme_sparc_recode_verify_init): Initialize the token for the replay
+	ITLB entry, and mark it as valid. 
+
+Mon Aug 31 01:58:38 2009  Matt Fredette  <fredette@alum.mit.edu>
+
+	* generic/fb-xlat-auto.sh: Now only check framebuffer contents that
+	may have been updated for changes. 
+
+	* host/gtk/gtk-screen.c (_tme_gtk_screen_th_update): If the
+	framebuffer needs a full redraw, force the next translation to
+	retranslate everything. 
+	(_tme_gtk_screen_mode_change): Now delay forcing the next translation
+	until the next screen update. 
+
+	* host/posix/posix-memory.c: Defined some macros for sizes of
+	cacheables, and the writable TLB entry hash set. 
+	Added struct tme_posix_memory_valids.  In struct tme_posix_memory,
+	added a mutex.  Fixed a bug where the rwlock was a mutex.  Added
+	pointers to any writable TLB entry hash set, a list of valids
+	bitmasks.  Added members for the current writable TLB size, and our
+	cacheable structure. 
+	(_tme_posix_memory_tlbs_invalidate): Added. 
+	(_tme_posix_memory_tlb_fill): If this memory is cacheable, return the
+	cacheable structure in the TLB entry, and if this is a write, track
+	the TLB entry in the hash set and clear the bit for the address' page
+	in all valids bitmasks. 
+	(_tme_posix_memory_valids_new):
+	(_tme_posix_memory_valids_set): Added. 
+	(tme_host_posix,memory): If the memory is cacheable, allocate the
+	writable TLB entry set, initialize the valids list and the writable
+	TLB size, and the cacheable structure. 
+
+	* ic/sparc/sparc-execute.c: Now define TME_PRIxSPARCREG. 
+	On sparc64, fixed the ASI mask code and set the default memory
+	context. 
+	[TME_HAVE_RECODE]: Set the default read/write flags for the current
+	CPU state. 
+	Instead of constructing the invalid ITLB entry, initialize its new
+	token and set it on the entry.  Never acquire the external mutex, and
+	only call the external check function if the external flag is set. 
+	Now save the previous PC.  If we're replaying recoded instructions for
+	the verifier, stop replaying if the previous PC was the last to
+	replay.  Otherwise, poison it to prevent all recoding.  Added
+	(tme_sparc_ireg_t) casts to the ITLB entry address checks, to avoid
+	doing math in a wider tme_bus_addr_t.  Now use TME_SPARC_TLB_HASH()
+	and TME_SPARC_ITLB_ENTRY() to get the ITLB entry from the array.  Now
+	check the context on an ITLB entry.  Now, instead of filling the ITLB
+	entry ourselves, just do a slow load of the instruction, which will
+	take care of everything, including fetching the instruction into the
+	memory buffer if needed.  Since idle loop detection can't take place
+	in the instruction executor when recode is in use, moved the
+	netbsd32-type-0 detection into tme_sparc32_wrpsr().  In the rare case
+	that an annulled instruction is also a branch target
+	(which can only happen if there are two branches in a row, where the
+	second one annuls), make sure we don't try to recode starting at the
+	annulled instruction. 
+	Use TME_SPARC_G0_OFFSET(ic) to find the globals. 
+	[TME_HAVE_RECODE]: Now recode instructions, run recoded instructions
+	thunks, and replay the same instructions through the normal executor
+	to compare the effects. 
+	TME_SPARC_IREG_IMM has been replaced by TME_SPARC_IREG_TMP(0).  Added
+	support for the sparc64 format two instructions.  Added support for
+	the sparc64 %pstate.AM in the control transfers. 
+
+	* ic/sparc/sparc-insns-auto.sh: Define _tme_sparc_float_null. 
+	Now emit the fpop1 and fpop2 instructions.  Now emit instructions for
+	sparc64, including the new sdivx, udivx, mulx, ldx, stx, ldxa, stxa,
+	casxa, casa, and the alternate floating-point load and store
+	instructions. 
+	(_tme_sparc32_alternate_asi_mask): Get the flags for an ASI and build
+	a mask using the new ASI-mask macros.  If this ASI has a special
+	handler, force a slow load or store by making the ASI mask undefined. 
+	(_tme_sparc64_alternate_asi_mask):
+	(_tme_sparc${arch}_fpu_mem_fpreg): Added. 
+	(tme_sparc${arch}_udiv):
+	(tme_sparc${arch}_udivcc):
+	(tme_sparc${arch}_sdiv):
+	(tme_sparc${arch}_sdivcc): Trap on division by zero, and added
+	overflow handling for the cc instructions.  Fixed a sparc64 bug where
+	we would only set %icc.Z when the 64-bit result was zero. 
+	In the load/store instructions, get the right address for the sparc64
+	casa and casxa instructions, and when %pstate.AM is set.  Get the
+	context for sparc64 alternate instructions.  Make a mask of ASI flags
+	that will trigger a slow load/store.  Check the DTLB entry's context. 
+	Added (tme_bus_addr${arch}_t) casts to the DTLB address check.  Check
+	that the ASI mask in the DTLB entry allows fast transfers.  For a slow
+	transfer, call the new tme_sparc${arch}_ls().  Now, allow the slow
+	function to complete an alternate load.  Get the byte order of the
+	access and do byteswapping as needed. 
+	(tme_sparc${arch}_${insn}): Added support for the sparc64 %pstate.AM
+	and possible address space hole. 
+	(tme_sparc${arch}_ldf*):
+	(tme_sparc${arch}_stf*): On sparc64, call the ASI misaligned function
+	to see if the address is misaligned.  Before the memory access, now
+	call _tme_sparc${arch}_fpu_mem_fpreg() to check for any traps and to
+	get the floating-point register. 
+	(tme_sparc${arch}_lddf*):
+	(tme_sparc${arch}_stdf*): On sparc64, call the ASI misaligned function
+	to see if the address is misaligned.  Before the memory access, now
+	call _tme_sparc${arch}_fpu_mem_fpreg() to check for any traps and to
+	get the floating-point register.  Added support for sparc64
+	fully-aligned and 32-bit aligned accesses. 
+	(tme_sparc${arch}_ldfsr):
+	(tme_sparc${arch}_stfsr): Now check for traps with
+	_tme_sparc${arch}_fpu_mem().  Added support for the sparc64 ldxfsr and
+	stxfsr. 
+	(tme_sparc${arch}_atomic): Added. 
+	(tme_sparc${arch}_load):
+	(tme_sparc${arch}_store): These functions are no longer called
+	directly by instruction functions.  They now only do final loads and
+	stores (as opposed to pre-access fault checking, DTLB filling, etc.). 
+	(tme_sparc${arch}_ls): Added.  This is the function called by
+	instruction functions to do a slow access.  This coordinates special
+	ASIs, address mapping, DTLB filling, pre-access fault checking, and
+	slow load, store, and atomic cycles. 
+
+	* ic/sparc/sparc-misc-auto.sh: Define the sparc64 alternate, MMU, and
+	interrupt globals.  Define TME_SPARC_IREG_INSN. 
+	Replaced TME_SPARC_IREG_IMM with TME_SPARC_IREG_TMP().  Defined many
+	sparc64 architected and internal registers. 
+
+	* ic/sparc/sparc-misc.c (_tme_sparc_bus_signal): Now recognize the bus
+	grant signal.  Now track both assertion and negation of halt and
+	reset.  Changed the external signal indications to true atomic flags,
+	and set the external atomic flag after any changes.  Moved the
+	condition variable notify inside the mutex lock. 
+	(_tme_sparc_bus_interrupt): Now update the external IPL value with an
+	atomic write, and set the external atomic flag afterwards.  Moved the
+	condition variable notify inside the mutex lock. 
+	(tme_sparc_idle): Now call the ic-specific external check function,
+	instead of the_sparc32_external_check(). 
+	(tme_sparc_thread): Added support for TME_SPARC_MODE_OFF. 
+	(_tme_sparc_generic_tlb_fill): Now take a tme_bus_addr_t.  Don't set
+	the ASI mask any more, the slow load/store function has arranged or
+	will arrange for it to be set. 
+	(_tme_sparc_connection_score):
+	(_tme_sparc_connections_new): Replaced bus connection TLB set allocate
+	references with TLB set add references.  Added support for UPA bus
+	connections. 
+	(_tme_sparc_connection_make): Replaced bus connection TLB set allocate
+	references with TLB set add references.  Added support for UPA bus
+	connections.  Now initialize the TLB set and add it to the bus,
+	getting the maximum context back in the v7 case. 
+	(tme_sparc_new): Added support for the tick-frequency and
+	prom-delay-factor options.  Initialize the cycles scaling.  The
+	processor starts off.  Initialize the external state, CWP offsets and
+	the ASI flags.  Initialize recoding. 
+	(tme_sparc_redispatch):
+	(tme_sparc32_trap_preinstruction): End any recode verifying. 
+	(tme_sparc32_external_check): Now take a flag that says whether or not
+	the external mutex is locked.  Update the new external state as
+	needed. 
+	(tme_sparc32_trap): End any recode verifying.  Now use
+	TME_SPARC32_CWP_UPDATE() to update the CWP offsets, and
+	TME_SPARC_REG_INDEX() to find %r17.  Now log traps. 
+	(tme_sparc32_fetch_slow):
+	(tme_sparc32_bus_fault): Removed. 
+	(tme_sparc32_ls_bus_cycle):
+	(tme_sparc32_ls_address_map):
+	(tme_sparc32_ls_trap):
+	(tme_sparc_nnpc_trap):
+	(tme_sparc_ls_bus_fault):
+	(tme_sparc64_trap_preinstruction):
+	(tme_sparc64_trap):
+	(tme_sparc64_trap_error_state): Added. 
+	(tme_sparc_callout_relock): Now check the ITLB entry's context. 
+	(tme_sparc32_dump): Replaced TME_SPARC_CWP_OFFSET() with hard-coded
+	multiplications by 16. 
+	(tme_sparc32_dump_memory): Converted into tme_sparc64_dump_memory(). 
+
+	* ic/sparc/sparc-rc-insns.c: Removed TME_SPARC_RECODE_INSN_STORE;
+	along with loads, stores are now detected by their
+	TME_RECODE_OPCODE_RW opcode.  Added TME_SPARC_RECODE_INSN_UPDATE_INSN. 
+	TME_SPARC_RECODE_INSN_ASSIST now includes
+	TME_SPARC_RECODE_INSN_UPDATE_INSN.  Replaced
+	TME_SPARC_RECODE_INSN_ASSIST_STORE with TME_SPARC_RECODE_INSN_ST, and
+	added TME_SPARC_RECODE_INSN_LD and TME_SPARC_RECODE_INSN_LDA.  These
+	are now used for the load and store instructions that can be recode
+	read/write instructions, and TME_SPARC_RECODE_INSN_ASSIST_FULL |
+	TME_SPARC_RECODE_INSN_NO_RD is used for stores (usually alternate
+	stores) that can't be.  Fixed a bug where std and stda were missing
+	TME_SPARC_RECODE_INSN_NO_RD. 
+	casx and casxa are now TME_SPARC_RECODE_INSN_ASSIST_FULL. 
+	(tme_sparc_recode_insn_assist_redispatch): Added, from the old
+	_tme_sparc_recode_insn_assist_redispatch(), all callers changed.  Now
+	check that the ITLB entry hasn't been poisoned by
+	tme_sparc_callout_relock(), and that the remaining instruction burst
+	is still nonzero. 
+	(_tme_sparc_recode_insn_assist_store): Removed. 
+	(_tme_sparc_recode_insn_assist_full): Now track statistics on assisted
+	opcodes. 
+	(_tme_sparc_recode_recode): Now use the ic's actual page size
+	everywhere, instead of a fixed sparc recode page size.  The fixed
+	sparc recode page size of 4KB forced writes to always be assisted when
+	the ic had a larger page size, because DTLB entries for writing were
+	never for a full page (since we made the fixed sparc recode page size
+	the validity size for cacheable memory, DTLB entries were never bigger
+	than that). 
+	For the v9 movr, fixed bugs where we had the wrong opcode and didn't
+	set the right conditions thunk.  Added support for the v9 ld*a
+	instructions, because they may be used for speculative loads, which we
+	do want to handle with recode read instructions. 
+	For BPcc and Bicc, extract the branch displacement using 32-bit types
+	for as long as possible.  Now test TME_SPARC_RECODE_INSN_UPDATE_INSN
+	to see if an instruction always or sometimes needs an assist, instead
+	of just checking for TME_RECODE_OPCODE_GUEST. 
+	Fixed a bug in the v9 32-bit shifts where we put the extension source
+	size in the immediate field, instead of the second source operand
+	field. 
+	Reused the old TME_SPARC_RECODE_INSN_STORE support for generating an
+	assisted store for generating recode read/write instructions. 
+
+Sun Aug 30 17:06:38 2009  Matt Fredette  <fredette@alum.mit.edu>
+
+	* ic/sparc/sparc-fpu-auto.sh (_tme_sparc_fpu_fcc_${precision}): Added
+	support for the additional fccN on sparc64. 
+	(tme_sparc_fpu_fpop[12]): Added support for encoded floating-point
+	register numbers, recode verification, FMOV*cc, FxTO*, F*TOx, FNEGd,
+	FABSd.  Now dirty any destination register. 
+
+	* ic/sparc/sparc-impl.h: Replaced all of the old TME_SPARC_TRAP_
+	macros with architecture-specific trap macros, whose values now
+	include priority and other flags.  For those trap names that are
+	common across architectures, a new TME_SPARC_TRAP() macro can be used
+	to expand to the right value for the current architecture.  All users
+	changed.  For sparc64, added the FPRS, TSTATE, WSTATE, VER, XCC, and
+	VIS GSR fields, and added more PSTATE fields.  Added the sparc VIS
+	ASIs. 
+	Added macros for the SPARC integer conditions.  Added
+	TME_SPARC_MODE_OFF and TME_SPARC_TL_MAX.  Added a set of macros for
+	updating the register window offsets for a new CWP, that update
+	separate offsets for the output, local, and input registers, and also
+	the recode register window offsets.  This simplifies
+	TME_SPARC_REG_INDEX.  Now that there are only flat DTLB and ITLB
+	arrays, added a TME_SPARC_TLB_HASH() to hash an address into an array. 
+	TME_SPARC_DTLB_ENTRY() and TME_SPARC_ITLB_ENTRY() now take one of
+	these hashes, instead of an address.  The slow load and store
+	functions, and any function that supports a slow load or store, now
+	take an expanded set of information about the access. 
+	Added macros for defining masks of load/store faults and memory
+	features. 
+	Now define TME_SPARC_FPU_FPREG_NUMBER_UNDEF, TME_SPARC_FPU_DIRTY(),
+	and TME_SPARC_FPU_IS_DISABLED().  Fixed TME_SPARC_FORMAT3_RD_ODD() to
+	take the register set name for the architecture. 
+	Added TME_SPARC_INSN_FPU_ENABLED, which TME_SPARC_INSN_FPU now uses. 
+	Removed TME_SPARC_INSN_FPU_STORE. 
+	[TME_HAVE_RECODE]: Now define macros for sparc recode. 
+	(tme_sparc_log_start): Fixed sparc64 support.  Now define macros for
+	fixing PROM delay factors.  Now define TME_SPARC_MEMORY_FLAGS() and
+	_TME_SPARC_MEMORY_FLAGS().  Removed TME_SPARC_ASI_DATA(). 
+	Now typedef _tme_sparc64_format3 and _tme_sparc_ls_asi_handler.  Added
+	struct tme_sparc_ls. 
+	[TME_HAVE_RECODE]: Added struct tme_sparc_recode_cacheable.  In struct
+	tme_sparc, added the cycles scaling, replaced the single CWP offset
+	with individual offsets for the global, output, local, and input
+	registers.  Added members for sparc64.  Expanded the
+	implementation-dependent data and functions, especially for the new
+	load/store architecture.  Retyped the instruction burst counters as
+	tme_uint32_t, since recode requires that.  Replaced the old TLB entry
+	set pointers with a single sparc TLB entry array and a complementary
+	array of tokens or recode TLB entries.  Added per-ASI information, and
+	members for memory context.  Added members for the new bus external
+	interface.  Changed the memory buffer to be a union of all of the
+	integral types.  Expanded the number of FPU registers and added the
+	sparc64 XFSR.  Added the VIS state.  Fixed a bug where the sparc64
+	idle PC was a tme_uint32_t.  Under [TME_HAVE_RECODE], added all of the
+	state needed for sparc recode.  Added more statistics.  Changed many
+	prototypes, generally for the new load/store architecture, trap
+	changes, sparc recode verification, and sparc64 support. 
+
+	* ic/sparc/sparc-vis-auto.sh (tme_sparc_vis)
+	[TME_SPARC_RECODE_VERIFY]: Clear the rd buffer. 
+	(_tme_sparc${arch}_vis_ls_cycle_pst${insn}): Fixed a bug where we
+	would get bit two of the store mask instead of bit one. 
+	(tme_sparc${arch}_vis_ls_asi_pst): Fixed some comments about trap
+	handling, and check that our caller checked that the FPU is enabled
+	and not in exception_pending mode. 
+	(tme_sparc${arch}_vis_ls_asi_fl): Fixed some comments about trap
+	handling, and check that our caller checked that the FPU is enabled
+	and in execute mode. 
+	(tme_sparc${arch}_vis_ls_asi_misaligned): Added. 
+
+	* libtme/log-prf.c: Added support for two 'l' flags.  Use the new
+	PRF_OUT_ARG_CODE() for each argument type found. 
+
+	* libtme/log.c: Define macros for the argument type codes.  Define
+	prf_lld(x) depending on whether or not long long int is supported, and
+	_TME_LOG_IF_INT64_T() depending on whether or not tme_int64_t is
+	supported.  Define _TME_LOG_ALIGN_ANY(). 
+	Typedef tme_log_arg_code_t. 
+	(LOG_PRF_LOCALS): Added support for two 'l' flags, and for long long
+	int arguments. 
+	(tme_output_append):
+	(tme_output_append_error):
+	(tme_output_prepend):
+	(tme_output_prepend_error): Define a dummy PRF_OUT_ARG_CODE(). 
+	(_tme_log_arg_code): Added. 
+	(tme_log_part): Added support for binary mode logging.  Define a dummy
+	PRF_OUT_ARG_CODE() for text mode logging. 
+
+	* tme/kgdb.h: Added. 
+
+	* tmesh/tmesh.c: Added macros, types, and globals for binary mode
+	logging. 
+	(_tmesh_log_output_binary): Added. 
+	(_tmesh_log_open):
+	(main): Added support for binary mode logging. 
+
+Sun Aug 30 14:42:15 2009  Matt Fredette  <fredette@alum.mit.edu>
+
+	* machine/sun2/sun2-control.c (_tme_sun2_control_cycle_handler):
+	Changed some tme_bus_addr_t to tme_bus_addr32_t.  Now call
+	_tme_sun2_mmu_context_user_set() on a write to the enable register, in
+	case the boot state changed. 
+
+	* machine/sun2/sun2-impl.h: In struct tme_sun2, removed the old
+	"special ROM [reset] read bus cycles" support, and added a pointer to
+	the m68k bus context register.  Removed the prototypes for
+	_tme_sun2_mmu_tlb_set_allocate(), _tme_sun2_mmu_tlb_set_add(), and
+	_tme_sun2_mmu_reset().  Added a prototype for
+	_tme_sun2_mmu_tlb_set_add(). 
+
+	* machine/sun2/sun2-mainbus.c (_tme_sun2_command): No longer call
+	_tme_sun2_mmu_reset(). 
+	(_tme_sun2_connection_score):
+	(_tme_sun2_connections_new): Replaced bus connection TLB set allocate
+	references with TLB set add references. 
+	(tme_machine_sun2): Initialize the m68k bus context register pointer. 
+
+	* machine/sun2/sun2-mmu.c: Changed some tme_bus_addr_t to
+	tme_bus_addr32_t.  Now define TME_SUN2_CONTEXT_COUNT. 
+	(_tme_sun2_m68k_tlb_fill):
+	(_tme_sun2_mmu_context_user_set): Now handle the boot state, and m68k
+	TLB filling in general, more like how sun3 does. 
+	(_tme_sun2_bus_tlb_fill): Now take a tme_bus_addr_t. 
+	(_tme_sun2_mmu_tlb_set_allocate):
+	(_tme_sun2_reset_cycle):
+	(_tme_sun2_mmu_reset): Removed. 
+	(_tme_sun2_mmu_tlb_set_add): Added. 
+	(_tme_sun2_mmu_new): Now use TME_SUN2_CONTEXT_COUNT instead of a
+	hard-coded 8. 
+
+	* machine/sun3/sun3-control.c (_tme_sun3_memerr_test_cycle_handler):
+	Now use tme_token_invalidate() instead of the removed
+	tme_bus_tlb_invalidate(). 
+
+	* machine/sun3/sun3-impl.h: In struct tme_sun3, added a pointer to the
+	m68k bus context register, removed the boot state TLB entry tracking
+	array, and track SDVMA TLB entry tokens instead of the TLB entries
+	themselves.  Replaced the _tme_sun3_mmu_tlb_set_allocate() with the
+	_tme_sun3_mmu_tlb_set_add() prototype. 
+
+	* machine/sun3/sun3-mainbus.c (_tme_sun3_connection_score):
+	(_tme_sun3_connections_new): Replaced bus connection TLB set allocate
+	references with TLB set add references. 
+
+	* machine/sun3/sun3-mmu.c: Changed some tme_bus_addr_t to
+	tme_bus_addr32_t.  Now define TME_SUN3_CONTEXT_COUNT. 
+	(_tme_sun3_tlb_fill): No longer track data TLB entries filled in the
+	boot state.  Since there is no backing TLB entry concept any more, the
+	memory error TLB entry pointer tracked is the real TLB entry pointer. 
+	(_tme_sun3_bus_tlb_fill): Now take a tme_bus_addr_t.  Now track and
+	invalidate SDVMA TLB entry tokens, instead of the TLB entries
+	themselves.  Call tme_sun_mmu_context_add() to associate the SDVMA TLB
+	entry with the current context. 
+	(_tme_sun3_mmu_sdvma_change): Now invalidate the SDVMA TLB entry
+	tokens, instead of the SDVMA TLB entries themselves. 
+	(_tme_sun3_mmu_context_set): No longer invalidate boot-state data
+	TLBs, and instead factor the boot state into the bus context presented
+	to the m68k, but do invalidate all SDVMA TLBs that depended on the
+	previous context. 
+	(_tme_sun3_mmu_tlb_set_allocate): Removed. 
+	(_tme_sun3_mmu_tlb_set_add): Added. 
+	(_tme_sun3_mmu_new): Internal context zero is no longer used for the
+	boot state. 
+
+	* machine/sun4/sun4-impl.h: In struct tme_sun4, added a token for the
+	cache internal TLB entry, a pointer to a v7 CPU bus context register,
+	removed the boot state TLB entry tracking array, and track SDVMA TLB
+	entry tokens instead of the TLB entries themselves.  Replaced the
+	_tme_sun44c_mmu_tlb_set_allocate() with the
+	_tme_sun44c_mmu_tlb_set_add() prototype.  In the
+	_tme_sun44c_tlb_fill_bus() prototype, fixed a tme_uint32_t to a
+	tme_bus_addr_t. 
+
+	* machine/sun4/sun4-mainbus.c (_tme_sun4_connection_score):
+	(_tme_sun4_connections_new): Replaced bus connection TLB set allocate
+	references with TLB set add references. 
+
+	* machine/sun4/sun44c-cache.c (_tme_sun44c_cache_cycle_bus):
+	(_tme_sun44c_tlb_fill_cache): Now use tme_token_invalidate() instead
+	of the removed tme_bus_tlb_invalidate(). 
+	(_tme_sun44c_cache_new): Initialize the token and set it on the cache
+	internal TLB entry. 
+
+	* machine/sun4/sun44c-memerr.c (_tme_sun44c_memerr_cycle_bus):
+	(_tme_sun44c_tlb_fill_memerr): Now use tme_token_invalidate() instead
+	of the removed tme_bus_tlb_invalidate(). 
+
+	* machine/sun4/sun44c-mmu.c: Changed some tme_bus_addr_t to
+	tme_bus_addr32_t.  Now define TME_SUN44C_CONTEXT_COUNT_MAX. 
+	(_tme_sun44c_tlb_fill_mmu): No longer track data TLB entries filled in
+	the boot state. 
+	(_tme_sun44c_tlb_fill_sparc): Now use TME_SPARC_ASI_MASK_SPECIAL() to
+	make the ASI mask for control space. 
+	(_tme_sun44c_tlb_fill_bus): Now take a tme_bus_addr_t.  Now track and
+	invalidate SDVMA TLB entry tokens, instead of the TLB entries
+	themselves.  Call tme_sun_mmu_context_add() to associate the SDVMA TLB
+	entry with the current context. 
+	(_tme_sun44c_mmu_sdvma_change): Now invalidate the SDVMA TLB entry
+	tokens, instead of the SDVMA TLB entries themselves. 
+	(_tme_sun44c_mmu_context_set): No longer invalidate boot-state data
+	TLBs, and instead factor the boot state into the bus context presented
+	to the SPARC, but do invalidate all SDVMA TLBs that depended on the
+	previous context. 
+	(_tme_sun44c_mmu_tlb_set_allocate): Removed. 
+	(_tme_sun44c_mmu_tlb_set_add): Added. 
+	(_tme_sun44c_mmu_new): Internal context zero is no longer used for the
+	boot state. 
+
+	* tme/Makefile.am: Added host and bus to SUBDIRS.  Added recode.h,
+	token.h, and completion.h to pkginclude_HEADERS. 
+
+	* tme/common.h: Added support for 64-bit byteswapping.  When
+	tme_uint64_t is the gcc unsigned long long, define
+	_TME_SHIFTMAX_INT64_T and TME_PRI64.  Now define size-specific printf
+	formats. 
+
+	* tme/connection.h: In struct tme_connection, added an opaque
+	identifier for an element to use with its connections.  Now define
+	TME_CONNECTION_BUS_UPA. 
+
+	* tme/log.h: Added support for different log modes, and for the new
+	binary log mode. 
+
+	* tme/misc.h: Added tme_misc_cycles_scaling_t.  Added prototypes for
+	tme_value64 tme_misc_cycles_scaled(), tme_misc_cycles_scaling(),
+	tme_misc_cycles_per_ms(), and tme_misc_cycles(). 
+
+	* tme/recode.h: Added macros, types, and other support for the
+	read/write instructions. 
+	Increased TME_RECODE_REG_GUEST_WINDOW_UNDEF from two to three, and
+	redid tme register information window macros, for sparc64. 
+	Added the read-uses records support. 
+
+	* tme/token.h (tme_token_busy): Make a write-before-read barrier after
+	setting the busy flag. 
+	(tme_token_invalidate_nosync): Added. 
+
+	* tme/host/recode-x86.h: Now define TME_RECODE_HOST_RW_THUNK, and
+	macros for making the read/write flags. 
+	In TME_RECODE_X86_IC, added a member for tracking any loaded register
+	window offset around an if/endif. 
+
+	* tme/ic/sparc.h: Redid the ASI mask system to work better for
+	sparc64, which uses many more ASIs, many of which do the same address
+	translation.  In struct tme_sparc_tlb, added a context member and a
+	link member.  The latter is for linking the TLB entry to any real
+	SPARC MMU object. 
+
+	* tme/machine/sun.h: Removed the prototypes for
+	tme_sun_mmu_tlbs_context_set() and tme_sun_mmu_tlb_set_allocate(), and
+	added the prototypes for tme_sun_mmu_context_add(),
+	tme_sun_mmu_context_switched(), and tme_sun_mmu_tlb_set_add(). 
+	Added the prototype for tme_sun_cgsix(). 
+
+Sat Aug 29 21:48:57 2009  Matt Fredette  <fredette@alum.mit.edu>
+
+	* bus/multibus/3c400.c (_tme_3c400_tlb_fill): Truncate the address
+	from the wider tme_bus_addr_t into a tme_bus_addr32_t local. 
+
+	* bus/sbus/sun-fbs4.c (tme_bus_sbus,cgsix): Added. 
+
+	* ic/am9513.c ic/isil7170.c ic/mm58167.c machine/sun/sun-bwtwo.c
+	  tme/ic/am9513.h tme/ic/isil7170.h tme/ic/mk48txx.h tme/ic/z8530.h:
+
+	  Changed some tme_bus_addr_t to tme_bus_addr32_t. 
+
+	* ic/mk48txx.c: Now define the eight registers beginning with the
+	watchdog register.  Changed some tme_bus_addr_t to tme_bus_addr32_t. 
+	(TME_MK48TXX_REG_FIRST):
+	(_tme_mk48txx_bus_cycle): Added support for the mk48t59. 
+	(tme_ic_,mk48txx,mk48t59): Added. 
+
+	* ic/ncr89c105.c ic/stp22xx/stp222x-impl.h ic/stp22xx/stp222x-iommu.c
+	  ic/stp22xx/stp222x-stc.c ic/stp22xx/stp222x-timer.c
+	  ic/stp22xx/stp22xx-impl.h ic/stp22xx/stp22xx.c:
+
+	  Removed some AUDITs. 
+
+	* ic/nec765.c: In struct tme_nec765, now store the i82077 DOR. 
+	(_tme_nec765_reset): Fixed a bug where the second argument was
+	supposed to be nonzero for a hard reset. 
+	(_tme_nec765_bus_cycle): For the check interrupts command, return the
+	current cylinder.  Added support for the calibrate command and the
+	i82077 DOR register.  On a request master cycle, don't return that the
+	controller is busy. 
+	(tme_ic_,nec765,i82077): Added. 
+
+	* ic/stp2024.c (_tme_stp2024_cycle_sbus): Fixed bugs where we were
+	byteswapping values read, even though tme_bus_cycle_xfer_reg() takes
+	care of that. 
+
+	* ic/z8530.c: Changed some tme_bus_addr_t to tme_bus_addr32_t. 
+	(_tme_z8530_callout): Now add TME_BUS_SIGNAL_EDGE to the interrupt
+	callout. 
+
+	* libtme/recode-notes.txt: Added. 
+
+	* tme/generic/float.h: Now define TME_FLOAT_FORMAT_NULL. 
+
+	* tme/generic/ic.h: Increased TME_IC_IREGS_SIZE. 
+
+Sat Aug 29 19:47:52 2009  Matt Fredette  <fredette@alum.mit.edu>
+
+	* generic/bus-device-auto.sh: Moved TME_BUS_ROUTER_INIT_INDEX to
+	bus-device.h. 
+	(tme_bus_device_dma_${name}_${i_width}): Replaced the old TLB entry
+	reserve/back mechanism with passing the TLB entry's token and a simple
+	structure copy. 
+
+	* generic/bus-el.c (_tme_bus_tlb_set_allocate): Removed
+	(_tme_bus_tlb_set_add): Added, from the old
+	_tme_bus_tlb_set_allocate(). 
+	(_tme_bus_connections_new): Provide _tme_bus_tlb_set_add() instead of
+	_tme_bus_tlb_set_allocate(). 
+
+	* generic/bus.c (tme_bus_tlb_set_allocate): Removed. 
+	(tme_bus_tlb_set_add): Added, from the old tme_bus_tlb_set_allocate(). 
+	(tme_bus_tlb_set_invalidate): Added. 
+	(tme_bus_tlb_map): Fixed a bug where we were using a long to hold a
+	bus address offset, instead of a tme_bus_addr_t. 
+	(tme_bus_tlb_construct):
+	(tme_bus_tlb_back):
+	(tme_bus_tlb_invalidate): Removed.  Now a TLB's token, not an entry
+	itself, is tracked by responders. 
+	(tme_bus_tlb_initialize): Now initialize a TLB entry to be not
+	cacheable. 
+
+	* ic/m68k/m68k-execute.c (_TME_M68K_EXECUTE_NAME): Now get the
+	instruction TLB entry directly.  Since TME_M68K_TLB_OK_FAST_READ was
+	removed, manually check everything about the instruction TLB entry,
+	including the new TLB context value.  Added some (tme_bus_addr32_t)
+	casts as needed, to avoid doing wider math when tme_bus_addr_t is
+	wider.  Replaced tme_bus_tlb_is_valid() and tme_m68k_tlb_is_valid()
+	uses with tme_m68k_tlb_is_valid() and tme_m68k_tlb_is_invalid(). 
+
+	* ic/m68k/m68k-impl.h (TME_M68K_TLB_ENTRY_SET):
+	(TME_M68K_TLB_ENTRY): Removed. 
+	(TME_M68K_DTLB_ENTRY): Added. 
+	In struct tme_m68k, replaced the old TLB set pointers with an array of
+	struct tme_m68k_tlb, and added the internal bus context register. 
+
+	* ic/m68k/m68k-insns-auto.sh: In the memory access functions, now use
+	TME_M68K_DTLB_ENTRY() instead of TME_M68K_TLB_ENTRY(), and get the
+	ITLB entry directly.  Since the TME_M68K_TLB_OK_FAST_* macros were
+	removed, manually check everything about a TLB entry, including the
+	new TLB context value.  In the slow memory access functions, replaced
+	tme_bus_tlb_is_valid() and tme_m68k_tlb_is_valid() uses with
+	tme_m68k_tlb_is_valid() and tme_m68k_tlb_is_invalid().  Check the new
+	TLB context value.  Added some (tme_bus_addr32_t) casts as needed, to
+	avoid doing wider math when tme_bus_addr_t is wider. 
+
+	* ic/m68k/m68k-misc.c (_tme_m68k_connection_score):
+	(_tme_m68k_connections_new): The tme_bus_tlb_set_allocate member has
+	been replaced by tme_bus_tlb_set_add. 
+	(_tme_m68k_connection_make): Initialize the new TLB array and add it
+	on the bus. 
+	(tme_m68k_go_slow): Since TME_M68K_TLB_OK_FAST_READ was removed,
+	manually check everything about the instruction TLB entry, including
+	the new TLB context value.  Added some (tme_bus_addr32_t) casts as
+	needed, to avoid doing wider math when tme_bus_addr_t is wider. 
+	(tme_m68k_tlb_fill): Replaced a tme_bus_tlb_unbusy_fill() with a
+	tme_m68k_tlb_unbusy()/tme_token_invalid_clear() pair.  Set the context
+	on the TLB entry after it's returned.  Added some tme_bus_addr32_t
+	casts. 
+	(tme_m68k_callout_relock): Now get the instruction TLB entry directly. 
+	Use tme_m68k_tlb_is_invalid() instead of tme_bus_tlb_is_invalid() and
+	check that the TLB context is the right one. 
+	(tme_m68k_rmw_start): Now use TME_M68K_DTLB_ENTRY() instead of
+	TME_M68K_TLB_ENTRY(), and tme_m68k_tlb_busy() and
+	tme_m68k_tlb_unbusy() instead of the plain bus versions.  Added some
+	tme_bus_addr32_t casts, and check a TLB's bus context as needed. 
+
+	* libtme/recode-insns.c (tme_recode_insns_thunk): Now generate
+	read-uses records, which track read-uses counts for guest registers
+	across different live regions in the instructions thunk (instead of
+	just the entire thunk).  One live region for a guest register ends,
+	and another begins, when a guest register is written or when all guest
+	registers are flushed out.  Initial read-uses records are produced at
+	a flush point, and write read-uses records are produced at a write. 
+	The register allocator uses these records to update its read-uses
+	counts when a live region changes. 
+	Read/write instructions also need all flags flushed, since they may
+	fault and never return. 
+
+	* libtme/recode-regs.c (tme_recode_regs_host_free_many): When all host
+	registers are freed, consume initial read-uses records to set the
+	read-uses counts for all guest registers that have live regions
+	beginning now. 
+	(tme_recode_regs_dst_any): A write begins a new live region for the
+	destination guest register, so consume a write read-use record to set
+	the read-uses count for it. 
+	(tme_recode_regs_dst_specific): When the specific host register
+	already has a guest register, after writing it if it's dirty, don't
+	move it into another host register if the guest register won't be read
+	later. 
+	A write begins a new live region for the destination guest register,
+	so consume a write read-use record to set the read-uses count for it. 
+
+	* libtme/host/x86/rc-x86-insns.c (_tme_recode_x86_insn_guest): Fixed a
+	bug when making a dummy high half of a double-host-size ia32 guest
+	function argument, where we would add to %esp instead of subtracting
+	from it. 
+	(_tme_recode_x86_insn_rw): Added. 
+	(_tme_recode_x86_insn_emit): When the first source operand is not
+	zero, don't assume that it's a guest register when checking the
+	opcode-makes-zero optimization.  For binary operations on an x86-64
+	host, we can only emit an immediate whose one or two host-sized parts
+	can be sign-extended from 32-bit parts.  On an ia32 host, we can
+	always emit any immediate, even for a double-host-sized guest. 
+	Added an optimization, where any current register window index is
+	saved at an if branch, switched with any current register window index
+	at an else branch, and compared to the current register window index
+	at the endif.  Only if they are different is the current register
+	window index invalidated.  This can often save a register window
+	offset reload after an if/endif.  Now call _tme_recode_x86_insn_rw()
+	for a read/write instruction. 
+
+	* libtme/host/x86/rc-x86-regs.c (tme_recode_host_reg_move): When
+	emitting a REX prefix for a register store, size may be
+	double-host-size, so be sure to use the minimum of that and the host
+	size. 
+
+	* libtme/host/x86/recode-x86.c: Now define register macros for the XMM
+	registers, and a generic undefined register number. 
+	Define opcodes for ROR, MOV_Ib_Eb, REP, Group 15 instructions, and XMM
+	move instructions. 
+	(_tme_recode_x86_raw_reg_copy): Removed. 
+	(_tme_recode_x86_raw_reg_binop): Added, from the old
+	_tme_recode_x86_raw_reg_copy(). 
+	(_tme_recode_x86_emit_reg_binop): Added, from the old
+	_tme_recode_x86_emit_reg_copy(). 
+	(_tme_recode_x86_emit_reg_copy): Now use
+	_tme_recode_x86_emit_reg_binop(). 
+	(_tme_recode_x86_emit_mul_constant): Added.  Now include
+	host/x86/rc-x86-rws.c. 
+
+	* machine/Makefile.am: Added sun4u to DIST_SUBDIRS. 
+
+	* machine/sun/Makefile.am: Added sun-cgsix.c to
+	libtme_machine_sun_la_SOURCES. 
+
+	* machine/sun/sun-cgsix.c: Added. 
+
+	* tme/generic/bus-device.h: Moved TME_BUS_ROUTER_INIT_INDEX here. 
+	Added a prototype for tme_bus_device_tlb_set_add(). 
+
+	* tme/generic/bus.h: Now define TME_BUS64_LOG2, TME_BUS128_LOG2,
+	TME_BUS_SIGNAL_BR, and TME_BUS_SIGNAL_BG. 
+	(tme_bus_tlb_is_valid):
+	(tme_bus_tlb_is_invalid):
+	(tme_bus_tlb_busy):
+	(tme_bus_tlb_unbusy):
+	(tme_bus_tlb_unbusy_fill): Now use the corresponding token macros with
+	the TLB entry's token. 
+	(_tme_bus_tlb_busy_change):
+	(_TME_BUS_TLB_OK):
+	(TME_BUS_TLB_OK_FAST_READ):
+	(TME_BUS_TLB_OK_FAST_WRITE):
+	(TME_BUS_TLB_OK_SLOW_READ):
+	(TME_BUS_TLB_OK_SLOW_WRITE): Removed.  Now define bus-size-specific
+	bus address types, and define tme_bus_addr_t to be the largest needed
+	bus address type.  Now define tme_bus_context_t, struct
+	tme_bus_cacheable, and struct tme_bus_tlb_set_info.  In struct
+	tme_bus_tlb, replaced the members for the old busy and invalid
+	mechanism with a pointer to the TLB entry's token.  Added a pointer
+	for a TLB entry's cacheable information.  Now that a TLB set (with its
+	bus context register pointer) is added to a bus connection instead of
+	allocated by it, replaced the old allocate function pointer with an
+	add function pointer in struct tme_bus_connection, and replaced the
+	tme_bus_tlb_set_allocate() prototype with one for
+	tme_bus_tlb_set_add().  Removed the prototypes for the old TLB entry
+	saving, invalidating, and initializing functions. 
+
+	* tme/ic/m68k.h (TME_M68K_TLB_OK_FAST_READ):
+	(TME_M68K_TLB_OK_FAST_WRITE):
+	(TME_M68K_TLB_OK_SLOW_READ):
+	(TME_M68K_TLB_OK_SLOW_WRITE): Removed. 
+	(tme_m68k_tlb_busy):
+	(tme_m68k_tlb_unbusy): Now use the corresponding token macro, on the
+	token directly in the TLB entry. 
+	(tme_m68k_tlb_is_valid):
+	(tme_m68k_tlb_is_invalid): Added.  Added a token and a bus context to
+	struct tme_m68k_tlb. 
+
+Sat Aug 29 01:35:17 2009  Matt Fredette  <fredette@alum.mit.edu>
+
+	* libtme/misc.c (_tme_misc_number_parse): Changed the G, M, and K
+	units from the powers of two to the powers of ten. 
+	(tme_misc_cycles_scaled):
+	(tme_misc_cycles_scaling):
+	[!TME_HAVE_MISC_CYCLES_PER_MS] (tme_misc_cycles_per_ms):
+	[!TME_HAVE_MISC_CYCLES] tme_misc_cycles(): Added. 
+
+	* libtme/host/x86/Makefile.am: Added misc-x86.c to EXTRA_DIST. 
+
+	* libtme/host/x86/rc-x86-flags.c (_tme_recode_x86_flags_shift_add_add):
+	In addition to when the shift count is more than three, also do all
+	shifting when an shl instruction when there is no constant and no
+	addend register. 
+
+Fri Aug 28 01:50:09 2009  Matt Fredette  <fredette@alum.mit.edu>
+
+	* generic/bus-device.c (tme_bus_device_tlb_set_add): Added. 
+	* host/gtk/gtk-display.h: Added tme_gtk_screen_full_redraw to struct
+	tme_gtk_screen. 
+
+	* ic/ieee754/ieee754-ops-auto.sh: Now emit an op for to_int64. 
+
+	* ic/sparc/sparc-rc-cc.c (_tme_sparc_recode_cc_init): Fixed bugs where
+	we weren't shifting the raw CCR and RCC register numbers to agree with
+	their eight-bit size.  Fixed a bug where we weren't making the
+	conditions thunk for the internal RCC register. 
+
+	* libtme/recode-impl.h: Added prototypes for
+	tme_recode_host_rw_thunk_new() and tme_recode_host_rw_thunk_dup(). 
+
+Thu Aug 20 22:45:50 2009  Matt Fredette  <fredette@alum.mit.edu>
+
+	* ic/sparc/sparc-rc-verify.c: Moved TME_SPARC_RECODE_VERIFY_IC_SIZE
+	before the TLBs.  Added TME_STP103X_BLOCK_FPREGS_DOUBLE and struct
+	tme_sparc_recode_verify_mem_block, for verifying block loads and
+	stores. 
+	In struct tme_sparc_recode_verify_mem, now track the PC for an access,
+	and any block load and store information.  Changed all sparc state
+	globals to be the new struct tme_sparc_recode type, which includes
+	space for an IC-specific extension. 
+	(_tme_sparc_recode_verify_mem_block):
+	(tme_sparc_recode_verify_mem_block): Added. 
+	(tme_sparc_recode_verify_mem): Now verify the PC of an access, and any
+	block load and store. 
+	(tme_sparc_recode_verify_reg_tick):
+	(tme_sparc_recode_verify_reg_tick_now): Added. 
+	(tme_sparc_recode_verify_begin): Now copy any IC-specific extension
+	into the input and replay states.  Now make the ITLB entry that the
+	replay will use, from the last ITLB entry used in the input state, and
+	also make one for tme_sparc_recode_insns_dump(). 
+	(tme_sparc_recode_verify_end): Now throw away any memory records for a
+	trapping PC.  Clear the log level while replaying.  Make the ITLB
+	entry that replay used unusable again.  Added more registers and
+	controls to ignore.  Now verify any IC-specific extension.  Added
+	support for sparc64 register windows.  Make sure we verified all of
+	the memory records. 
+	(tme_sparc_recode_verify_init): Check the verify and total sizes for
+	this IC.  Initialize all of the replay state TLB entries to be
+	unusable. 
+
+Thu Jun 18 01:16:53 2009  Matt Fredette  <fredette@alum.mit.edu>
+
+	* ic/ad184x.c ic/stp2024.c ic/sparc/sparc-kgdb.c
+	  ic/sparc/sparc-vis-auto.sh ic/sparc/sparc-vis.c:
+
+	  Added. 
+
+	* ic/sparc/sparc-rc-verify.c: Moved _tme_sparc_recode_verify_on to
+	sparc-recode.c. 
+	(tme_sparc_recode_verify_mem): Fixed a bug where this was always
+	passed an ASI mask, but we thought it got an ASI. 
+	(_tme_sparc_recode_verify_change): Added. 
+	(tme_sparc_recode_verify_begin): Now call
+	_tme_sparc_recode_verify_change() to turn verifying on or off.  Now
+	set the recode IC in the replay state. 
+	(tme_sparc_recode_verify_end): No longer override changes to the old
+	TLB array pointers.  Turned the override of the memory buffer into a
+	struct assignment.  No longer use TME_SPARC_CWP_OFFSET(). 
+	(tme_sparc_recode_insns_dump): Now use TME_SPARC_TLB_HASH() and
+	TME_SPARC_ITLB_ENTRY() to get the instruction TLB entry. 
+
+	* ic/sparc/stp103x.c: Removed the TME_STP103X_TTE_TAG_ macros, since
+	they weren't being used. 
+	Now define TME_STP103X_ASI_DCACHE_DATA, TME_STP103X_ASI_DCACHE_TAG,
+	and TME_STP103X_ASI_BLK_COMMIT.  Now define TME_STP103X_BLOCK_SIZE and
+	TME_STP103X_BLOCK_FPREGS_DOUBLE.  Moved the GSR value from struct
+	tme_stp103x to struct tme_sparc.  All users changed. 
+	Added a missing static to _TME_SPARC_EXECUTE_OPMAP.  Added
+	tme_sparc64_vis_ls_asi_pst and tme_sparc64_vis_ls_asi_fl to
+	_tme_stp103x_ls_asi_handlers[]. 
+	(_tme_stp103x_update_pstate): Fixed bugs where we weren't clearing all
+	of the global-register-selection bits in the PSTATE value before using
+	+ to set new bits.  Now check that the selection isn't reserved. 
+	(_tme_stp103x_impdep1): Added support for the VIS instructions. 
+	(_tme_stp103x_tlb_invalidate): Added. 
+	(_tme_stp103x_ls_cycle_quad): Fixed a bug where weren't checking the a
+	fast transfer TLB for a quad's worth.  Now use the
+	TME_SPARC_LSINFO_ENDIAN_LITTLE indication from tme_sparc64_load(),
+	instead of figuring it out ourselves. 
+	(_tme_stp103x_ls_asi_quad): Fixed a bug where we were checking for an
+	stda instruction instead of an ldda instruction. 
+	(_tme_stp103x_ls_asi_tsb_ptr): Fixed a bug where we weren't shifting
+	the tag access register image into a TSB entry offset. 
+	(_tme_stp103x_ls_asi_tlb_data_in): Fixed a bug where we weren't
+	invalidating a TLB entry before replacing it. 
+	(_tme_stp103x_ls_asi_mmu_demap): Now use _tme_stp103x_tlb_invalidate()
+	to invalidate TLB entries. 
+	(_tme_stp103x_ls_asi_dcache): Separate the code that handles writing
+	zero to a tag and the code that handles the special PROM writes. 
+	Added support for reading tags, always as zero. 
+	(_tme_stp103x_block_buffer_bswap):
+	(_tme_stp103x_ls_cycle_block_ld):
+	(_tme_stp103x_ls_cycle_block_st):
+	(_tme_stp103x_ls_asi_block): Added. 
+	(_tme_stp103x_new): Now initialize tme_sparc_vis_ls_fault_illegal. 
+	Added support for ASI_NUCLEUS_QUAD_LDD_LITTLE and the VIS partial
+	store and short load ASIs. 
+
+	* ic/stp22xx/Makefile.am: Added stp222x-impl.h to EXTRA_DIST. 
+
+	* ic/stp22xx/stp220x.c: Added a missing static to
+	_tme_stp2210_mc124x9_subregion. 
+	(_tme_stp220x_tlb_fill_transition): Fixed a bug where we would return
+	a TLB entry that could handle read and write cycles, even if the
+	old-style TLB entry didn't support what the caller wasn't filling for. 
+
+	* ic/stp22xx/stp222x-impl.h: Now track the active IDIs in struct
+	tme_stp222x.  Added a prototype for tme_stp222x_mdu_intcon(). 
+
+	* ic/stp22xx/stp222x-main.c: Changed the obio offset for the audio IDI
+	to zero, to match the new stp2024 emulation. 
+	(_tme_stp222x_signal): Now call tme_stp222x_mdu_intcon() to handle an
+	interrupt signal. 
+	(_tme_stp222x_tlb_fill_transition): Fixed a bug where we would return
+	a TLB entry that could handle read and write cycles, even if the
+	old-style TLB entry didn't support what the caller wasn't filling for. 
+
+	* ic/stp22xx/stp222x-mdu.c: Added the TME_STP222X_MDU_IDI_TEST macro. 
+	(tme_stp222x_mdu_intcon): Added. 
+	(tme_stp222x_mdu_regs_clear): If the IDI is being updated to received,
+	or if the IDI is still active in the interrupt contentrator, mark the
+	IDI is received. 
+
+	* ic/stp22xx/stp22xx.c (tme_stp22xx_enter_master)
+	[TME_STP22XX_BUS_TRANSITION]: Before we enter, if we were making a bus
+	master cycle callout, find the completion and force it to be valid,
+	since the transition code may not get a chance to do that before we
+	are reentered by another master. 
+	(tme_stp22xx_slave_cycle) [TME_STP22XX_BUS_TRANSITION]: Before we make
+	a bus master cycle callout, assume that the callout will complete
+	without error.  When the callout returns, validate the completion only
+	if tme_stp22xx_enter_master() didn't do it. 
+
+Tue Jun 16 00:31:33 2009  Matt Fredette  <fredette@alum.mit.edu>
+
+	* ic/Makefile.am: Added stp22xx, ncr89c105, stp2024, and ad184x. 
+
+Tue May 05 22:12:56 2009  Matt Fredette  <fredette@alum.mit.edu>
+
+	* ic/stp22xx/stp222x-iommu.c:
+	* ic/stp22xx/stp222x-stc.c: Added. 
+
+Sat Feb 28 16:48:11 2009  Matt Fredette  <fredette@alum.mit.edu>
+
+	* ic/ncr89c105.c ic/sparc/stp103x.c ic/stp22xx/Makefile.am
+	  ic/stp22xx/stp220x.c ic/stp22xx/stp222x-asearch.c
+	  ic/stp22xx/stp222x-aspace.c ic/stp22xx/stp222x-impl.h
+	  ic/stp22xx/stp222x-main.c ic/stp22xx/stp222x-mdu.c
+	  ic/stp22xx/stp222x-timer.c ic/stp22xx/stp22xx-impl.h
+	  ic/stp22xx/stp22xx.c libtme/host/x86/misc-x86.c tme/completion.h
+	  tme/bus/Makefile.am tme/bus/upa.h:
+
+	  Added. 
+
+Fri Oct 03 00:48:18 2008  Matt Fredette  <fredette@alum.mit.edu>
+
+	* ic/sparc/sparc-insns-auto.sh: In the load and store functions, added
+	support for verifying and replaying transfers for recode.  In the slow
+	load and store functions, a TLB entry now has a token pointer that is
+	always defined, and we no longer have the tme_bus_tlb_global to point
+	a TLB entry back to itself.  When recode is supported, call a function
+	to update the corresponding recode TLB entry. 
+
+Wed Sep 24 23:04:32 2008  Matt Fredette  <fredette@alum.mit.edu>
+
+	* Makefile.am (dist-hook): Now remove any
+	${distdir}/libtme/recode-host.c. 
+
+	* ic/sparc/sparc-rc-ls.c libtme/recode-rws.c libtme/token.c
+	  libtme/host/Makefile.am libtme/host/x86/Makefile.am
+	  libtme/host/x86/rc-x86-rws.c tme/token.h tme/host/Makefile.am:
+
+	  Added. 
+
+	* libtme/host/x86/Makefile: Removed. 
+
+	* tme/memory.h: Added tme_shared to the definition of
+	tme_memory_atomic_flag_t, and removed the requirement that a lock be
+	gived in calls to tme_memory_atomic_read_flag() and
+	tme_memory_atomic_write_flag().  Added tme_memory_atomic_init_flag(). 
+
+	* tme/generic/fb.h: Added members for the first and last bytes updated
+	in the real framebuffer memory. 
+
+Wed Jul 02 00:01:39 2008  Matt Fredette  <fredette@alum.mit.edu>
+
+	* libtme/host/x86/rc-x86-insns.c (_tme_recode_x86_insn_jump): A
+	TME_RECODE_OPCODE_JUMP instruction now always jumps somewhere.  Any
+	alternate jump is taken if the jump recode flag is set.  A jump jumps
+	to the instructions thunk epilogue if it can't be chained, otherwise
+	it jumps to the jump-chain sub. 
+	(_tme_recode_x86_insn_size_max_check): Added. 
+	(tme_recode_host_insns_thunk_new): Now call
+	tme_recode_insns_thunk_invalidate_all() when there is no space for
+	another instructions thunk. 
+
+	* libtme/host/x86/rc-x86-regs.c (tme_recode_host_reg_move): Fixed a
+	bug found by -Wuninitialized where we wouldn't initialize
+	reg_x86_other for loads. 
+
+	* libtme/host/x86/recode-x86.c (tme_recode_host_ic_new): The new
+	TME_RECODE_X86_OFFSET_JUMP_CHAIN_DIRECT offset in the jump chain subs
+	is used when the address of the jump to chain is already in the c
+	register, and the zero offset in the subs is used when the address of
+	the jump to chain is at the c register plus six
+	(the size of the 32-bit conditional alternate jump).  After the
+	indirect jump at the end of the jump chain subs, emit an undefined
+	instruction, to avoid unnecessary speculation by the CPU.  No longer
+	set the first variable thunk offset; machine-independent code does
+	that. 
+	Call _tme_recode_x86_insn_size_max_check(). 
+
+	* tme/recode.h: Now define the TME_RECODE_JUMP_ options.  Now define
+	TME_RECODE_INSNS_THUNK_INSNS_MAX.  Added the
+	tme_recode_ic_thunk_off_variable member.  Added a prototype for
+	tme_recode_insns_thunk_invalidate_all(). 
+
+	* tme/host/recode-mmap.h: Now define TME_RECODE_HOST_THUNK_SIZE_MAX. 
+
+	* tme/host/recode-x86.h: Replaced TME_RECODE_HOST_THUNK_INSNS_MAX with
+	TME_RECODE_HOST_INSN_SIZE_MAX and moved TME_RECODE_HOST_THUNK_SIZE_MAX
+	to the host recode header that is providing the instructions thunk
+	memory.  Replaced the tme_recode_x86_ic_thunk_off_variable member with
+	a machine-independent member. 
+
+Tue Jul 01 02:02:57 2008  Matt Fredette  <fredette@alum.mit.edu>
+
+	* ic/sparc/sparc-rc-insns.c: Removed
+	TME_SPARC_RECODE_INSN_NO_UPDATE_PC_NEXT, since instructions that need
+	to update PC_next, now update both PC and PC_next themselves, instead
+	of relying on TME_SPARC_RECODE_INSN_UPDATE_PCS.  Updated the recode
+	state flags for jumps.  In various places, now track some statistics. 
+	(_tme_sparc_recode_insn_assist_redispatch): Added. 
+	(_tme_sparc_recode_insn_assist_store):
+	(_tme_sparc_recode_insn_assist_full): Before returning, call
+	_tme_sparc_recode_insn_assist_redispatch(), which will redispatch and
+	not return if the recode page for the instructions thunk is no longer
+	valid. 
+	[_TME_SPARC_STATS] (_tme_sparc_recode_insns_total): Added. 
+	(_tme_sparc_recode_recode): Don't update PC and PC_next automatically
+	at the beginning of each instructions thunk, just to make PC valid
+	from PC_next.  Instead, track where the valid PC is, and update them
+	only for full assists and control transfer instructions.  Now
+	calculate the worst-case position in the recode instructions buffer,
+	past which we may not be able to recode another instruction.  In a few
+	places where we have to immediately stop recoding, we may have recoded
+	no instructions at all for the thunk.  In this case, return zero
+	instead of calling abort().  It was too hard to get
+	TME_SPARC_RECODE_INSN_NO_UPDATE_PC_NEXT to work all of the time, so
+	now everywhere we need to update PC_next, update both PC and PC_next. 
+	Now set the new recode flags for jumps, for the control transfer
+	instructions. 
+	Fixed a bug where we would emit a sethi instruction even if it is
+	annulled in the delay slot of an unconditional branch.  At the end of
+	the instructions thunk, emit a TME_RECODE_OPCODE_JUMP instruction. 
+
+	* ic/sparc/sparc-rc-verify.c (tme_sparc_recode_verify_failed): No
+	longer abort(), so we can continue if needed. 
+	(tme_sparc_recode_verify_begin): Added support for turning
+	verification on and off. 
+	(tme_sparc_recode_verify_end): Added more fields to ignore in the bulk
+	comparison. 
+	(tme_sparc_recode_insns_dump): Added. 
+
+	* ic/sparc/sparc-recode.c: Moved the #include of the verify code after
+	tme_sparc_recode_invalidate_all().  Renamed the
+	tme_sparc_recode_src_key_offset_chain member to
+	tme_sparc_recode_chain_src_key_offset. 
+	(tme_sparc_recode_invalidate_all): Added. 
+	(_tme_sparc_recode_jump_chain) [_TME_SPARC_RECODE_VERIFY]: Stop
+	chaining only if the verifier is on. 
+	(tme_sparc_recode): Now save the cacheable recode page.  While an
+	instructions thunk is running, it may need to confirm that its page is
+	still valid. 
+	(tme_sparc_recode_dump_insns): Updated the dump of
+	TME_RECODE_OPCODE_JUMP instructions. 
+
+	* libtme/recode-conds.c (tme_recode_conds_thunk): Make sure the first
+	variable thunk goes after this conditions thunk. 
+
+	* libtme/recode-flags.c (tme_recode_flags_thunk): Make sure the first
+	variable thunk goes after any instructions added for a flags thunk. 
+
+	* libtme/recode-ic.c (tme_recode_ic_new): Make sure the first variable
+	thunk goes after any thunks made by tme_recode_host_ic_new(). 
+
+	* libtme/recode-impl.h: Renamed tme_recode_host_thunk_flush_all() to
+	tme_recode_host_thunk_invalidate_all(). 
+
+	* libtme/recode-insns.c (tme_recode_insns_thunk): Fixed a comment. 
+	(tme_recode_insns_thunk_invalidate_all): Added. 
+
+	* libtme/host/recode-mmap.c (tme_recode_host_thunk_flush_all): Renamed
+	to tme_recode_host_thunk_invalidate_all(). 
+
+	* libtme/host/x86/rc-x86-conds.c (tme_recode_host_conds_thunk_new): No
+	longer update the removed tme_recode_x86_ic_thunk_off_variable member. 
+
+	* libtme/host/x86/rc-x86-flags.c (tme_recode_host_flags_thunk_new):
+	(_tme_recode_x86_flags_thunk_chain): No longer update the removed
+	tme_recode_x86_ic_thunk_off_variable member. 
+
+Mon Jun 30 22:42:10 2008  Matt Fredette  <fredette@alum.mit.edu>
+
+	* host/gtk/gtk-screen.c (_tme_gtk_screen_new): Fixed the
+	gtk_window_set_policy() arguments, so the top-level window always
+	grows and shrinks automatically. 
+
+Sun Jun 01 23:25:11 2008  Matt Fredette  <fredette@alum.mit.edu>
+
+	* ic/sparc/sparc-rc-cc.c ic/sparc/sparc-rc-insns.c
+	  ic/sparc/sparc-rc-verify.c ic/sparc/sparc-recode.c
+	  libtme/recode-conds.c libtme/recode-flags.c libtme/recode-ic.c
+	  libtme/recode-impl.h libtme/recode-insns.c libtme/recode-regs.c
+	  libtme/host/recode-mmap.c libtme/host/x86/Makefile
+	  libtme/host/x86/rc-x86-conds.c libtme/host/x86/rc-x86-flags.c
+	  libtme/host/x86/rc-x86-insns.c libtme/host/x86/rc-x86-regs.c
+	  libtme/host/x86/rc-x86-subs-asm.S libtme/host/x86/recode-x86.c
+	  tme/recode.h tme/host/recode-mmap.h tme/host/recode-x86.h:
+
+	  Added. 
+
 Thu Sep 06 23:35:41 2007  Matthew Fredette  <fredette@alum.mit.edu>
 
 	* Release 0.6 out.

@@ -1,4 +1,4 @@
-/* $Id: sun-cgtwo.c,v 1.7 2007/03/03 15:36:15 fredette Exp $ */
+/* $Id: sun-cgtwo.c,v 1.8 2010/06/05 19:18:05 fredette Exp $ */
 
 /* machine/sun/sun-cgtwo.c - Sun cgtwo emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun-cgtwo.c,v 1.7 2007/03/03 15:36:15 fredette Exp $");
+_TME_RCSID("$Id: sun-cgtwo.c,v 1.8 2010/06/05 19:18:05 fredette Exp $");
 
 /* includes: */
 #include <tme/machine/sun.h>
@@ -217,7 +217,7 @@ struct tme_suncg2 {
   unsigned int tme_suncg2_flags;
 
   /* any outstanding TLBs: */
-  struct tme_bus_tlb *tme_suncg2_tlbs[4];
+  struct tme_token *tme_suncg2_tlb_tokens[4];
   unsigned int tme_suncg2_tlb_head;
 
   /* a rasterop buffered SRC value: */
@@ -252,18 +252,20 @@ static void
 _tme_suncg2_tlb_invalidate(struct tme_suncg2 *suncg2, struct tme_bus_tlb *tlb_valid)
 {
   unsigned int tlb_i;
-  struct tme_bus_tlb *tlb;
+  struct tme_token *token_valid;
+  struct tme_token *token;
 
+  token_valid = NULL;
   if (tlb_valid != NULL) {
-    tlb_valid = tlb_valid->tme_bus_tlb_global;
+    token_valid = tlb_valid->tme_bus_tlb_token;
   }
 
-  for (tlb_i = 0; tlb_i < TME_ARRAY_ELS(suncg2->tme_suncg2_tlbs); tlb_i++) {
-    tlb = suncg2->tme_suncg2_tlbs[tlb_i];
-    suncg2->tme_suncg2_tlbs[tlb_i] = NULL;
-    if (tlb != NULL
-	&& tlb != tlb_valid) {
-      tme_bus_tlb_invalidate(tlb);
+  for (tlb_i = 0; tlb_i < TME_ARRAY_ELS(suncg2->tme_suncg2_tlb_tokens); tlb_i++) {
+    token = suncg2->tme_suncg2_tlb_tokens[tlb_i];
+    suncg2->tme_suncg2_tlb_tokens[tlb_i] = NULL;
+    if (token != NULL
+	&& token != token_valid) {
+      tme_token_invalidate(token);
     }
   }
 }
@@ -272,16 +274,17 @@ _tme_suncg2_tlb_invalidate(struct tme_suncg2 *suncg2, struct tme_bus_tlb *tlb_va
 static void
 _tme_suncg2_tlb_add(struct tme_suncg2 *suncg2, struct tme_bus_tlb *tlb_valid)
 {
-  struct tme_bus_tlb *tlb;
+  struct tme_token *token_valid;
+  struct tme_token *token;
 
-  tlb_valid = tlb_valid->tme_bus_tlb_global;
+  token_valid = tlb_valid->tme_bus_tlb_token;
 
-  tlb = suncg2->tme_suncg2_tlbs[suncg2->tme_suncg2_tlb_head % TME_ARRAY_ELS(suncg2->tme_suncg2_tlbs)];
-  if (tlb != NULL
-      && tlb != tlb_valid) {
-    tme_bus_tlb_invalidate(tlb);
+  token = suncg2->tme_suncg2_tlb_tokens[suncg2->tme_suncg2_tlb_head % TME_ARRAY_ELS(suncg2->tme_suncg2_tlb_tokens)];
+  if (token != NULL
+      && token != token_valid) {
+    tme_token_invalidate(token);
   }
-  suncg2->tme_suncg2_tlbs[suncg2->tme_suncg2_tlb_head % TME_ARRAY_ELS(suncg2->tme_suncg2_tlbs)] = tlb_valid;
+  suncg2->tme_suncg2_tlb_tokens[suncg2->tme_suncg2_tlb_head % TME_ARRAY_ELS(suncg2->tme_suncg2_tlb_tokens)] = token_valid;
   suncg2->tme_suncg2_tlb_head++;
 }
 
@@ -855,8 +858,8 @@ _tme_suncg2_bus_cycle_displayed(void *_suncg2, struct tme_bus_cycle *cycle_init)
 {
   struct tme_suncg2 *suncg2;
   unsigned int plane_i;
-  tme_bus_addr_t address_first;
-  tme_bus_addr_t address_last;
+  tme_bus_addr32_t address_first;
+  tme_bus_addr32_t address_last;
 
   /* recover our data structure: */
   suncg2 = (struct tme_suncg2 *) _suncg2;
@@ -1090,7 +1093,7 @@ static int
 _tme_suncg2_bus_cycle_regs(void *_suncg2, struct tme_bus_cycle *cycle_init)
 {
   struct tme_suncg2 *suncg2;
-  tme_bus_addr_t address;
+  tme_bus_addr32_t address;
   tme_uint16_t *reg;
   tme_uint16_t reg_old, reg_new;
   tme_uint16_t junk;
@@ -1108,7 +1111,7 @@ _tme_suncg2_bus_cycle_regs(void *_suncg2, struct tme_bus_cycle *cycle_init)
   /* coarsely decode the address: */
   address
     = (cycle_init->tme_bus_cycle_address
-       & (((tme_bus_addr_t) 0)
+       & (((tme_bus_addr32_t) 0)
 	  - TME_SUNCG2_SIZ_REG_PAGE));
 
   /* lock the mutex: */
@@ -1312,18 +1315,23 @@ _tme_suncg2_bus_cycle_cmap(void *_suncg2, struct tme_bus_cycle *cycle_init)
 /* the suncg2 TLB filler: */
 static int
 _tme_suncg2_tlb_fill(void *_suncg2, struct tme_bus_tlb *tlb, 
-		     tme_bus_addr_t address, unsigned int cycles)
+		     tme_bus_addr_t address_wider, unsigned int cycles)
 {
   struct tme_suncg2 *suncg2;
   tme_uint8_t *memory;
-  tme_bus_addr_t address_first;
-  tme_bus_addr_t address_last;
+  tme_bus_addr32_t address;
+  tme_bus_addr32_t address_first;
+  tme_bus_addr32_t address_last;
 
   /* recover our data structure: */
   suncg2 = (struct tme_suncg2 *) _suncg2;
 
   /* initialize the TLB entry: */
   tme_bus_tlb_initialize(tlb);
+
+  /* get the normal-width address: */
+  address = address_wider;
+  assert (address == address_wider);
 
   /* the fast reading and writing rwlock: */
   tlb->tme_bus_tlb_rwlock = &suncg2->tme_suncg2_rwlock;

@@ -1,4 +1,4 @@
-/* $Id: sun4-mainbus.c,v 1.5 2007/02/15 01:32:14 fredette Exp $ */
+/* $Id: sun4-mainbus.c,v 1.6 2009/08/30 14:03:11 fredette Exp $ */
 
 /* machine/sun4/sun4-mainbus.c - implementation of Sun 4 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun4-mainbus.c,v 1.5 2007/02/15 01:32:14 fredette Exp $");
+_TME_RCSID("$Id: sun4-mainbus.c,v 1.6 2009/08/30 14:03:11 fredette Exp $");
 
 /* includes: */
 #include "sun4-impl.h"
@@ -406,7 +406,7 @@ _tme_sun4_connection_score(struct tme_connection *conn, unsigned int *_score)
 
     /* this must be an SPARC chip, and not another bus: */
   case TME_CONNECTION_BUS_SPARC:
-    if (conn_bus->tme_bus_tlb_set_allocate == NULL
+    if (conn_bus->tme_bus_tlb_set_add == NULL
 	&& conn_sparc->tme_sparc_bus_tlb_fill == NULL
 	&& conn_sparc->tme_sparc_bus_fpu_strict != NULL) {
       score = 10;
@@ -416,7 +416,7 @@ _tme_sun4_connection_score(struct tme_connection *conn, unsigned int *_score)
     /* this must be a bus, and not a chip, and the bus must still be
        free: */
   case TME_CONNECTION_BUS_GENERIC:
-    if ((conn_bus->tme_bus_tlb_set_allocate != NULL
+    if ((conn_bus->tme_bus_tlb_set_add != NULL
 	 && conn_bus->tme_bus_tlb_fill != NULL)
 	&& (conn_sun4->tme_sun4_bus_connection_which >= TME_SUN4_32_CONN_BUS_COUNT
 	    || sun4->tme_sun4_buses[conn_sun4->tme_sun4_bus_connection_which] == NULL)) {
@@ -513,9 +513,9 @@ _tme_sun4_connections_new(struct tme_element *element, const char * const *args,
     /* fill in the generic bus connection: */
     conn_bus->tme_bus_signal = _tme_sun4_bus_signal;
     conn_bus->tme_bus_intack = _tme_sun4_bus_intack;
-    conn_bus->tme_bus_tlb_set_allocate
+    conn_bus->tme_bus_tlb_set_add
       = (TME_SUN4_IS_SUN44C(sun4)
-	 ? _tme_sun44c_mmu_tlb_set_allocate
+	 ? _tme_sun44c_mmu_tlb_set_add
 	 : NULL);
 
     /* full in the SPARC bus connection: */
@@ -676,7 +676,7 @@ _tme_sun4_connections_new(struct tme_element *element, const char * const *args,
     
     /* fill in the generic bus connection for a bus: */
     if (which_conn < TME_SUN4_32_CONN_BUS_COUNT) {
-      conn_bus->tme_bus_tlb_set_allocate = _tme_sun44c_mmu_tlb_set_allocate;
+      conn_bus->tme_bus_tlb_set_add = _tme_sun44c_mmu_tlb_set_add;
     }
   }
 

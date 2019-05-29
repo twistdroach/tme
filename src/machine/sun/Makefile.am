@@ -9,6 +9,7 @@ pkglib_LTLIBRARIES = libtme-machine-sun.la
 libtme_machine_sun_la_SOURCES = sun-mmu.c \
 	sun-bwtwo.c \
 	sun-cgtwo.c \
+	sun-cgsix.c \
 	sun-fb.c sun-fb.h \
 	sun-si.c \
 	sun-obie.c

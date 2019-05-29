@@ -1,4 +1,4 @@
-/* $Id: sun2-control.c,v 1.4 2007/02/15 01:37:32 fredette Exp $ */
+/* $Id: sun2-control.c,v 1.5 2009/08/30 14:42:15 fredette Exp $ */
 
 /* machine/sun2/sun2-control.c - implementation of Sun 2 emulation control space: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun2-control.c,v 1.4 2007/02/15 01:37:32 fredette Exp $");
+_TME_RCSID("$Id: sun2-control.c,v 1.5 2009/08/30 14:42:15 fredette Exp $");
 
 /* includes: */
 #include "sun2-impl.h"
@@ -47,7 +47,7 @@ _tme_sun2_control_cycle_handler(void *_sun2, struct tme_bus_cycle *cycle_init)
 {
   struct tme_sun2 *sun2;
   struct tme_bus_cycle cycle_resp;
-  tme_bus_addr_t reg, address, index;
+  tme_bus_addr32_t reg, address, index;
   tme_uint32_t pte;
   int rc;
 
@@ -149,6 +149,9 @@ _tme_sun2_control_cycle_handler(void *_sun2, struct tme_bus_cycle *cycle_init)
     if (_TME_SUN2_REG_ACCESSED(tme_sun2_enable)) {
       rc = _tme_sun2_ipl_check(sun2);
       assert(rc == TME_OK);
+      /* in case TME_SUN2_ENA_NOTBOOT changed, make a pseudo-context
+	 change: */
+      _tme_sun2_mmu_context_user_set(sun2);
     }
   }
 

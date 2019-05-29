@@ -1,4 +1,4 @@
-/* $Id: ms-mssystems.c,v 1.2 2003/08/05 03:38:28 fredette Exp $ */
+/* $Id: ms-mssystems.c,v 1.3 2010/02/14 00:42:25 fredette Exp $ */
 
 /* serial/ms-mssystems.c - MouseSystems serial mouse emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: ms-mssystems.c,v 1.2 2003/08/05 03:38:28 fredette Exp $");
+_TME_RCSID("$Id: ms-mssystems.c,v 1.3 2010/02/14 00:42:25 fredette Exp $");
 
 /* includes: */
 #include "serial-ms.h"
@@ -145,6 +145,13 @@ _tme_serial_ms_mssystems5_init(struct tme_serial_ms *serial_ms)
   config->tme_serial_config_bits_data = 8;
   config->tme_serial_config_bits_stop = 1;
   config->tme_serial_config_parity = TME_SERIAL_PARITY_NONE;
+
+  /* set our rate-limiting: */
+  serial_ms->tme_serial_ms_rate_usec
+    = TME_MAX(serial_ms->tme_serial_ms_rate_usec,
+	      (1000000
+	       / (config->tme_serial_config_baud
+		  / 5 /* size of one packet */)));
 
   return (TME_OK);
 }

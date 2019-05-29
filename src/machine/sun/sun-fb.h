@@ -1,4 +1,4 @@
-/* $Id: sun-fb.h,v 1.3 2007/03/29 01:48:13 fredette Exp $ */
+/* $Id: sun-fb.h,v 1.4 2009/11/08 17:02:39 fredette Exp $ */
 
 /* machine/sun/sun-fb.h - header file for Sun framebuffer emulation: */
 
@@ -37,13 +37,14 @@
 #define _MACHINE_SUN_FB_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun-fb.h,v 1.3 2007/03/29 01:48:13 fredette Exp $");
+_TME_RCSID("$Id: sun-fb.h,v 1.4 2009/11/08 17:02:39 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus.h>
 #include <tme/generic/bus-device.h>
 #include <tme/generic/fb.h>
 #include <tme/ic/bt458.h>
+#include <tme/completion.h>
 
 /* macros: */
 
@@ -88,6 +89,11 @@ _TME_RCSID("$Id: sun-fb.h,v 1.3 2007/03/29 01:48:13 fredette Exp $");
 /* the maximum number of bus subregions for registers that a Sun
    framebuffer can have: */
 #define TME_SUNFB_BUS_SUBREGIONS_MAX	(8)
+
+/* the log handle: */
+#define TME_SUNFB_LOG_HANDLE(sunfb)		(&(sunfb)->tme_sunfb_element->tme_element_log_handle)
+
+#define TME_SUNFB_BUS_TRANSITION		(1)
 
 /* a Sun framebuffer: */
 struct tme_sunfb {
@@ -139,7 +145,7 @@ struct tme_sunfb {
 
   /* the (relative) bus address of the last byte of displayed
      framebuffer memory: */
-  tme_bus_addr_t tme_sunfb_memory_address_last_displayed;
+  tme_bus_addr32_t tme_sunfb_memory_address_last_displayed;
 
   /* the memory.  usually, this memory is displayed directly, but this
      won't be the case when there is an overlay plane, for example: */
@@ -153,6 +159,14 @@ struct tme_sunfb {
 
   /* this forces the next update to be a full one: */
   void (*tme_sunfb_update_full) _TME_P((struct tme_sunfb *));
+
+  /* the token for one outstanding writable TLB entry: */
+  struct tme_token *tme_sunfb_tlb_token;
+
+  /* the offsets of the first and last bytes updated in the real
+     framebuffer memory: */
+  tme_uint32_t tme_sunfb_offset_updated_first;
+  tme_uint32_t tme_sunfb_offset_updated_last;
 
   /* these are used for index-mapping pixel values or pixel subfield
      values to intensities, or vice-versa.  if these are NULL,
@@ -192,6 +206,9 @@ struct tme_sunfb {
   /* if the given type is valid, it returns NULL and updates the
      framebuffer structure, else it returns a string of valid types: */
   const char *(*tme_sunfb_type_set) _TME_P((struct tme_sunfb *, const char *));
+
+  /* any interrupt signal: */
+  tme_uint32_t tme_sunfb_bus_signal_int;
 };
 
 /* prototypes: */
@@ -207,8 +224,22 @@ int tme_sunfb_new(struct tme_sunfb *sunfb, const char * const *args, char **_out
 /* some standard register bus cycle handlers: */
 int tme_sunfb_bus_cycle_p4 _TME_P((void *, struct tme_bus_cycle *));
 int tme_sunfb_bus_cycle_s4 _TME_P((void *, struct tme_bus_cycle *));
+int tme_sunfb_bus_cycle_bt458 _TME_P((void *, struct tme_bus_cycle *));
 
 /* this is called before the framebuffer's display is updated: */
 int tme_sunfb_memory_update _TME_P((struct tme_fb_connection *));
+
+#if TME_SUNFB_BUS_TRANSITION
+
+/* this is the bus cycle transition glue: */
+struct tme_completion;
+int tme_sunfb_bus_cycle_transition _TME_P((void *,
+					   struct tme_bus_cycle *,
+					   void (*) _TME_P((struct tme_sunfb *,
+							    struct tme_bus_cycle *,
+							    tme_uint32_t *,
+							    struct tme_completion *))));
+
+#endif /* TME_SUNFB_BUS_TRANSITION */
 
 #endif /* !_MACHINE_SUN_FB_H */

@@ -1,4 +1,4 @@
-/* $Id: bus-device.h,v 1.8 2006/09/30 12:43:39 fredette Exp $ */
+/* $Id: bus-device.h,v 1.9 2009/08/29 17:48:27 fredette Exp $ */
 
 /* tme/generic/bus-device.h - header file for generic bus device support: */
 
@@ -37,13 +37,27 @@
 #define _TME_GENERIC_BUS_DEVICE_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: bus-device.h,v 1.8 2006/09/30 12:43:39 fredette Exp $");
+_TME_RCSID("$Id: bus-device.h,v 1.9 2009/08/29 17:48:27 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
 #include <tme/generic/bus.h>
 
 /* macros: */
+
+/* this indexes an initiator bus router array for a device with a port size
+   of 8 * (2 ^ siz_lg2) bits: */
+#define TME_BUS_ROUTER_INIT_INDEX(siz_lg2, cycle_size, address) \
+(((                                                             \
+   /* by the maximum cycle size: */                             \
+   ((cycle_size) - 1)                                           \
+                                                                \
+   /* by the address alignment: */                              \
+   << siz_lg2)                                                  \
+  + ((address) & ((1 << (siz_lg2)) - 1)))                       \
+                                                                \
+ /* factor in the size of the generic bus router array: */      \
+ * TME_BUS_ROUTER_SIZE(siz_lg2))
 
 /* structures: */
 
@@ -101,6 +115,11 @@ int tme_bus_device_connection_score _TME_P((struct tme_connection *, unsigned in
 int tme_bus_device_connection_make _TME_P((struct tme_connection *, unsigned int));
 int tme_bus_device_connection_break _TME_P((struct tme_connection *, unsigned int));
 int tme_bus_device_connections_new _TME_P((struct tme_element *, _tme_const char * _tme_const *, struct tme_connection **, char **));
+
+/* this adds a bus device generic TLB set: */
+int tme_bus_device_tlb_set_add _TME_P((struct tme_bus_device *,
+				       unsigned long,
+				       struct tme_bus_tlb *));
 
 /* the 16-bit bus master DMA read function: */
 int tme_bus_device_dma_read_16 _TME_P((struct tme_bus_device *,

@@ -1,4 +1,4 @@
-/* $Id: sun-bwtwo.c,v 1.4 2007/02/15 02:05:12 fredette Exp $ */
+/* $Id: sun-bwtwo.c,v 1.6 2009/11/08 17:03:58 fredette Exp $ */
 
 /* machine/sun/sun-bwtwo.c - Sun bwtwo emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun-bwtwo.c,v 1.4 2007/02/15 02:05:12 fredette Exp $");
+_TME_RCSID("$Id: sun-bwtwo.c,v 1.6 2009/11/08 17:03:58 fredette Exp $");
 
 /* includes: */
 #include <tme/machine/sun.h>
@@ -149,7 +149,7 @@ _tme_sunbw2_bus_cycle_csr(void *_sunbw2, struct tme_bus_cycle *cycle_init)
 {
   struct tme_sunbw2 *sunbw2;
   tme_uint16_t csr_old, csr_new;
-  tme_bus_addr_t undecoded;
+  tme_bus_addr32_t undecoded;
 
   /* recover our data structure: */
   sunbw2 = (struct tme_sunbw2 *) _sunbw2;
@@ -251,6 +251,9 @@ _tme_sunbw2_type_set(struct tme_sunfb *sunfb, const char *bw2_type_string)
      framebuffer memory is zero: */
   sunbw2->tme_sunbw2_bus_subregion_memory.tme_bus_subregion_address_first = 0;
 
+  /* assume that we can use the unspecified interrupt: */
+  sunfb->tme_sunfb_bus_signal_int = TME_BUS_SIGNAL_INT_UNSPEC;
+
   /* dispatch on the new type: */
   switch (bw2_type) {
 
@@ -319,6 +322,9 @@ _tme_sunbw2_type_set(struct tme_sunfb *sunfb, const char *bw2_type_string)
 
     /* we use the default S4 memory address: */
     sunbw2->tme_sunbw2_bus_subregion_memory.tme_bus_subregion_address_first = 0;
+
+    /* the SBus bwtwo uses priority seven interrupts: */
+    sunfb->tme_sunfb_bus_signal_int = TME_BUS_SIGNAL_INT(7);
 
     break;
   }

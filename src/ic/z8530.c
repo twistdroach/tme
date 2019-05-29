@@ -1,4 +1,4 @@
-/* $Id: z8530.c,v 1.18 2007/08/25 20:53:51 fredette Exp $ */
+/* $Id: z8530.c,v 1.20 2010/06/05 16:07:17 fredette Exp $ */
 
 /* ic/z8530.c - implementation of Zilog 8530 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: z8530.c,v 1.18 2007/08/25 20:53:51 fredette Exp $");
+_TME_RCSID("$Id: z8530.c,v 1.20 2010/06/05 16:07:17 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -450,34 +450,31 @@ _tme_z8530_rr0_update(struct tme_z8530 *z8530,
 /* this updates the modified interrupt vector stored in RR2 of
    channel B: */
 static int
-_tme_z8530_rr2_update(struct tme_z8530 *z8530)
+_tme_z8530_rr2_update(struct tme_z8530 *z8530,
+		      tme_uint8_t rr3_ip)
 {
-  tme_uint8_t ius;
   struct tme_z8530_chan *chan;
   int int_type;
   int vector;
 
-  /* get the highest-priority interrupt currently under service: */
-  for (ius = z8530->tme_z8530_ius;
-       ius & (ius - 1);
-       ius &= (ius - 1));
-  assert(ius <= TME_Z8530_RR3_CHAN_A_IP_RX);
+  /* there can be at most one RR3 IP bit: */
+  assert ((rr3_ip & (rr3_ip - 1)) == 0);
 
   /* get which channel this IP bit is for, and make sure the IP bit is
      shifted down to a TME_Z8530_RR3_CHAN_B_IP_ value: */
-  if (ius <= TME_Z8530_RR3_CHAN_B_IP_RX) {    
+  if (rr3_ip <= TME_Z8530_RR3_CHAN_B_IP_RX) {    
     chan = &z8530->tme_z8530_chan_b;
-    ius /= TME_Z8530_RR3_CHAN_B_IP_STATUS;
+    rr3_ip /= TME_Z8530_RR3_CHAN_B_IP_STATUS;
     int_type = TME_Z8530_INT_CHAN_B;
   }
   else {
     chan = &z8530->tme_z8530_chan_a;
-    ius /= TME_Z8530_RR3_CHAN_A_IP_STATUS;
+    rr3_ip /= TME_Z8530_RR3_CHAN_A_IP_STATUS;
     int_type = TME_Z8530_INT_CHAN_A;
   }
 
   /* map that bit into an interrupt type: */
-  switch (ius) {
+  switch (rr3_ip) {
   case TME_Z8530_RR3_CHAN_B_IP_RX:
     int_type
       |= (_tme_z8530_rx_fifo_special(chan)
@@ -523,18 +520,14 @@ _tme_z8530_rr2_update(struct tme_z8530 *z8530)
   return (vector);
 }
 
-/* this returns any pending interrupt with higher priority than the
-   highest-priority interrupt currently under service, or zero if
-   there is no such interrupt (or if interrupts are disabled): */
+/* this updates RR2, and returns any pending interrupt with higher
+   priority than the highest-priority interrupt currently under
+   service, or zero if there is no such interrupt (or if interrupts
+   are disabled): */
 static int
-_tme_z8530_int_pending(const struct tme_z8530 *z8530)
+_tme_z8530_int_pending(struct tme_z8530 *z8530)
 {
   tme_uint8_t rr3;
-
-  /* if interrupts are disabled, return zero now: */
-  if (!(z8530->tme_z8530_wr9 & TME_Z8530_WR9_MIE)) {
-    return (0);
-  }
 
   /* get the highest priority IP bit: */
   rr3 = z8530->tme_z8530_rr3;
@@ -543,11 +536,25 @@ _tme_z8530_int_pending(const struct tme_z8530 *z8530)
   }
   assert(rr3 <= TME_Z8530_RR3_CHAN_A_IP_RX);
 
-  /* if the highest priority IP bit isn't currently under service,
-     return it, else return zero: */
-  return (rr3 > z8530->tme_z8530_ius
-	  ? rr3
-	  : 0);
+  /* if the highest priority IP bit is currently under service: */
+  if (rr3 <= z8530->tme_z8530_ius) {
+
+    /* there is no interrupt pending: */
+    rr3 = 0;
+  }
+
+  /* if interrupts are disabled: */
+  if ((z8530->tme_z8530_wr9 & TME_Z8530_WR9_MIE) == 0) {
+
+    /* there is no interrupt pending: */
+    rr3 = 0;
+  }
+
+  /* update RR2: */
+  _tme_z8530_rr2_update(z8530,
+			rr3);
+
+  return (rr3);
 }
 
 /* this does an interrupt acknowledge.  it returns TME_OK iff an
@@ -568,11 +575,35 @@ _tme_z8530_intack(struct tme_z8530 *z8530, int *_vector)
     return (ENOENT);
   }
 
+  /* if this is a hard interrupt acknowledge: */
+  if (_vector != NULL) {
+
+    /* if the chip's IEI pin is tied low: */
+    if (z8530->tme_z8530_socket.tme_z8530_socket_flags
+	& TME_Z8530_SOCKET_FLAG_IEI_TIED_LOW) {
+
+      /* when IEI is low, we return without error, but we also don't
+	 recognize the hard interrupt acknowledge cycle as selecting us
+	 and we don't drive any vector: */
+      *_vector = TME_BUS_INTERRUPT_VECTOR_UNDEF;
+      return (TME_OK);
+    }
+
+    /* otherwise, we assume that the IEI pin is currently high, which
+       means we always recognize the hard interrupt acknowledge cycle
+       as selecting us.  this isn't a problem, even if there are
+       multiple devices that can interrupt at our level, because we're
+       not really driving a bus here, we're responding to a directed
+       request for an interrupt vector.  we assume that if there
+       really is an important priority system within our interrupt
+       level, that it's enforced by the bus implementation: */
+  }
+
   /* set the corresponding IUS bit: */
   z8530->tme_z8530_ius |= rr3;
 
-  /* update RR2 and get the vector: */
-  vector = _tme_z8530_rr2_update(z8530);
+  /* get the vector from the updated RR2 in channel B: */
+  vector = z8530->tme_z8530_chan_b.tme_z8530_chan_rdreg[2];
 
   /* get the current WR9 value: */
   wr9 = z8530->tme_z8530_wr9;
@@ -585,20 +616,6 @@ _tme_z8530_intack(struct tme_z8530 *z8530, int *_vector)
     if (wr9 & TME_Z8530_WR9_NV) {
       *_vector = TME_BUS_INTERRUPT_VECTOR_UNDEF;
     }
-
-    /* if the chip's IEI pin is tied low, return no vector: */
-    else if (z8530->tme_z8530_socket.tme_z8530_socket_flags & TME_Z8530_SOCKET_FLAG_IEI_TIED_LOW) {
-      *_vector = TME_BUS_INTERRUPT_VECTOR_UNDEF;
-    }
-
-    /* otherwise, we behave as if the IEI pin is tied *high*, which
-       means we always drive an interrupt vector on the bus.  this
-       isn't a problem, even if there are multiple devices that can
-       interrupt at our level, because we're not really driving a bus
-       here, we're responding to a directed request for an interrupt
-       vector.  we assume that if there really is an important
-       priority system within our interrupt level, that it's enforced
-       by the bus implementation: */
 
     /* if we're supposed to acknowledge hard interrupts with the
        modified vector, return the modified vector: */
@@ -889,6 +906,7 @@ _tme_z8530_callout(struct tme_z8530 *z8530, struct tme_z8530_chan *chan, int new
     rc = (*conn_bus->tme_bus_signal)
       (conn_bus,
        TME_BUS_SIGNAL_INT_UNSPEC
+       | TME_BUS_SIGNAL_EDGE
        | (int_asserted
 	  ? TME_BUS_SIGNAL_LEVEL_ASSERTED
 	  : TME_BUS_SIGNAL_LEVEL_NEGATED));
@@ -921,7 +939,7 @@ _tme_z8530_bus_cycle(void *_z8530, struct tme_bus_cycle *cycle_init)
 {
   struct tme_z8530 *z8530;
   struct tme_z8530_chan *chan;
-  tme_bus_addr_t address, z8530_address_last;
+  tme_bus_addr32_t address, z8530_address_last;
   int is_csr;
   tme_uint8_t buffer, value;
   struct tme_bus_cycle cycle_resp;
@@ -1064,9 +1082,6 @@ _tme_z8530_bus_cycle(void *_z8530, struct tme_bus_cycle *cycle_init)
 	     ius & (ius - 1);
 	     ius &= (ius - 1));
 	z8530->tme_z8530_ius ^= ius;
-
-	/* update RR2: */
-	_tme_z8530_rr2_update(z8530);
 	
 	/* always check for an interrupt callout: */
 	new_callouts |= TME_Z8530_CALLOUT_INT;
@@ -1514,7 +1529,7 @@ _tme_z8530_tlb_fill(void *_z8530, struct tme_bus_tlb *tlb,
 		     tme_bus_addr_t address, unsigned int cycles)
 {
   struct tme_z8530 *z8530;
-  tme_bus_addr_t z8530_address_last;
+  tme_bus_addr32_t z8530_address_last;
 
   /* recover our data structure: */
   z8530 = (struct tme_z8530 *) _z8530;

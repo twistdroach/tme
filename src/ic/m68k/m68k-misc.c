@@ -1,4 +1,4 @@
-/* $Id: m68k-misc.c,v 1.26 2007/08/25 22:45:12 fredette Exp $ */
+/* $Id: m68k-misc.c,v 1.27 2009/08/29 19:47:52 fredette Exp $ */
 
 /* ic/m68k/m68k-misc.c - miscellaneous things for the m68k emulator: */
 
@@ -36,7 +36,7 @@
 /* includes: */
 #include "m68k-impl.h"
 
-_TME_RCSID("$Id: m68k-misc.c,v 1.26 2007/08/25 22:45:12 fredette Exp $");
+_TME_RCSID("$Id: m68k-misc.c,v 1.27 2009/08/29 19:47:52 fredette Exp $");
 
 /* the memory buffer read and write functions: */
 #if TME_M68K_SIZE_8 != 1
@@ -353,7 +353,7 @@ _tme_m68k_connection_score(struct tme_connection *conn, unsigned int *_score)
 
     /* this must be a bus, and not another m68k chip: */
   case TME_CONNECTION_BUS_M68K:
-    if (conn_bus->tme_bus_tlb_set_allocate != NULL
+    if (conn_bus->tme_bus_tlb_set_add != NULL
 	&& conn_m68k->tme_m68k_bus_tlb_fill != NULL
 	&& conn_m68k->tme_m68k_bus_m6888x_enable == NULL) {
       score = 10;
@@ -362,7 +362,7 @@ _tme_m68k_connection_score(struct tme_connection *conn, unsigned int *_score)
 
     /* this must be a bus, and not another chip: */
   case TME_CONNECTION_BUS_GENERIC:
-    if (conn_bus->tme_bus_tlb_set_allocate != NULL
+    if (conn_bus->tme_bus_tlb_set_add != NULL
 	&& conn_bus->tme_bus_tlb_fill != NULL) {
       score = 1;
     }
@@ -383,6 +383,10 @@ _tme_m68k_connection_make(struct tme_connection *conn, unsigned int state)
   struct tme_m68k_bus_connection *conn_m68k;
   struct tme_bus_connection *conn_bus;
   struct tme_connection *conn_other;
+  struct tme_bus_tlb_set_info tlb_set_info;
+  unsigned long tlb_i;
+  struct tme_m68k_tlb *tlb;
+  int rc;
 
   /* since the CPU is halted, it won't be making any connection calls,
      so we only have to do work when the connection is fully made: */
@@ -413,21 +417,29 @@ _tme_m68k_connection_make(struct tme_connection *conn, unsigned int state)
     default: abort();
     }
 
-    /* allocate the TLB hash set: */
-    (*ic->_tme_m68k_bus_connection->tme_m68k_bus_connection.tme_bus_tlb_set_allocate)
-      (&ic->_tme_m68k_bus_connection->tme_m68k_bus_connection, 
-       _TME_M68K_TLB_HASH_SIZE, 
-       sizeof(struct tme_m68k_tlb),
-       &ic->_tme_m68k_tlb_array_bus,
-       &ic->_tme_m68k_tlbs_rwlock);
+    /* make the TLB set information: */
+    memset(&tlb_set_info, 0, sizeof(tlb_set_info));
+    tlb_set_info.tme_bus_tlb_set_info_token0 = &ic->_tme_m68k_tlb_array[0].tme_m68k_tlb_token;
+    tlb_set_info.tme_bus_tlb_set_info_token_stride = sizeof(struct tme_m68k_tlb);
+    tlb_set_info.tme_bus_tlb_set_info_token_count = TME_ARRAY_ELS(ic->_tme_m68k_tlb_array);
+    tlb_set_info.tme_bus_tlb_set_info_bus_context = &ic->_tme_m68k_bus_context;
 
-    /* allocate the ITLB set: */
-    (*ic->_tme_m68k_bus_connection->tme_m68k_bus_connection.tme_bus_tlb_set_allocate)
-      (&ic->_tme_m68k_bus_connection->tme_m68k_bus_connection, 
-       1, 
-       sizeof(struct tme_m68k_tlb),
-       &ic->_tme_m68k_itlb_bus,
-       &ic->_tme_m68k_tlbs_rwlock);
+    /* initialize the TLBs in the set: */
+    for (tlb_i = 0; tlb_i < TME_ARRAY_ELS(ic->_tme_m68k_tlb_array); tlb_i++) {
+      tlb = &ic->_tme_m68k_tlb_array[tlb_i];
+
+      /* initialize this token: */
+      tme_token_init(&tlb->tme_m68k_tlb_token);
+
+      /* connect this token with this TLB: */
+      tlb->tme_m68k_tlb_bus_tlb.tme_bus_tlb_token = &tlb->tme_m68k_tlb_token;
+    }
+
+    /* add the TLB set: */
+    rc = ((*ic->_tme_m68k_bus_connection->tme_m68k_bus_connection.tme_bus_tlb_set_add)
+	  (&ic->_tme_m68k_bus_connection->tme_m68k_bus_connection,
+	   &tlb_set_info));
+    assert (rc == TME_OK);
   }
 
   /* NB: the machine needs to issue a reset to bring the CPU out of halt. */
@@ -469,7 +481,7 @@ _tme_m68k_connections_new(struct tme_element *element, const char * const *args,
 
   /* fill in the generic bus connection: */
   conn_bus->tme_bus_signal = _tme_m68k_bus_signal;
-  conn_bus->tme_bus_tlb_set_allocate = NULL;
+  conn_bus->tme_bus_tlb_set_add = NULL;
 
   /* full in the m68k bus connection: */
   conn_m68k->tme_m68k_bus_interrupt = _tme_m68k_bus_interrupt;
@@ -492,7 +504,7 @@ _tme_m68k_connections_new(struct tme_element *element, const char * const *args,
 
   /* fill in the generic bus connection: */
   conn_bus->tme_bus_signal = _tme_m68k_bus_signal;
-  conn_bus->tme_bus_tlb_set_allocate = NULL;
+  conn_bus->tme_bus_tlb_set_add = NULL;
   conn_bus->tme_bus_tlb_fill = NULL;
 
   /* add this connection to the set of possibilities: */
@@ -649,27 +661,32 @@ tme_m68k_do_reset(struct tme_m68k *ic)
 int
 tme_m68k_go_slow(const struct tme_m68k *ic)
 {
-  struct tme_m68k_tlb *tlb;
+  tme_bus_context_t bus_context;
+  const struct tme_m68k_tlb *tlb;
   tme_uint32_t linear_pc;
   const tme_shared tme_uint8_t *emulator_load;
   const tme_shared tme_uint8_t *emulator_load_last;
 
-  tlb = tme_memory_atomic_pointer_read(struct tme_m68k_tlb *, ic->_tme_m68k_itlb, &ic->_tme_m68k_tlbs_rwlock);
+  bus_context = ic->_tme_m68k_bus_context;
+  tlb = &ic->_tme_m68k_itlb;
   emulator_load = tlb->tme_m68k_tlb_emulator_off_read;
   emulator_load_last = emulator_load;
   if (emulator_load != TME_EMULATOR_OFF_UNDEF) {
-    emulator_load += tlb->tme_m68k_tlb_linear_first;
-    emulator_load_last += tlb->tme_m68k_tlb_linear_last;
+    emulator_load += (tme_bus_addr32_t) tlb->tme_m68k_tlb_linear_first;
+    emulator_load_last += (tme_bus_addr32_t) tlb->tme_m68k_tlb_linear_last;
     assert (emulator_load <= emulator_load_last);
   }
   linear_pc = ic->tme_m68k_ireg_pc;
   return (
 	  
 	  /* the ITLB entry must support reads from emulator memory: */
-	  !TME_M68K_TLB_OK_FAST_READ(tlb, 
-				     TME_M68K_FUNCTION_CODE_PROGRAM(ic),
-				     linear_pc,
-				     linear_pc)
+	  tme_m68k_tlb_is_invalid(tlb)
+	  || tlb->tme_m68k_tlb_bus_context != bus_context
+	  || (tlb->tme_m68k_tlb_function_codes_mask
+	      & TME_BIT(TME_M68K_FUNCTION_CODE_PROGRAM(ic))) == 0
+	  || linear_pc < (tme_bus_addr32_t) tlb->tme_m68k_tlb_linear_first
+	  || linear_pc > (tme_bus_addr32_t) tlb->tme_m68k_tlb_linear_last
+	  || tlb->tme_m68k_tlb_emulator_off_read == TME_EMULATOR_OFF_UNDEF
 
 	  /* the ITLB emulator memory must be 32-bit aligned for the
 	     benefit of the fast instruction word fetch macros, so
@@ -753,13 +770,11 @@ tme_m68k_tlb_fill(struct tme_m68k *ic, struct tme_m68k_tlb *tlb,
     external_address &= 0x00ffffff;
   }
 
-  /* this m68k implementation never fills TLB entries on the stack, so
-     a TLB entry reserves itself.  this also means that we don't have
-     to call tme_bus_tlb_back() after the fill: */
-  tlb->tme_m68k_tlb_bus_tlb.tme_bus_tlb_global = &tlb->tme_m68k_tlb_bus_tlb;
+  /* unbusy the TLB entry: */
+  tme_m68k_tlb_unbusy(tlb);
 
-  /* unbusy the TLB entry for filling: */
-  tme_bus_tlb_unbusy_fill(&tlb->tme_m68k_tlb_bus_tlb);
+  /* clear any invalid token: */
+  tme_token_invalid_clear(&tlb->tme_m68k_tlb_token);
 
   /* unlock for the callout: */
   tme_m68k_callout_unlock(ic);
@@ -774,16 +789,19 @@ tme_m68k_tlb_fill(struct tme_m68k *ic, struct tme_m68k_tlb *tlb,
   /* relock after the callout: */
   tme_m68k_callout_relock(ic);
 
+  /* set the context on the TLB entry: */
+  tlb->tme_m68k_tlb_bus_context = ic->_tme_m68k_bus_context;
+
   /* rebusy the TLB entry: */
-  tme_bus_tlb_busy(&tlb->tme_m68k_tlb_bus_tlb);
+  tme_m68k_tlb_busy(tlb);
 
   /* if this code isn't 32-bit clean, we have to deal: */
   if (external_address != linear_address) {
     tlb_internal.tme_bus_tlb_addr_first
-      = (tlb->tme_m68k_tlb_linear_first
+      = (((tme_bus_addr32_t) tlb->tme_m68k_tlb_linear_first)
 	 | (linear_address ^ external_address));
     tlb_internal.tme_bus_tlb_addr_last
-      = (tlb->tme_m68k_tlb_linear_last
+      = (((tme_bus_addr32_t) tlb->tme_m68k_tlb_linear_last)
 	 | (linear_address ^ external_address));
     tlb_internal.tme_bus_tlb_cycles_ok = tlb->tme_m68k_tlb_bus_tlb.tme_bus_tlb_cycles_ok;
     tme_bus_tlb_map(&tlb->tme_m68k_tlb_bus_tlb, external_address,
@@ -1355,6 +1373,7 @@ void
 tme_m68k_callout_relock(struct tme_m68k *ic)
 {
   struct tme_m68k_tlb *tlb;
+  tme_bus_context_t bus_context;
   struct tme_m68k_tlb *tlb_now;
 
   assert ((ic->_tme_m68k_mode == TME_M68K_MODE_EXECUTION)
@@ -1367,12 +1386,17 @@ tme_m68k_callout_relock(struct tme_m68k *ic)
     /* rebusy the fast instruction TLB entry: */
     tme_m68k_tlb_busy(tlb);
       
-    /* get what should be our instruction TLB entry now: */
-    tlb_now = tme_memory_atomic_pointer_read(struct tme_m68k_tlb *, ic->_tme_m68k_itlb, &ic->_tme_m68k_tlbs_rwlock);
+    /* get the bus context: */
+    bus_context = ic->_tme_m68k_bus_context;
 
-    /* if the instruction TLB entry has changed or is invalid: */
+    /* get what should be our instruction TLB entry now: */
+    tlb_now = &ic->_tme_m68k_itlb;
+
+    /* if this instruction TLB entry has changed, is for the wrong
+       context, or is invalid: */
     if (__tme_predict_false(tlb_now != tlb
-			    || tme_bus_tlb_is_invalid(&tlb->tme_m68k_tlb_bus_tlb))) {
+			    || tlb->tme_m68k_tlb_bus_context != bus_context
+			    || tme_m68k_tlb_is_invalid(tlb))) {
 
       /* poison ic->_tme_m68k_insn_fetch_fast_last so the fast
 	 instruction executor fetch macros will fail: */
@@ -1403,7 +1427,7 @@ int
 tme_m68k_rmw_start(struct tme_m68k *ic,
 		   struct tme_m68k_rmw *rmw)
 {
-  struct tme_m68k_tlb *tlb_set;
+  tme_bus_context_t bus_context;
   struct tme_m68k_tlb *tlbs_all[3];
   int tlbs_busy[2];
   struct tme_m68k_tlb *tlb;
@@ -1435,28 +1459,27 @@ tme_m68k_rmw_start(struct tme_m68k *ic,
   assert (rmw->tme_m68k_rmw_address_count == 1
 	  || rmw->tme_m68k_rmw_address_count == 2);
 
-  /* get the TLB set from which we will get all TLB entries for this
-     instruction.  for some machines it may be important to guarantee
-     that no one can observe an atomic operation being split by a TLB
-     set change: */
-  tlb_set = tme_memory_atomic_pointer_read(struct tme_m68k_tlb *,
-					   ic->_tme_m68k_tlb_array,
-					   &ic->_tme_m68k_tlbs_rwlock);
+  /* get the context that we will use to index TLB entries for this
+     instruction.  NB that this may be different from the context in
+     which the instruction eventually completes: */
+  bus_context = ic->_tme_m68k_bus_context;
 
   /* assume that we will only consider one TLB entry, for the first
      address: */
-  tlbs_all[0] = TME_M68K_TLB_ENTRY_SET(tlb_set,
-				       ic->_tme_m68k_ea_function_code,
-				       rmw->tme_m68k_rmw_addresses[0]);
+  tlbs_all[0] = TME_M68K_DTLB_ENTRY(ic,
+				    bus_context,
+				    ic->_tme_m68k_ea_function_code,
+				    rmw->tme_m68k_rmw_addresses[0]);
   tlbs_all[1] = NULL;
 
   /* if there are two addresses: */
   if (rmw->tme_m68k_rmw_address_count == 2) {
 
     /* we will consider another TLB entry for the second address: */
-    tlbs_all[1] = TME_M68K_TLB_ENTRY_SET(tlb_set,
-					 ic->_tme_m68k_ea_function_code,
-					 rmw->tme_m68k_rmw_addresses[1]);
+    tlbs_all[1] = TME_M68K_DTLB_ENTRY(ic,
+				      bus_context,
+				      ic->_tme_m68k_ea_function_code,
+				      rmw->tme_m68k_rmw_addresses[1]);
 
     /* if the TLB entry for the second address collides with the TLB
        entry for the first address: */
@@ -1464,10 +1487,11 @@ tme_m68k_rmw_start(struct tme_m68k *ic,
 
       /* we will instead consider an alternate TLB entry for the
          second address: */
-      tlbs_all[1] = TME_M68K_TLB_ENTRY_SET(tlb_set,
-					   ic->_tme_m68k_ea_function_code,
-					   (rmw->tme_m68k_rmw_addresses[1]
-					    + TME_M68K_TLB_ADDRESS_BIAS(1)));
+      tlbs_all[1] = TME_M68K_DTLB_ENTRY(ic,
+					bus_context,
+					ic->_tme_m68k_ea_function_code,
+					(rmw->tme_m68k_rmw_addresses[1]
+					 + TME_M68K_TLB_ADDRESS_BIAS(1)));
       assert (tlbs_all[1] != tlbs_all[0]);
     }
   }
@@ -1532,6 +1556,9 @@ tme_m68k_rmw_start(struct tme_m68k *ic,
     /* assume that no address needs a TLB fill: */
     address_i_fill = rmw->tme_m68k_rmw_address_count;
 
+    /* get the bus context for this iteration: */
+    bus_context = ic->_tme_m68k_bus_context;
+
     /* walk the addresses: */
     address_i = 0;
     do {
@@ -1549,25 +1576,26 @@ tme_m68k_rmw_start(struct tme_m68k *ic,
 
 	/* if this TLB entry isn't busy, busy it: */
 	if (!tlbs_busy[tlb_i]) {
-	  tme_bus_tlb_busy(&tlb->tme_m68k_tlb_bus_tlb);
+	  tme_m68k_tlb_busy(tlb);
 	  tlbs_busy[tlb_i] = TRUE;
 	}
 
-	/* if this TLB entry is valid, applies to this function code
+	/* if this TLB entry is valid, applies to this context, function code
 	   and address, and allows at least the desired cycle(s), and
 	   either this address isn't already using a TLB entry, or the
 	   TLB entry it's using doesn't cover the entire operand, or
 	   this TLB entry allows more cycles or allows both fast
 	   reading and fast writing: */
-	if (tme_bus_tlb_is_valid(&tlb->tme_m68k_tlb_bus_tlb)
+	if (tme_m68k_tlb_is_valid(tlb)
+	    && tlb->tme_m68k_tlb_bus_context == bus_context
 	    && (tlb->tme_m68k_tlb_function_codes_mask
 		& TME_BIT(ic->_tme_m68k_ea_function_code)) != 0
-	    && address >= tlb->tme_m68k_tlb_linear_first
-	    && address <= tlb->tme_m68k_tlb_linear_last
+	    && address >= (tme_bus_addr32_t) tlb->tme_m68k_tlb_linear_first
+	    && address <= (tme_bus_addr32_t) tlb->tme_m68k_tlb_linear_last
 	    && (tlb->tme_m68k_tlb_cycles_ok
 		& address_cycles[address_i]) != 0
 	    && (tlb_use == NULL
-		|| (tlb_use->tme_m68k_tlb_linear_last - address) < rmw->tme_m68k_rmw_size
+		|| (((tme_bus_addr32_t) tlb_use->tme_m68k_tlb_linear_last) - address) < rmw->tme_m68k_rmw_size
 		|| tlb->tme_m68k_tlb_cycles_ok > tlb_use->tme_m68k_tlb_cycles_ok
 		|| (tlb->tme_m68k_tlb_emulator_off_read != TME_EMULATOR_OFF_UNDEF
 		    && tlb->tme_m68k_tlb_emulator_off_write != TME_EMULATOR_OFF_UNDEF))) {
@@ -1638,7 +1666,7 @@ tme_m68k_rmw_start(struct tme_m68k *ic,
 
       /* if the other TLB entry is busy, unbusy it: */
       if (tlbs_busy[!tlb_i]) {
-	tme_bus_tlb_unbusy(&tlbs_all[tlb_i]->tme_m68k_tlb_bus_tlb);
+	tme_m68k_tlb_unbusy(tlbs_all[tlb_i]);
 	tlbs_busy[!tlb_i] = FALSE;
       }
 
@@ -1662,7 +1690,7 @@ tme_m68k_rmw_start(struct tme_m68k *ic,
       tlb = rmw->tme_m68k_rmw_tlbs[address_i];
 
       /* if this TLB entry doesn't cover the entire operand: */
-      if ((tlb->tme_m68k_tlb_linear_last - address) < rmw->tme_m68k_rmw_size) {
+      if ((((tme_bus_addr32_t) tlb->tme_m68k_tlb_linear_last) - address) < rmw->tme_m68k_rmw_size) {
 
 	/* we can't support this instruction on this memory, because
 	   we can't split an atomic operation across TLB entries.  on
@@ -1722,7 +1750,7 @@ tme_m68k_rmw_start(struct tme_m68k *ic,
 	/* if the other TLB entry is busy, unbusy it: */
 	tlb_i = (tlb == tlbs_all[1]);
 	if (tlbs_busy[!tlb_i]) {
-	  tme_bus_tlb_unbusy(&tlbs_all[tlb_i]->tme_m68k_tlb_bus_tlb);
+	  tme_m68k_tlb_unbusy(tlbs_all[tlb_i]);
 	  tlbs_busy[!tlb_i] = FALSE;
 	}
 
@@ -1775,13 +1803,13 @@ tme_m68k_rmw_start(struct tme_m68k *ic,
       && (!supported
 	  || (tlbs_all[0] != rmw->tme_m68k_rmw_tlbs[0]
 	      && tlbs_all[0] != rmw->tme_m68k_rmw_tlbs[1]))) {
-    tme_bus_tlb_unbusy(&tlbs_all[0]->tme_m68k_tlb_bus_tlb);
+    tme_m68k_tlb_unbusy(tlbs_all[0]);
   }
   if (tlbs_busy[1]
       && (!supported
 	  || (tlbs_all[1] != rmw->tme_m68k_rmw_tlbs[0]
 	      && tlbs_all[1] != rmw->tme_m68k_rmw_tlbs[1]))) {
-    tme_bus_tlb_unbusy(&tlbs_all[1]->tme_m68k_tlb_bus_tlb);
+    tme_m68k_tlb_unbusy(tlbs_all[1]);
   }
 
   /* if this instruction is not supported on this memory: */
@@ -1900,7 +1928,7 @@ tme_m68k_rmw_finish(struct tme_m68k *ic,
       /* if the other TLB entry is busy, unbusy it: */
       tlb_i = (tlb == tlbs_all[1]);
       if (tlbs_busy[!tlb_i]) {
-	tme_bus_tlb_unbusy(&tlbs_all[tlb_i]->tme_m68k_tlb_bus_tlb);
+	tme_m68k_tlb_unbusy(tlbs_all[tlb_i]);
 	tlbs_busy[!tlb_i] = FALSE;
       }
 
@@ -1968,10 +1996,10 @@ tme_m68k_rmw_finish(struct tme_m68k *ic,
 
   /* unbusy all TLB entries: */
   if (tlbs_busy[0]) {
-    tme_bus_tlb_unbusy(&tlbs_all[0]->tme_m68k_tlb_bus_tlb);
+    tme_m68k_tlb_unbusy(tlbs_all[0]);
   }
   if (tlbs_busy[1]) {
-    tme_bus_tlb_unbusy(&tlbs_all[1]->tme_m68k_tlb_bus_tlb);
+    tme_m68k_tlb_unbusy(tlbs_all[1]);
   }
 
   /* cas2 is a difficult instruction to emulate, since it accesses two

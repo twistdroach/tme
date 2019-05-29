@@ -1,4 +1,4 @@
-/* $Id: mm58167.c,v 1.7 2006/09/30 12:43:36 fredette Exp $ */
+/* $Id: mm58167.c,v 1.8 2009/08/29 21:22:47 fredette Exp $ */
 
 /* ic/mm58167.c - implementation of National Semiconductor MM58167 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: mm58167.c,v 1.7 2006/09/30 12:43:36 fredette Exp $");
+_TME_RCSID("$Id: mm58167.c,v 1.8 2009/08/29 21:22:47 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -103,7 +103,7 @@ static int
 _tme_mm58167_bus_cycle(void *_mm58167, struct tme_bus_cycle *cycle_init)
 {
   struct tme_mm58167 *mm58167;
-  tme_bus_addr_t address, mm58167_address_last;
+  tme_bus_addr32_t address, mm58167_address_last;
   tme_uint8_t buffer, value;
   struct tme_bus_cycle cycle_resp;
   unsigned int reg;
@@ -260,7 +260,7 @@ _tme_mm58167_tlb_fill(void *_mm58167, struct tme_bus_tlb *tlb,
 		     tme_bus_addr_t address, unsigned int cycles)
 {
   struct tme_mm58167 *mm58167;
-  tme_bus_addr_t mm58167_address_last;
+  tme_bus_addr32_t mm58167_address_last;
 
   /* recover our data structure: */
   mm58167 = (struct tme_mm58167 *) _mm58167;

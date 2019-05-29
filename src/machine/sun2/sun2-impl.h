@@ -1,4 +1,4 @@
-/* $Id: sun2-impl.h,v 1.9 2006/09/30 12:43:38 fredette Exp $ */
+/* $Id: sun2-impl.h,v 1.10 2009/08/30 14:30:16 fredette Exp $ */
 
 /* machine/sun2/sun2-impl.h - implementation header file for Sun 2 emulation: */
 
@@ -37,7 +37,7 @@
 #define _MACHINE_SUN2_IMPL_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun2-impl.h,v 1.9 2006/09/30 12:43:38 fredette Exp $");
+_TME_RCSID("$Id: sun2-impl.h,v 1.10 2009/08/30 14:30:16 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus.h>
@@ -147,18 +147,14 @@ struct tme_sun2 {
 #define tme_sun2_mbmem tme_sun2_buses[TME_SUN2_BUS_MBMEM]
 #define tme_sun2_vmebus tme_sun2_buses[TME_SUN2_BUS_VME]
 
-  /* during reset, this handles the special ROM read bus cycles: */
-  struct tme_m68k_tlb *tme_sun2_reset_tlbs;
-  unsigned int tme_sun2_reset_tlb_count;
-  unsigned int tme_sun2_reset_cycles;
-  void *tme_sun2_reset_cycle_private;
-  tme_bus_cycle_handler tme_sun2_reset_cycle;
-
   /* the interrupt lines that are being asserted: */
   tme_uint8_t tme_sun2_int_signals[(TME_M68K_IPL_MAX + 1 + 7) >> 3];
 
   /* the last ipl we gave to the CPU: */
   unsigned int tme_sun2_int_ipl_last;
+
+  /* the m68k bus context register: */
+  tme_bus_context_t *tme_sun2_m68k_bus_context;
 };
 
 /* prototypes: */
@@ -166,16 +162,13 @@ void _tme_sun2_mmu_new _TME_P((struct tme_sun2 *));
 int _tme_sun2_m68k_tlb_fill _TME_P((struct tme_m68k_bus_connection *, struct tme_m68k_tlb *,
 				    unsigned int, tme_uint32_t, unsigned int));
 int _tme_sun2_bus_tlb_fill _TME_P((struct tme_bus_connection *, struct tme_bus_tlb *,
-				   tme_uint32_t, unsigned int));
-int _tme_sun2_mmu_tlb_set_allocate _TME_P((struct tme_bus_connection *,
-					   unsigned int, unsigned int, 
-					   struct tme_bus_tlb * tme_shared *,
-					   tme_rwlock_t *));
+				   tme_bus_addr_t, unsigned int));
+int _tme_sun2_mmu_tlb_set_add _TME_P((struct tme_bus_connection *,
+				      struct tme_bus_tlb_set_info *));
 int _tme_sun2_mmu_pte_get _TME_P((struct tme_sun2 *, tme_uint32_t, tme_uint32_t *));
 int _tme_sun2_mmu_pte_set _TME_P((struct tme_sun2 *, tme_uint32_t, tme_uint32_t));
 void _tme_sun2_mmu_context_system_set _TME_P((struct tme_sun2 *));
 void _tme_sun2_mmu_context_user_set _TME_P((struct tme_sun2 *));
-int _tme_sun2_mmu_reset _TME_P((struct tme_sun2 *));
 
 int _tme_sun2_control_cycle_handler _TME_P((void *, struct tme_bus_cycle *));
 int _tme_sun2_ipl_check _TME_P((struct tme_sun2 *));

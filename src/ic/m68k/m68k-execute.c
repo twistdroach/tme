@@ -1,4 +1,4 @@
-/* $Id: m68k-execute.c,v 1.23 2007/02/21 01:28:59 fredette Exp $ */
+/* $Id: m68k-execute.c,v 1.24 2009/08/29 19:25:48 fredette Exp $ */
 
 /* ic/m68k/m68k-execute.c - executes Motorola 68k instructions: */
 
@@ -33,7 +33,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-_TME_RCSID("$Id: m68k-execute.c,v 1.23 2007/02/21 01:28:59 fredette Exp $");
+_TME_RCSID("$Id: m68k-execute.c,v 1.24 2009/08/29 19:25:48 fredette Exp $");
 
 /* includes: */
 #include "m68k-auto.h"
@@ -45,6 +45,7 @@ _TME_M68K_EXECUTE_NAME(struct tme_m68k *ic)
 #undef _TME_M68K_SEQUENCE_RESTARTING
 #undef _TME_M68K_INSN_FETCH_SAVE
 #ifdef _TME_M68K_EXECUTE_FAST
+  tme_bus_context_t bus_context;
   struct tme_m68k_tlb *tlb;
   const tme_shared tme_uint8_t *fetch_fast_next;
 #define _TME_M68K_INSN_FETCH_SAVE \
@@ -114,9 +115,16 @@ do { \
 #ifdef _TME_M68K_EXECUTE_FAST
 
   /* get our instruction TLB entry and reload it: */
-  tlb = tme_memory_atomic_pointer_read(struct tme_m68k_tlb *, ic->_tme_m68k_itlb, &ic->_tme_m68k_tlbs_rwlock);
+  bus_context = ic->_tme_m68k_bus_context;
+  tlb = &ic->_tme_m68k_itlb;
   tme_m68k_tlb_busy(tlb);
-  if (!TME_M68K_TLB_OK_FAST_READ(tlb, function_code_program, ic->tme_m68k_ireg_pc, ic->tme_m68k_ireg_pc)) {
+  if (__tme_predict_false(tme_m68k_tlb_is_invalid(tlb)
+			  || tlb->tme_m68k_tlb_bus_context != bus_context
+			  || (tlb->tme_m68k_tlb_function_codes_mask
+			      & TME_BIT(function_code_program)) == 0
+			  || ic->tme_m68k_ireg_pc < (tme_bus_addr32_t) tlb->tme_m68k_tlb_linear_first
+			  || ic->tme_m68k_ireg_pc > (tme_bus_addr32_t) tlb->tme_m68k_tlb_linear_last
+			  || tlb->tme_m68k_tlb_emulator_off_read == TME_EMULATOR_OFF_UNDEF)) {
     tme_m68k_tlb_fill(ic, tlb,
 		      function_code_program,
 		      ic->tme_m68k_ireg_pc,
@@ -132,7 +140,7 @@ do { \
   }
 
   /* set up to do fast reads from the instruction TLB entry: */
-  ic->_tme_m68k_insn_fetch_fast_last = tlb->tme_m68k_tlb_emulator_off_read + tlb->tme_m68k_tlb_linear_last - (sizeof(tme_uint32_t) - 1);
+  ic->_tme_m68k_insn_fetch_fast_last = tlb->tme_m68k_tlb_emulator_off_read + ((tme_bus_addr32_t) tlb->tme_m68k_tlb_linear_last) - (sizeof(tme_uint32_t) - 1);
   ic->_tme_m68k_insn_fetch_fast_itlb = tlb;
   ic->_tme_m68k_group0_hook = tme_m68k_group0_hook_fast;
 #else  /* !_TME_M68K_EXECUTE_FAST */
@@ -152,10 +160,11 @@ do { \
 	    && tlb->tme_m68k_tlb_emulator_off_read != TME_EMULATOR_OFF_UNDEF
 	    && (tlb->tme_m68k_tlb_function_codes_mask & TME_BIT(function_code_program)) != 0
 	    && (fetch_fast_next > ic->_tme_m68k_insn_fetch_fast_last
-		|| ((tme_bus_tlb_is_valid(&tlb->tme_m68k_tlb_bus_tlb)
+		|| ((tme_m68k_tlb_is_valid(tlb)
 		     || !TME_THREADS_COOPERATIVE)
-		    && ic->tme_m68k_ireg_pc >= tlb->tme_m68k_tlb_linear_first
-		    && (ic->tme_m68k_ireg_pc + sizeof(tme_uint16_t) - 1) <= tlb->tme_m68k_tlb_linear_last)));
+		    && tlb->tme_m68k_tlb_bus_context == ic->_tme_m68k_bus_context
+		    && ic->tme_m68k_ireg_pc >= (tme_bus_addr32_t) tlb->tme_m68k_tlb_linear_first
+		    && (ic->tme_m68k_ireg_pc + sizeof(tme_uint16_t) - 1) <= (tme_bus_addr32_t) tlb->tme_m68k_tlb_linear_last)));
     tme_m68k_verify_begin(ic, fetch_fast_next);
 #else  /* !_TME_M68K_EXECUTE_FAST */
     linear_pc = ic->tme_m68k_ireg_pc;
@@ -891,7 +900,7 @@ do { \
        entry, but we didn't make any callouts at all (for TLB fills,
        slow bus cycles, etc.) where we would have noticed this
        earlier: */
-    if (tme_bus_tlb_is_invalid(&tlb->tme_m68k_tlb_bus_tlb)) {
+    if (tme_m68k_tlb_is_invalid(tlb)) {
       tme_m68k_redispatch(ic);
     }
 #endif /* _TME_M68K_EXECUTE_FAST */

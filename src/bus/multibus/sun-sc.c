@@ -1,4 +1,4 @@
-/* $Id: sun-sc.c,v 1.7 2006/09/30 12:43:31 fredette Exp $ */
+/* $Id: sun-sc.c,v 1.8 2010/06/05 14:12:53 fredette Exp $ */
 
 /* bus/multibus/sun-sc.c - implementation of Sun `sc' SCSI Multibus board emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun-sc.c,v 1.7 2006/09/30 12:43:31 fredette Exp $");
+_TME_RCSID("$Id: sun-sc.c,v 1.8 2010/06/05 14:12:53 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -166,8 +166,8 @@ struct tme_sun_sc {
   int tme_sun_sc_cycle_tail;
 
   /* our DMA TLB set: */
-  struct tme_bus_tlb * tme_shared tme_sun_sc_dma_tlb;
-  tme_rwlock_t tme_sun_sc_dma_tlb_rwlock;
+  struct tme_bus_tlb tme_sun_sc_dma_tlb;
+  int tme_sun_sc_dma_tlb_added;
 
   /* the internal DMA buffer: */
   tme_uint8_t tme_sun_sc_int_dma[2];
@@ -340,7 +340,7 @@ static int
 _tme_sun_sc_bus_cycle_dma(struct tme_sun_sc *sun_sc,
 			  struct tme_bus_tlb *tlb,
 			  tme_uint8_t cycle_type,
-			  tme_bus_addr_t address,
+			  tme_bus_addr32_t address,
 			  int word_mode)
 {
   struct tme_bus_cycle cycle_init;
@@ -407,10 +407,10 @@ _tme_sun_sc_callout(struct tme_sun_sc *sun_sc, int new_callouts)
   int old_tail;
   struct tme_sun_sc_cycle *sun_sc_cycle;
   int callouts, later_callouts;
-  tme_bus_addr_t address;
+  tme_bus_addr32_t address;
   tme_uint16_t resid;
   tme_uint8_t cycle_type;
-  tme_bus_addr_t avail;
+  tme_bus_addr32_t avail;
   tme_uint8_t *emulator_off;
   tme_uint16_t icr;
   int rc;
@@ -551,14 +551,10 @@ _tme_sun_sc_callout(struct tme_sun_sc *sun_sc, int new_callouts)
 		  : sizeof(tme_uint8_t)));
 
       /* get the TLB entry: */
-      tlb
-	= tme_memory_atomic_pointer_read(struct tme_bus_tlb *,
-					 sun_sc->tme_sun_sc_dma_tlb,
-					 &sun_sc->tme_sun_sc_dma_tlb_rwlock);
+      tlb = &sun_sc->tme_sun_sc_dma_tlb;
       
-      /* reserve this TLB entry: */
-      tlb_local.tme_bus_tlb_global = tlb;
-      tlb = &tlb_local;
+      /* pass this TLB's token: */
+      tlb_local.tme_bus_tlb_token = tlb->tme_bus_tlb_token;
 
       /* unlock the mutex: */
       tme_mutex_unlock(&sun_sc->tme_sun_sc_mutex);
@@ -567,7 +563,7 @@ _tme_sun_sc_callout(struct tme_sun_sc *sun_sc, int new_callouts)
       rc = (conn_bus != NULL
 	    ? ((*conn_bus->tme_bus_tlb_fill)
 	       (conn_bus,
-		tlb,
+		&tlb_local,
 		address,
 		cycle_type))
 	    : TME_OK);
@@ -586,7 +582,7 @@ _tme_sun_sc_callout(struct tme_sun_sc *sun_sc, int new_callouts)
       else {
 
 	/* store the TLB entry: */
-	tme_bus_tlb_back(tlb);
+	*tlb = tlb_local;
 
 	/* get the number of bytes available in this TLB entry: */
 	avail
@@ -1148,13 +1144,18 @@ _tme_sun_sc_bus_cycle_other(void *_sun_sc,
 static int
 _tme_sun_sc_tlb_fill(void *_sun_sc, 
 		     struct tme_bus_tlb *tlb, 
-		     tme_bus_addr_t address,
+		     tme_bus_addr_t address_wider,
 		     unsigned int cycles)
 {
   struct tme_sun_sc *sun_sc;
+  tme_bus_addr32_t address;
 
   /* recover our data structure: */
   sun_sc = (struct tme_sun_sc *) _sun_sc;
+
+  /* get the normal-width address: */
+  address = address_wider;
+  assert (address == address_wider);
 
   /* the address must be within range: */
   assert(address < TME_SUN_SC_SIZ_CARD);
@@ -1350,10 +1351,7 @@ do {						\
 	      - sun_sc_cycle->tme_sun_sc_cycle_dma.tme_scsi_dma_out));
       
       /* get the TLB entry: */
-      tlb
-	= tme_memory_atomic_pointer_read(struct tme_bus_tlb *,
-					 sun_sc->tme_sun_sc_dma_tlb,
-					 &sun_sc->tme_sun_sc_dma_tlb_rwlock);
+      tlb = &sun_sc->tme_sun_sc_dma_tlb;
       
       /* get the DMA address: */
       address
@@ -1481,9 +1479,7 @@ _tme_sun_sc_connection_make_bus(struct tme_connection *conn,
      set yet, allocate it: */
   if (rc == TME_OK
       && state == TME_CONNECTION_FULL
-      && tme_memory_atomic_pointer_read(struct tme_bus_tlb *,
-					sun_sc->tme_sun_sc_dma_tlb,
-					&sun_sc->tme_sun_sc_dma_tlb_rwlock) == NULL) {
+      && !sun_sc->tme_sun_sc_dma_tlb_added) {
 
     /* get our bus connection: */
     conn_bus = tme_memory_atomic_pointer_read(struct tme_bus_connection *,
@@ -1491,13 +1487,11 @@ _tme_sun_sc_connection_make_bus(struct tme_connection *conn,
 					      &sun_sc->tme_sun_sc_device.tme_bus_device_connection_rwlock);
 
     /* allocate the TLB set: */
-    rc = ((*conn_bus->tme_bus_tlb_set_allocate)
-	  (conn_bus,
-	   1, 
-	   sizeof(struct tme_bus_tlb),
-	   &sun_sc->tme_sun_sc_dma_tlb,
-	   &sun_sc->tme_sun_sc_dma_tlb_rwlock));
+    rc = tme_bus_device_tlb_set_add(&sun_sc->tme_sun_sc_device,
+				    1, 
+				    &sun_sc->tme_sun_sc_dma_tlb);
     assert (rc == TME_OK);
+    sun_sc->tme_sun_sc_dma_tlb_added = TRUE;
   }
 
   return (rc);

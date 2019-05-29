@@ -1,4 +1,4 @@
-/* $Id: isil7170.h,v 1.1 2004/08/19 11:47:00 fredette Exp $ */
+/* $Id: isil7170.h,v 1.2 2009/08/29 21:22:47 fredette Exp $ */
 
 /* tme/ic/isil7170.h - public header file for Intersil 7170 emulation */
 
@@ -37,7 +37,7 @@
 #define _TME_IC_ISIL7170_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: isil7170.h,v 1.1 2004/08/19 11:47:00 fredette Exp $");
+_TME_RCSID("$Id: isil7170.h,v 1.2 2009/08/29 21:22:47 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -59,7 +59,7 @@ struct tme_isil7170_socket {
   unsigned int tme_isil7170_socket_version;
 
   /* the address increment: */
-  tme_bus_addr_t tme_isil7170_socket_addr_shift;
+  tme_bus_addr32_t tme_isil7170_socket_addr_shift;
 
   /* the system bus byte lane the chip is wired to: */
   unsigned int tme_isil7170_socket_port_least_lane;

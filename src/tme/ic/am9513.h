@@ -1,4 +1,4 @@
-/* $Id: am9513.h,v 1.3 2003/05/16 21:48:15 fredette Exp $ */
+/* $Id: am9513.h,v 1.4 2009/08/29 21:22:47 fredette Exp $ */
 
 /* tme/ic/am9513.h - public header file for Am9513 emulation */
 
@@ -37,7 +37,7 @@
 #define _TME_IC_AM9513_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: am9513.h,v 1.3 2003/05/16 21:48:15 fredette Exp $");
+_TME_RCSID("$Id: am9513.h,v 1.4 2009/08/29 21:22:47 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -53,10 +53,10 @@ struct tme_am9513_socket {
   unsigned int tme_am9513_socket_version;
 
   /* the bus address of the command register: */
-  tme_bus_addr_t tme_am9513_socket_address_cmd;
+  tme_bus_addr32_t tme_am9513_socket_address_cmd;
 
   /* the bus address of the data register: */
-  tme_bus_addr_t tme_am9513_socket_address_data;
+  tme_bus_addr32_t tme_am9513_socket_address_data;
 
   /* the system bus byte lane the chip is wired to: */
   unsigned int tme_am9513_socket_port_least_lane;

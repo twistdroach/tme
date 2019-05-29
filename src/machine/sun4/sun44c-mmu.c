@@ -1,4 +1,4 @@
-/* $Id: sun44c-mmu.c,v 1.3 2007/09/06 23:25:20 fredette Exp $ */
+/* $Id: sun44c-mmu.c,v 1.4 2009/08/30 14:05:10 fredette Exp $ */
 
 /* machine/sun4/sun44c-mmu.c - implementation of Sun 4/4c MMU emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun44c-mmu.c,v 1.3 2007/09/06 23:25:20 fredette Exp $");
+_TME_RCSID("$Id: sun44c-mmu.c,v 1.4 2009/08/30 14:05:10 fredette Exp $");
 
 /* includes: */
 #include "sun4-impl.h"
@@ -78,6 +78,9 @@ _TME_RCSID("$Id: sun44c-mmu.c,v 1.3 2007/09/06 23:25:20 fredette Exp $");
 #define TME_SUN4C_ASYNC_ERR_PROTERR	TME_BIT(6)	/* MMU protection error */
 #define TME_SUN4C_ASYNC_ERR_INVALID	TME_BIT(7)	/* MMU page invalid error (not 4/60?) */
 #define TME_SUN4C_ASYNC_ERR_SIZE_MASK	(0x0300)	/* log2 of access size */
+
+/* the real maximum number of contexts a sun4/4c MMU can have: */
+#define TME_SUN44C_CONTEXT_COUNT_MAX	(16)
 
 /* common bus error bits: */
 #define TME_SUN44C_BUSERR_COMMON_INVALID	TME_BIT(0)
@@ -477,7 +480,6 @@ _tme_sun44c_tlb_fill_mmu(const struct tme_bus_connection *conn_bus_init,
   tme_uint32_t asi_mask_si;
   unsigned short access;
   struct tme_bus_tlb tlb_bus;
-  unsigned int tlb_i;
   unsigned short tlb_flags;
 
   /* recover our sun4: */
@@ -521,7 +523,7 @@ _tme_sun44c_tlb_fill_mmu(const struct tme_bus_connection *conn_bus_init,
       }
 	
       /* create the mapping TLB entry: */
-      tlb_bus.tme_bus_tlb_addr_first = address & (((tme_bus_addr_t) 0) - TME_SUN44C_PROM_SIZE);
+      tlb_bus.tme_bus_tlb_addr_first = address & (((tme_bus_addr32_t) 0) - TME_SUN44C_PROM_SIZE);
       tlb_bus.tme_bus_tlb_addr_last = address | (TME_SUN44C_PROM_SIZE - 1);
       tlb_bus.tme_bus_tlb_cycles_ok
 	= TME_BUS_CYCLE_READ;
@@ -538,24 +540,6 @@ _tme_sun44c_tlb_fill_mmu(const struct tme_bus_connection *conn_bus_init,
 
     /* this should be the supervisor data ASI only: */
     assert (asi_mask == TME_SPARC32_ASI_MASK_SD);
-
-    /* update the head pointer for the active boot state TLB entry
-       list: */
-    tlb_i = sun4->tme_sun44c_boot_state_tlb_next
-      = ((sun4->tme_sun44c_boot_state_tlb_next
-	  + 1)
-	 % TME_SUN44C_BOOT_STATE_TLBS);
-
-    /* if the new head pointer already has a TLB entry, and it doesn't
-       happen to be the same as this TLB entry, invalidate it: */
-    if (sun4->tme_sun44c_boot_state_tlbs[tlb_i] != NULL
-	&& (sun4->tme_sun44c_boot_state_tlbs[tlb_i]
-	    != tlb->tme_bus_tlb_global)) {
-      tme_bus_tlb_invalidate(sun4->tme_sun44c_boot_state_tlbs[tlb_i]);
-    }
-
-    /* add this TLB entry to the active list: */
-    sun4->tme_sun44c_boot_state_tlbs[tlb_i] = tlb->tme_bus_tlb_global;
 
     /* if this TLB entry ends up good for the supervisor, it's not
        good for the supervisor instruction ASI: */
@@ -603,12 +587,17 @@ int
 _tme_sun44c_tlb_fill_sparc(struct tme_sparc_bus_connection *conn_sparc,
 			   struct tme_sparc_tlb *tlb_sparc,
 			   tme_uint32_t asi_mask,
-			   tme_bus_addr_t address,
+			   tme_bus_addr_t address_wider,
 			   unsigned int cycles)
 {
+  tme_uint32_t address;
   struct tme_sun4 *sun4;
   struct tme_bus_tlb *tlb;
   struct tme_bus_tlb tlb_bus;
+ 
+  /* get the normal-width address: */
+  address = address_wider;
+  assert (address == address_wider);
 
   /* recover our sun4: */
   sun4 = (struct tme_sun4 *) conn_sparc->tme_sparc_bus_connection.tme_bus_connection.tme_connection_element->tme_element_private;
@@ -650,7 +639,7 @@ _tme_sun44c_tlb_fill_sparc(struct tme_sparc_bus_connection *conn_sparc,
   }
 
   /* if this is for control space: */
-  if (__tme_predict_false(asi_mask == TME_SPARC_ASI_MASK(TME_SUN4_32_ASI_CONTROL))) {
+  if (__tme_predict_false(asi_mask == TME_SPARC_ASI_MASK_SPECIAL(TME_SUN4_32_ASI_CONTROL, TRUE))) {
 
     /* if this address is before the UART bypass: */
     if (__tme_predict_true(address < TME_SUN44C_CONTROL_UART_BYPASS)) {
@@ -689,15 +678,20 @@ _tme_sun44c_tlb_fill_sparc(struct tme_sparc_bus_connection *conn_sparc,
 int
 _tme_sun44c_tlb_fill_bus(struct tme_bus_connection *conn_bus_init,
 			 struct tme_bus_tlb *tlb,
-			 tme_uint32_t address,
+			 tme_bus_addr_t address_wider,
 			 unsigned int cycles)
 {
+  tme_uint32_t address;
   struct tme_sun4 *sun4;
   struct tme_sun4_bus_connection *conn_sun4;
   tme_uint32_t base, mask;
   tme_uint32_t asi_mask;
   struct tme_bus_tlb tlb_bus;
   unsigned int tlb_i;
+
+  /* get the normal-width address: */
+  address = address_wider;
+  assert (address == address_wider);
 
   /* recover our sun4: */
   sun4 = (struct tme_sun4 *) conn_bus_init->tme_bus_connection.tme_connection_element->tme_element_private;
@@ -778,14 +772,14 @@ _tme_sun44c_tlb_fill_bus(struct tme_bus_connection *conn_bus_init,
 
   /* if the new head pointer already has a TLB entry, and it doesn't
      happen to be the same as this TLB entry, invalidate it: */
-  if (sun4->tme_sun44c_sdvma_tlbs[tlb_i] != NULL
-      && (sun4->tme_sun44c_sdvma_tlbs[tlb_i]
-	  != tlb->tme_bus_tlb_global)) {
-    tme_bus_tlb_invalidate(sun4->tme_sun44c_sdvma_tlbs[tlb_i]);
+  if (sun4->tme_sun44c_sdvma_tlb_tokens[tlb_i] != NULL
+      && (sun4->tme_sun44c_sdvma_tlb_tokens[tlb_i]
+	  != tlb->tme_bus_tlb_token)) {
+    tme_token_invalidate(sun4->tme_sun44c_sdvma_tlb_tokens[tlb_i]);
   }
 
   /* add this TLB entry to the active list: */
-  sun4->tme_sun44c_sdvma_tlbs[tlb_i] = tlb->tme_bus_tlb_global;
+  sun4->tme_sun44c_sdvma_tlb_tokens[tlb_i] = tlb->tme_bus_tlb_token;
 
   /* if system DVMA is disabled: */
   if (__tme_predict_false(!(sun4->tme_sun44c_enable & TME_SUN44C_ENA_SDVMA))) {
@@ -815,6 +809,9 @@ _tme_sun44c_tlb_fill_bus(struct tme_bus_connection *conn_bus_init,
 			     &asi_mask,
 			     address,
 			     cycles);
+
+  /* this bus TLB entry depends on the current context: */
+  tme_sun_mmu_context_add(sun4->tme_sun44c_mmu, tlb);
 
   /* create the mapping TLB entry.  we do this even if base == 0,
      because the TLB entry as currently filled may cover more address
@@ -981,7 +978,7 @@ _tme_sun44c_mmu_pte_set(struct tme_sun4 *sun4, tme_uint32_t address, tme_uint32_
   unsigned int pte_flags;
 #ifndef TME_NO_LOG
   const char *bus_name;
-  tme_bus_addr_t physical_address;
+  tme_bus_addr32_t physical_address;
       
   /* this silences gcc -Wuninitialized: */
   bus_name = NULL;
@@ -1068,9 +1065,9 @@ _tme_sun44c_mmu_sdvma_change(struct tme_sun4 *sun4)
   /* whenever the SDVMA bit changes, we have to invalidate all SDVMA
      TLB entries: */
   for (tlb_i = 0; tlb_i < TME_SUN44C_SDVMA_TLBS; tlb_i++) {
-    if (sun4->tme_sun44c_sdvma_tlbs[tlb_i] != NULL) {
-      tme_bus_tlb_invalidate(sun4->tme_sun44c_sdvma_tlbs[tlb_i]);
-      sun4->tme_sun44c_sdvma_tlbs[tlb_i] = NULL;
+    if (sun4->tme_sun44c_sdvma_tlb_tokens[tlb_i] != NULL) {
+      tme_token_invalidate(sun4->tme_sun44c_sdvma_tlb_tokens[tlb_i]);
+      sun4->tme_sun44c_sdvma_tlb_tokens[tlb_i] = NULL;
     }
   }
 }
@@ -1079,26 +1076,17 @@ _tme_sun44c_mmu_sdvma_change(struct tme_sun4 *sun4)
 void
 _tme_sun44c_mmu_context_set(struct tme_sun4 *sun4)
 {
-  unsigned int tlb_i;
+  tme_bus_context_t context_base;
 
-  /* every TLB set has an extra context's worth of TLB entries.
-     context zero is used for the "boot state", and the remaining
-     contexts correspond to the normal MMU contexts.
-
-     context zero is used for the boot state because at TLB set
-     allocation time, TLB sets are initialized pointing to the context
-     zero TLBs (by tme_sun_mmu_tlb_set_allocate), and TLBs must be
-     initialized to the boot state TLBs.
-
+  /* there are up to (TME_SUN44C_CONTEXT_COUNT_MAX * 2) total
+     contexts.  contexts zero through an implementation's last context
+     number are the not-boot (normal) contexts.  the same number of
+     contexts starting at TME_SUN44C_CONTEXT_COUNT_MAX are the same
+     contexts, but in the boot state.
+     
      in the boot state, TLB fills for supervisor program references
      bypass the MMU and are filled to reference the PROM, and data
-     fills are filled as normal using the current context.  since context
-     register changes can happen while in the boot state, but we only
-     have one boot state context in the TLB sets, we have to track 
-     the data TLBs we fill in the boot state.
-
-     we don't bother to track the supervisor program TLB fills, since
-     they never change.  */
+     fills are filled as normal using the current context: */
 
   /* in the not-boot (i.e., normal, state): */
   if (__tme_predict_true(sun4->tme_sun44c_enable & TME_SUN44C_ENA_NOTBOOT)) {
@@ -1108,8 +1096,8 @@ _tme_sun44c_mmu_context_set(struct tme_sun4 *sun4)
 	     _("context now #%d"),
 	     sun4->tme_sun44c_context));
 
-    /* update all TLB sets to reflect the context change: */
-    tme_sun_mmu_tlbs_context_set(sun4->tme_sun44c_mmu, sun4->tme_sun44c_context + 1);
+    /* the normal state contexts are numbered from zero: */
+    context_base = 0;
   }
 
   /* in the boot state: */
@@ -1120,25 +1108,25 @@ _tme_sun44c_mmu_context_set(struct tme_sun4 *sun4)
 	     _("context now #%d (boot state)"),
 	     sun4->tme_sun44c_context));
 
-    /* update all TLB sets to reflect the pseudo-context change: */
-    tme_sun_mmu_tlbs_context_set(sun4->tme_sun44c_mmu, 0);
-
-    /* invalidate all of the boot-state data TLBs: */
-    for (tlb_i = 0; tlb_i < TME_SUN44C_BOOT_STATE_TLBS; tlb_i++) {
-      if (sun4->tme_sun44c_boot_state_tlbs[tlb_i] != NULL) {
-	tme_bus_tlb_invalidate(sun4->tme_sun44c_boot_state_tlbs[tlb_i]);
-	sun4->tme_sun44c_boot_state_tlbs[tlb_i] = NULL;
-      }
-    }
+    /* the boot state contexts are numbered from
+       TME_SUN44C_CONTEXT_COUNT_MAX: */
+    context_base = TME_SUN44C_CONTEXT_COUNT_MAX;
   }
+
+  /* update the sparc bus context register: */
+  *sun4->tme_sun44c_sparc_bus_context
+    = (context_base
+       + sun4->tme_sun44c_context);
+
+  /* invalidate all DVMA TLBs that depended on the previous context: */
+  tme_sun_mmu_context_switched(sun4->tme_sun44c_mmu);
 }
 
-/* this allocates a new TLB set: */
+
+/* this adds a new TLB set: */
 int
-_tme_sun44c_mmu_tlb_set_allocate(struct tme_bus_connection *conn_bus_asker,
-				 unsigned int count, unsigned int sizeof_one, 
-				 struct tme_bus_tlb * tme_shared * _tlbs,
-				 tme_rwlock_t *_tlbs_rwlock)
+_tme_sun44c_mmu_tlb_set_add(struct tme_bus_connection *conn_bus_asker,
+			    struct tme_bus_tlb_set_info *tlb_set_info)
 {
   struct tme_sun4 *sun4;
   int rc;
@@ -1146,8 +1134,30 @@ _tme_sun44c_mmu_tlb_set_allocate(struct tme_bus_connection *conn_bus_asker,
   /* recover our sun4: */
   sun4 = (struct tme_sun4 *) conn_bus_asker->tme_bus_connection.tme_connection_element->tme_element_private;
 
-  /* get the MMU to allocate the TLB set: */
-  rc = tme_sun_mmu_tlb_set_allocate(sun4->tme_sun44c_mmu, count, sizeof_one, _tlbs, _tlbs_rwlock);
+  /* add the TLB set to the MMU: */
+  rc = tme_sun_mmu_tlb_set_add(sun4->tme_sun44c_mmu,
+			       tlb_set_info);
+  assert (rc == TME_OK);
+
+  /* if this is the TLB set from the sparc: */
+  if (conn_bus_asker->tme_bus_connection.tme_connection_type == TME_CONNECTION_BUS_SPARC) {
+
+    /* the sparc must be a v7, which must expose a bus context register: */
+    assert (tlb_set_info->tme_bus_tlb_set_info_bus_context != NULL);
+
+    /* save the pointer to the sparc bus context register, and
+       initialize it: */
+    sun4->tme_sun44c_sparc_bus_context
+      = tlb_set_info->tme_bus_tlb_set_info_bus_context;
+    _tme_sun44c_mmu_context_set(sun4);
+
+    /* return the maximum context number.  there are up to
+       (TME_SUN44C_CONTEXT_COUNT_MAX * 2) contexts, as discussed
+       above: */
+    tlb_set_info->tme_bus_tlb_set_info_bus_context_max
+      = ((TME_SUN44C_CONTEXT_COUNT_MAX * 2)
+	 - 1);
+  }
 
   return (rc);
 }
@@ -1180,7 +1190,6 @@ _tme_sun44c_mmu_new(struct tme_sun4 *sun4)
   else {
     abort();
   }
-  mmu_info.tme_sun_mmu_info_contexts++; /* internal context zero is for the boot state */
   mmu_info.tme_sun_mmu_info_tlb_fill_private = sun4;
   mmu_info.tme_sun_mmu_info_tlb_fill = _tme_sun44c_tlb_fill_pte;
   mmu_info.tme_sun_mmu_info_proterr_private = &sun4->tme_sun4_dummy_connection_sparc;

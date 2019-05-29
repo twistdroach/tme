@@ -1,4 +1,4 @@
-/* $Id: scsi-device.c,v 1.7 2007/01/19 00:42:06 fredette Exp $ */
+/* $Id: scsi-device.c,v 1.8 2009/11/08 17:17:42 fredette Exp $ */
 
 /* scsi/scsi-device.c - implementation of generic SCSI device support: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: scsi-device.c,v 1.7 2007/01/19 00:42:06 fredette Exp $");
+_TME_RCSID("$Id: scsi-device.c,v 1.8 2009/11/08 17:17:42 fredette Exp $");
 
 /* includes: */
 #include <tme/scsi/scsi-device.h>
@@ -290,6 +290,9 @@ _tme_scsi_device_cycle(struct tme_scsi_connection *conn_scsi,
   int new_callouts;
   tme_scsi_control_t control_old;
   unsigned long count;
+  void (*do_cdb) _TME_P((struct tme_scsi_device *,
+			 tme_scsi_control_t,
+			 tme_scsi_control_t));
 
   /* recover our device: */
   scsi_device = conn_scsi->tme_scsi_connection.tme_connection_element->tme_element_private;
@@ -518,10 +521,19 @@ _tme_scsi_device_cycle(struct tme_scsi_connection *conn_scsi,
 	  if (((*scsi_device->tme_scsi_device_address_lun)
 	       (scsi_device))
 	      == TME_OK) {
+
+	    /* if this command is illegal: */
+	    do_cdb
+	      = (scsi_device->tme_scsi_device_do_cdb
+		 [scsi_device->tme_scsi_device_cdb[0]]);
+	    if (__tme_predict_false(do_cdb == NULL)) {
+
+	      /* use the illegal command handler: */
+	      do_cdb = tme_scsi_device_cdb_illegal;
+	    }
 	    
 	    /* call out for the CDB: */
-	    (*scsi_device->tme_scsi_device_do_cdb
-	     [scsi_device->tme_scsi_device_cdb[0]])
+	    (*do_cdb)
 	      (scsi_device,
 	       control_old,
 	       control_new);

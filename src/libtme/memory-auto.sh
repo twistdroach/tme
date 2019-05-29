@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# $Id: memory-auto.sh,v 1.1 2006/09/30 12:43:37 fredette Exp $
+# $Id: memory-auto.sh,v 1.2 2010/02/15 15:16:28 fredette Exp $
 
 # libtme/memory-auto.sh - automatically generates C code for
 # memory support:
@@ -91,7 +91,7 @@ EOF
 fi
 cat <<EOF
 
-_TME_RCSID("\$Id: memory-auto.sh,v 1.1 2006/09/30 12:43:37 fredette Exp $");
+_TME_RCSID("\$Id: memory-auto.sh,v 1.2 2010/02/15 15:16:28 fredette Exp $");
 EOF
 if $header; then
     cat <<EOF
@@ -115,7 +115,8 @@ if $header; then
     *((type_part *)							\\
       (_tme_cast_pointer(tme_uint8_t *, type_whole *, mem)		\\
        + (offset)))							\\
-      = (((type_whole) (x))						\\
+      = (type_part)							\\
+        (((type_whole) (x))						\\
 	 >> (8 * (TME_ENDIAN_NATIVE == TME_ENDIAN_BIG			\\
 		  ? (sizeof(type_whole)					\\
 		     - ((offset) + sizeof(type_part)))			\\
@@ -541,7 +542,7 @@ for op in read write; do
 	if test `expr ${host_boundary} \>= ${size_ifdef}` = 1; then
 	    echo "#ifdef TME_HAVE_INT${host_boundary}_T"
 	fi
-	echo "  ${op_const}tme_shared tme_uint${host_boundary}_t *parts${host_boundary};"
+	echo "  ${op_const_mem}tme_shared tme_uint${host_boundary}_t *parts${host_boundary};"
 	echo "  tme_uint${host_boundary}_t part${host_boundary}_buffer;"
 	echo "  tme_uint${host_boundary}_t part${host_boundary};"
 	echo "  tme_uint${host_boundary}_t part${host_boundary}_next;"
@@ -606,7 +607,7 @@ for op in read write; do
 
 	echo ""
 	echo "    /* make a ${host_boundary}-bit pointer to the memory: */"
-	echo "    parts${host_boundary} = (${op_const}tme_shared tme_uint${host_boundary}_t *) mem;"
+	echo "    parts${host_boundary} = (${op_const_mem}tme_shared tme_uint${host_boundary}_t *) mem;"
 	echo ""
 	echo "    /* if this pointer is not ${host_boundary}-bit aligned: */"
 	echo "    if (__tme_predict_false((((unsigned long) parts${host_boundary}) % sizeof(tme_uint${host_boundary}_t)) != 0)) {"
@@ -615,7 +616,7 @@ for op in read write; do
 	echo "      count_misaligned = ((unsigned long) parts${host_boundary}) % sizeof(tme_uint${host_boundary}_t);"
 	echo ""
 	echo "      /* truncate this pointer to the previous ${host_boundary}-bit boundary: */"
-	echo "      parts${host_boundary} = (${op_const}tme_shared tme_uint${host_boundary}_t *) (((unsigned long) parts${host_boundary}) & (((unsigned long) 0) - sizeof(tme_uint${host_boundary}_t)));"
+	echo "      parts${host_boundary} = (${op_const_mem}tme_shared tme_uint${host_boundary}_t *) (((unsigned long) parts${host_boundary}) & (((unsigned long) 0) - sizeof(tme_uint${host_boundary}_t)));"
 	echo ""
 	echo "      /* get the number of bytes to ${op} in the first ${host_boundary}-bit memory part: */"
 	echo "      count_done = sizeof(tme_uint${host_boundary}_t) - count_misaligned;"
@@ -1052,13 +1053,27 @@ for size in ${sizes}; do
 		;;
 
 	    atomic)
-		echo "${op_indent0}/* if we aren't locking for all memory accesses, and we can \\"
-		echo "${op_indent0}   make direct ${size}-bit accesses, and this memory is aligned \\"
-		echo "${op_indent0}   enough to make a single direct atomic access, do the single \\"
-		echo "${op_indent0}   direct atomic ${op}: */ \\"
-		echo "${op_indent0}(__tme_predict_true(TME_MEMORY_ALIGNMENT_ATOMIC(TME_MEMORY_TYPE_COMMON) != 0 \\"
-		echo "${op_indent0}                    && TME_MEMORY_ALIGNMENT_ATOMIC(tme_uint${size}_t) != 0 \\"
-		echo "${op_indent0}                    && _tme_memory_address_test(mem, TME_MEMORY_ALIGNMENT_ATOMIC(tme_uint${size}_t) - 1, align_min) == 0)) \\"
+		echo "${op_indent0}/* if threads are cooperative, do a plain ${op}: */ \\"
+		echo "${op_indent0}(TME_THREADS_COOPERATIVE) \\"
+		echo "${op_then}"
+		echo -n "${op_indent2}tme_memory_${op}${size}("
+		# this strips off the tme_shared qualifier:
+		#
+		if test ${op} = read; then
+		    echo -n "(_tme_const tme_uint${size}_t *) _tme_audit_type(mem, tme_uint${size}_t *)"
+		else
+		    echo -n "(tme_uint${size}_t *) _tme_cast_pointer_shared(tme_uint${size}_t *, tme_uint${size}_t *, mem)"
+		fi
+		echo "${op_x}, align_min)${op_semi} \\"
+
+		echo "${op_indent1}/* otherwise, if we aren't locking for all memory accesses, and we can \\"
+		echo "${op_indent1}   make direct ${size}-bit accesses, and this memory is aligned \\"
+		echo "${op_indent1}   enough to make a single direct atomic access, do the single \\"
+		echo "${op_indent1}   direct atomic ${op}: */ \\"
+		echo "${op_else_if}" | tr '@' '\n'
+		echo "${op_indent1}(__tme_predict_true(TME_MEMORY_ALIGNMENT_ATOMIC(TME_MEMORY_TYPE_COMMON) != 0 \\"
+		echo "${op_indent1}                    && TME_MEMORY_ALIGNMENT_ATOMIC(tme_uint${size}_t) != 0 \\"
+		echo "${op_indent1}                    && _tme_memory_address_test(mem, TME_MEMORY_ALIGNMENT_ATOMIC(tme_uint${size}_t) - 1, align_min) == 0)) \\"
 		echo "${op_then}"
 		echo "${op_indent2}(*_tme_audit_type(mem, tme_uint${size}_t *)) \\"
 		if test ${op} = write; then

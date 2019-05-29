@@ -1,4 +1,4 @@
-/* $Id: 3c400.c,v 1.9 2006/09/30 12:43:31 fredette Exp $ */
+/* $Id: 3c400.c,v 1.11 2010/06/05 13:49:56 fredette Exp $ */
 
 /* bus/multibus/3c400.c - implementation of the Multibus 3c400 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: 3c400.c,v 1.9 2006/09/30 12:43:31 fredette Exp $");
+_TME_RCSID("$Id: 3c400.c,v 1.11 2010/06/05 13:49:56 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -95,9 +95,13 @@ _TME_RCSID("$Id: 3c400.c,v 1.9 2006/09/30 12:43:31 fredette Exp $");
 
 /* these get and put the CSR: */
 #define TME_3C400_CSR_GET(_3c400)	\
-  tme_betoh_u16(*((tme_uint16_t *) &(_3c400)->tme_3c400_card[TME_3C400_REG_CSR]))
+  ((((tme_uint16_t) (_3c400)->tme_3c400_card[TME_3C400_REG_CSR + 0]) << 8)	\
+   + (_3c400)->tme_3c400_card[TME_3C400_REG_CSR + 1])
 #define TME_3C400_CSR_PUT(_3c400, csr)	\
-  (*((tme_uint16_t *) &(_3c400)->tme_3c400_card[TME_3C400_REG_CSR]) = tme_htobe_u16(csr))
+  do {										\
+    (_3c400)->tme_3c400_card[TME_3C400_REG_CSR + 0] = (csr) >> 8;		\
+    (_3c400)->tme_3c400_card[TME_3C400_REG_CSR + 1] = (tme_uint8_t) (csr);	\
+  } while (/* CONSTCOND */ 0)
 
 /* the callout flags: */
 #define TME_3C400_CALLOUT_CHECK		(0)
@@ -680,12 +684,17 @@ _tme_3c400_read(struct tme_ethernet_connection *conn_eth,
 /* the _3c400 TLB filler: */
 static int
 _tme_3c400_tlb_fill(void *__3c400, struct tme_bus_tlb *tlb, 
-		    tme_bus_addr_t address, unsigned int cycles)
+		    tme_bus_addr_t address_wider, unsigned int cycles)
 {
   struct tme_3c400 *_3c400;
+  tme_bus_addr32_t address;
 
   /* recover our data structure: */
   _3c400 = (struct tme_3c400 *) __3c400;
+
+  /* get the normal-width address: */
+  address = address_wider;
+  assert (address == address_wider);
 
   /* the address must be within range: */
   assert(address < TME_3C400_SIZ_CARD);

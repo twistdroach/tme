@@ -10,21 +10,56 @@
 #define TME_SPARC_IREG_G5		(5)
 #define TME_SPARC_IREG_G6		(6)
 #define TME_SPARC_IREG_G7		(7)
-#define TME_SPARC_IREG_PC		(((TME_SPARC_WINDOWS_MAX * 16) + 8) + 8)
-#define TME_SPARC_IREG_PC_NEXT		(((TME_SPARC_WINDOWS_MAX * 16) + 8) + 9)
-#define TME_SPARC_IREG_PC_NEXT_NEXT		(((TME_SPARC_WINDOWS_MAX * 16) + 8) + 10)
-#define TME_SPARC_IREG_IMM		(((TME_SPARC_WINDOWS_MAX * 16) + 8) + 11)
-#define TME_SPARC_IREG_Y		(((TME_SPARC_WINDOWS_MAX * 16) + 8) + 14)
-#define TME_SPARC_IREG_FPX		(((TME_SPARC_WINDOWS_MAX * 16) + 8) + 16)
-#define tme_sparc32_ireg_psr		tme_sparc_ireg_uint32(((TME_SPARC_WINDOWS_MAX * 16) + 8) + 20)
-#define tme_sparc32_ireg_wim		tme_sparc_ireg_uint32(((TME_SPARC_WINDOWS_MAX * 16) + 8) + 21)
-#define tme_sparc32_ireg_tbr		tme_sparc_ireg_uint32(((TME_SPARC_WINDOWS_MAX * 16) + 8) + 22)
-#define tme_sparc64_ireg_tba		tme_sparc_ireg_uint64(((TME_SPARC_WINDOWS_MAX * 16) + 8) + 22)
-#define tme_sparc64_ireg_pstate		tme_sparc_ireg_uint32((((TME_SPARC_WINDOWS_MAX * 16) + 8) + 23) << 1)
-#define tme_sparc64_ireg_ccr		tme_sparc_ireg_uint8(((((TME_SPARC_WINDOWS_MAX * 16) + 8) + 24) << 3) + 0)
-#define tme_sparc64_ireg_asi		tme_sparc_ireg_uint8(((((TME_SPARC_WINDOWS_MAX * 16) + 8) + 24) << 3) + 1)
+#define TME_SPARC64_IREG_AG_G0	((TME_SPARC_WINDOWS_MAX * 16) + 8 + (8 * 0))
+#define TME_SPARC64_IREG_MG_G0	((TME_SPARC_WINDOWS_MAX * 16) + 8 + (8 * 1))
+#define TME_SPARC64_IREG_IG_G0	((TME_SPARC_WINDOWS_MAX * 16) + 8 + (8 * 2))
+#define TME_SPARC_IREG_PC		((TME_SPARC_WINDOWS_MAX * 16) + 32)
+#define TME_SPARC_IREG_PC_NEXT		((TME_SPARC_WINDOWS_MAX * 16) + 33)
+#define TME_SPARC_IREG_PC_NEXT_NEXT		((TME_SPARC_WINDOWS_MAX * 16) + 34)
+#define TME_SPARC_IREG_INSN		((TME_SPARC_WINDOWS_MAX * 16) + 35)
+#define TME_SPARC_IREG_TMP(x)		((TME_SPARC_WINDOWS_MAX * 16) + 36 + (x))
+#define TME_SPARC_IREG_Y		((TME_SPARC_WINDOWS_MAX * 16) + 39)
+#define TME_SPARC_IREG_FPX		((TME_SPARC_WINDOWS_MAX * 16) + 40)
+#define TME_SPARC32_IREG_PSR		((TME_SPARC_WINDOWS_MAX * 16) + 44)
+#define tme_sparc32_ireg_psr		tme_sparc_ireg_uint32(TME_SPARC32_IREG_PSR)
+#define tme_sparc64_ireg_pstate	tme_sparc_ireg_uint32(((TME_SPARC_WINDOWS_MAX * 16) + 44) << 1)
+#define tme_sparc32_ireg_wim		tme_sparc_ireg_uint32((TME_SPARC_WINDOWS_MAX * 16) + 45)
+#define tme_sparc64_ireg_winstates	tme_sparc_ireg_uint32((((TME_SPARC_WINDOWS_MAX * 16) + 45) << 1) + 0)
+#define TME_SPARC64_WINSTATES_CWP(x)		(((x) & 0x3f) << (8 * 0))
+#define tme_sparc64_ireg_cwp		tme_sparc_ireg_uint8((((TME_SPARC_WINDOWS_MAX * 16) + 45) << 3) + 0)
+#define TME_SPARC64_WINSTATES_CANRESTORE(x)	(((x) & 0x3f) << (8 * 1))
+#define tme_sparc64_ireg_canrestore	tme_sparc_ireg_uint8((((TME_SPARC_WINDOWS_MAX * 16) + 45) << 3) + 1)
+#define TME_SPARC64_WINSTATES_CANSAVE(x)	(((x) & 0x3f) << (8 * 2))
+#define tme_sparc64_ireg_cansave	tme_sparc_ireg_uint8((((TME_SPARC_WINDOWS_MAX * 16) + 45) << 3) + 2)
+#define TME_SPARC64_WINSTATES_OTHERWIN(x)	(((x) & 0x3f) << (8 * 3))
+#define tme_sparc64_ireg_otherwin	tme_sparc_ireg_uint8((((TME_SPARC_WINDOWS_MAX * 16) + 45) << 3) + 3)
+#define tme_sparc64_ireg_winstates_mask tme_sparc_ireg_uint32((((TME_SPARC_WINDOWS_MAX * 16) + 45) << 1) + 1)
+#define tme_sparc32_ireg_tbr		tme_sparc_ireg_uint32((TME_SPARC_WINDOWS_MAX * 16) + 46)
+#define tme_sparc64_ireg_tba		tme_sparc_ireg_uint64((TME_SPARC_WINDOWS_MAX * 16) + 46)
+#define tme_sparc64_ireg_tpc(tl)	tme_sparc_ireg_uint64((TME_SPARC_WINDOWS_MAX * 16) + (TME_SPARC_TL_MAX * 0) + 47 + ((tl) - 1))
+#define tme_sparc64_ireg_tnpc(tl)	tme_sparc_ireg_uint64((TME_SPARC_WINDOWS_MAX * 16) + (TME_SPARC_TL_MAX * 1) + 47 + ((tl) - 1))
+#define TME_SPARC64_IREG_TSTATE(tl)	((TME_SPARC_WINDOWS_MAX * 16) + (TME_SPARC_TL_MAX * 2) + 47 + ((tl) - 1))
+#define tme_sparc64_ireg_tstate(tl)	tme_sparc_ireg_uint64(TME_SPARC64_IREG_TSTATE(tl))
+#define tme_sparc64_ireg_tstate_ccr(tl) tme_sparc_ireg_uint8((TME_SPARC64_IREG_TSTATE(tl) << 3) + sizeof(tme_uint32_t))
+#if TME_SPARC_TL_MAX > 8
+#error "TME_SPARC_TL_MAX changed"
+#endif
+#define tme_sparc64_ireg_tt(tl)	tme_sparc_ireg_uint8((((TME_SPARC_WINDOWS_MAX * 16) + (TME_SPARC_TL_MAX * 3) + 47) << 3) + ((tl) - 1))
+#define tme_sparc64_ireg_tl		tme_sparc_ireg_uint8(((((TME_SPARC_WINDOWS_MAX * 16) + (TME_SPARC_TL_MAX * 3) + 1) + 47) << 3) + 0)
+#define tme_sparc64_ireg_pil		tme_sparc_ireg_uint8(((((TME_SPARC_WINDOWS_MAX * 16) + (TME_SPARC_TL_MAX * 3) + 1) + 47) << 3) + 1)
+#define tme_sparc64_ireg_asi		tme_sparc_ireg_uint8(((((TME_SPARC_WINDOWS_MAX * 16) + (TME_SPARC_TL_MAX * 3) + 1) + 47) << 3) + 2)
+#define tme_sparc64_ireg_fprs		tme_sparc_ireg_uint8(((((TME_SPARC_WINDOWS_MAX * 16) + (TME_SPARC_TL_MAX * 3) + 1) + 47) << 3) + 3)
+#define tme_sparc64_ireg_wstate	tme_sparc_ireg_uint8(((((TME_SPARC_WINDOWS_MAX * 16) + (TME_SPARC_TL_MAX * 3) + 1) + 47) << 3) + 4)
+#define tme_sparc64_ireg_cleanwin	tme_sparc_ireg_uint8(((((TME_SPARC_WINDOWS_MAX * 16) + (TME_SPARC_TL_MAX * 3) + 1) + 47) << 3) + 5)
+#define tme_sparc64_ireg_tick_npt	tme_sparc_ireg_uint8(((((TME_SPARC_WINDOWS_MAX * 16) + (TME_SPARC_TL_MAX * 3) + 1) + 47) << 3) + 6)
+#define tme_sparc64_ireg_tick_offset	tme_sparc_ireg_uint64(((TME_SPARC_WINDOWS_MAX * 16) + (TME_SPARC_TL_MAX * 3) + 1) + 48)
+#define tme_sparc64_ireg_ver		tme_sparc_ireg_uint64(((TME_SPARC_WINDOWS_MAX * 16) + (TME_SPARC_TL_MAX * 3) + 1) + 49)
+#define TME_SPARC64_IREG_CCR		(((TME_SPARC_WINDOWS_MAX * 16) + (TME_SPARC_TL_MAX * 3) + 1) + 50)
+#define tme_sparc64_ireg_ccr		tme_sparc_ireg_uint8(TME_SPARC64_IREG_CCR << 3)
+#define TME_SPARC64_IREG_RCC		(((TME_SPARC_WINDOWS_MAX * 16) + (TME_SPARC_TL_MAX * 3) + 1) + 51)
+#define tme_sparc64_ireg_va_hole_start tme_sparc_ireg_uint64(((TME_SPARC_WINDOWS_MAX * 16) + (TME_SPARC_TL_MAX * 3) + 1) + 52)
 /* automatically generated by sparc-insns-auto.sh, do not edit! */
-_TME_RCSID("$Id: sparc-insns-auto.sh,v 1.5 2007/03/29 01:16:09 fredette Exp $");
+_TME_RCSID("$Id: sparc-insns-auto.sh,v 1.10 2010/06/05 16:13:41 fredette Exp $");
 
 TME_SPARC_FORMAT3_DECL(tme_sparc32_add, tme_uint32_t);
 TME_SPARC_FORMAT3_DECL(tme_sparc32_addcc, tme_uint32_t);
@@ -88,6 +123,100 @@ TME_SPARC_FORMAT3_DECL(tme_sparc32_ldfsr, tme_uint32_t);
 TME_SPARC_FORMAT3_DECL(tme_sparc32_stf, tme_uint32_t);
 TME_SPARC_FORMAT3_DECL(tme_sparc32_stdf, tme_uint32_t);
 TME_SPARC_FORMAT3_DECL(tme_sparc32_stfsr, tme_uint32_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc32_fpop1, tme_uint32_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc32_fpop2, tme_uint32_t);
 TME_SPARC_FORMAT3_DECL(tme_sparc32_mulscc, tme_uint32_t);
-const tme_shared tme_uint8_t *tme_sparc32_load _TME_P((struct tme_sparc *, tme_uint32_t, unsigned int));
-tme_shared tme_uint8_t *tme_sparc32_store _TME_P((struct tme_sparc *, tme_uint32_t, const tme_uint32_t *, unsigned int));
+void tme_sparc32_atomic _TME_P((struct tme_sparc *, struct tme_sparc_ls *));
+void tme_sparc32_load _TME_P((struct tme_sparc *, struct tme_sparc_ls *));
+void tme_sparc32_store _TME_P((struct tme_sparc *, struct tme_sparc_ls *));
+tme_shared tme_uint8_t *tme_sparc32_ls _TME_P((struct tme_sparc *, tme_uint32_t, tme_uint32_t *, tme_uint32_t));
+
+#ifdef TME_HAVE_INT64_T
+TME_SPARC_FORMAT3_DECL(tme_sparc64_add, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_addcc, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_sub, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_subcc, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_or, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_orcc, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_orn, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_orncc, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_and, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_andcc, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_andn, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_andncc, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_xor, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_xorcc, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_xnor, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_xnorcc, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_addx, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_addxcc, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_subx, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_subxcc, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_taddcc, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_taddcctv, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_tsubcc, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_tsubcctv, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_umul, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_umulcc, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_smul, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_smulcc, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_udiv, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_udivcc, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_sdiv, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_sdivcc, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_sll, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_srl, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_sra, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_ldb, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_stb, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_ldh, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_sth, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_ld, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_st, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_ldd, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_std, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_ldstub, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_ldstuba, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_swap, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_swapa, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_ldba, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_stba, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_ldha, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_stha, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_lda, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_sta, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_ldda, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_stda, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_jmpl, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_ldf, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_lddf, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_ldfsr, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_stf, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_stdf, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_stfsr, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_fpop1, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_fpop2, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_mulscc, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_ldx, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_stx, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_ldqf, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_stqf, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_ldxa, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_stxa, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_ldfa, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_lddfa, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_stfa, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_stdfa, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_ldqfa, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_stqfa, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_casa, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_casxa, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_mulx, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_sdivx, tme_uint64_t);
+TME_SPARC_FORMAT3_DECL(tme_sparc64_udivx, tme_uint64_t);
+void tme_sparc64_atomic _TME_P((struct tme_sparc *, struct tme_sparc_ls *));
+void tme_sparc64_load _TME_P((struct tme_sparc *, struct tme_sparc_ls *));
+void tme_sparc64_store _TME_P((struct tme_sparc *, struct tme_sparc_ls *));
+tme_shared tme_uint8_t *tme_sparc64_ls _TME_P((struct tme_sparc *, tme_uint64_t, tme_uint64_t *, tme_uint32_t));
+
+#endif /* TME_HAVE_INT64_T */

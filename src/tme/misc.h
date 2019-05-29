@@ -1,4 +1,4 @@
-/* $Id: misc.h,v 1.2 2004/01/09 03:14:36 fredette Exp $ */
+/* $Id: misc.h,v 1.4 2009/11/08 17:25:47 fredette Exp $ */
 
 /* tme/misc.h - public header file for miscellaneous things: */
 
@@ -37,7 +37,16 @@
 #define _TME_MISC_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: misc.h,v 1.2 2004/01/09 03:14:36 fredette Exp $");
+_TME_RCSID("$Id: misc.h,v 1.4 2009/11/08 17:25:47 fredette Exp $");
+
+/* types: */
+
+/* a cycles scaling: */
+#ifdef _TME_HAVE_LONG_DOUBLE
+typedef long double tme_misc_cycles_scaling_t;
+#else  /* !_TME_HAVE_LONG_DOUBLE */
+typedef double tme_misc_cycles_scaling_t;
+#endif /* !_TME_HAVE_LONG_DOUBLE */
 
 /* prototypes: */
 int tme_init _TME_P((void));
@@ -55,5 +64,10 @@ _tme_unumber_t tme_misc_unumber_parse _TME_P((_tme_const char *, _tme_unumber_t)
 _tme_number_t tme_misc_number_parse _TME_P((_tme_const char *, _tme_number_t));
 #undef _tme_unumber_t
 #undef _tme_number_t
+union tme_value64 tme_misc_cycles_scaled _TME_P((const tme_misc_cycles_scaling_t *, const union tme_value64 *));
+void tme_misc_cycles_scaling _TME_P((tme_misc_cycles_scaling_t *, tme_uint32_t, tme_uint32_t));
+tme_uint32_t tme_misc_cycles_per_ms _TME_P((void));
+union tme_value64 tme_misc_cycles _TME_P((void));
+void tme_misc_cycles_spin_until _TME_P((const union tme_value64 *));
 
 #endif /* !_TME_MISC_H */

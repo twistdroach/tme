@@ -1,4 +1,4 @@
-/* $Id: sun3-impl.h,v 1.3 2006/09/30 12:43:38 fredette Exp $ */
+/* $Id: sun3-impl.h,v 1.4 2009/08/30 14:19:55 fredette Exp $ */
 
 /* machine/sun3/sun3-impl.h - implementation header file for Sun 3 emulation: */
 
@@ -37,7 +37,7 @@
 #define _MACHINE_SUN3_IMPL_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun3-impl.h,v 1.3 2006/09/30 12:43:38 fredette Exp $");
+_TME_RCSID("$Id: sun3-impl.h,v 1.4 2009/08/30 14:19:55 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus.h>
@@ -212,15 +212,13 @@ struct tme_sun3 {
   /* the last clock interrupt bus signal: */
   unsigned int tme_sun3_int_signal_clock_last;
 
-  /* the set of active boot state TLB entries: */
-  unsigned int tme_sun3_boot_state_tlb_next;
-#define TME_SUN3_BOOT_STATE_TLBS	(8)
-  struct tme_bus_tlb *tme_sun3_boot_state_tlbs[TME_SUN3_BOOT_STATE_TLBS];
-
   /* the set of active SDVMA TLB entries: */
   unsigned int tme_sun3_sdvma_tlb_next;
 #define TME_SUN3_SDVMA_TLBS		(16)
-  struct tme_bus_tlb *tme_sun3_sdvma_tlbs[TME_SUN3_SDVMA_TLBS];
+  struct tme_token *tme_sun3_sdvma_tlb_tokens[TME_SUN3_SDVMA_TLBS];
+
+  /* the m68k bus context register: */
+  tme_bus_context_t *tme_sun3_m68k_bus_context;
 };
 
 /* prototypes: */
@@ -228,11 +226,9 @@ void _tme_sun3_mmu_new _TME_P((struct tme_sun3 *));
 int _tme_sun3_m68k_tlb_fill _TME_P((struct tme_m68k_bus_connection *, struct tme_m68k_tlb *,
 				    unsigned int, tme_uint32_t, unsigned int));
 int _tme_sun3_bus_tlb_fill _TME_P((struct tme_bus_connection *, struct tme_bus_tlb *,
-				   tme_uint32_t, unsigned int));
-int _tme_sun3_mmu_tlb_set_allocate _TME_P((struct tme_bus_connection *,
-					   unsigned int, unsigned int, 
-					   struct tme_bus_tlb * tme_shared *,
-					   tme_rwlock_t *));
+				   tme_bus_addr_t, unsigned int));
+int _tme_sun3_mmu_tlb_set_add _TME_P((struct tme_bus_connection *,
+				      struct tme_bus_tlb_set_info *));
 int _tme_sun3_mmu_pte_get _TME_P((struct tme_sun3 *, tme_uint32_t, tme_uint32_t *));
 int _tme_sun3_mmu_pte_set _TME_P((struct tme_sun3 *, tme_uint32_t, tme_uint32_t));
 void _tme_sun3_mmu_sdvma_change _TME_P((struct tme_sun3 *));

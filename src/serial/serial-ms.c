@@ -1,4 +1,4 @@
-/* $Id: serial-ms.c,v 1.3 2003/10/16 02:48:25 fredette Exp $ */
+/* $Id: serial-ms.c,v 1.4 2010/02/14 00:48:04 fredette Exp $ */
 
 /* serial/serial-ms.c - serial mouse emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: serial-ms.c,v 1.3 2003/10/16 02:48:25 fredette Exp $");
+_TME_RCSID("$Id: serial-ms.c,v 1.4 2010/02/14 00:48:04 fredette Exp $");
 
 /* includes: */
 #include "serial-ms.h"
@@ -69,6 +69,10 @@ _tme_serial_ms_callout(struct tme_serial_ms *serial_ms, int new_callouts)
   struct tme_serial_config config;
   tme_uint8_t buffer_input[32];
   tme_serial_data_flags_t data_flags;
+  struct timeval now;
+  unsigned long rate_sleep_usec;
+  unsigned long passed_sec;
+  long passed_usec;
   struct tme_mouse_event buffer_events[32];
   int old_empty;
   int rc;
@@ -230,19 +234,73 @@ _tme_serial_ms_callout(struct tme_serial_ms *serial_ms, int new_callouts)
     /* if the mouse connection is readable: */
     if (callouts & TME_SERIAL_MS_CALLOUT_MOUSE_READ) {
 
-      /* unlock the mutex: */
-      tme_mutex_unlock(&serial_ms->tme_serial_ms_mutex);
+      /* get the current time: */
+      gettimeofday(&now, NULL);
 
-      /* do the read: */
-      rc = (conn_mouse != NULL
-	    ? ((*conn_mouse->tme_mouse_connection_read)
-	       (conn_mouse,
-		buffer_events,
-		TME_ARRAY_ELS(buffer_events)))
-	    : ENOENT);
+      /* if we're not already doing a rate-limiting sleep: */
+      rate_sleep_usec = serial_ms->tme_serial_ms_rate_sleep_usec;
+      if (rate_sleep_usec == 0) {
+
+	/* see how many microseconds have passed since the last event
+	   was read, clipping it at one second: */
+	passed_sec = now.tv_sec;
+	passed_usec = now.tv_usec;
+	passed_usec -= serial_ms->tme_serial_ms_event_read_last.tv_usec;
+	if (passed_usec < 0) {
+	  passed_sec -= 1;
+	  passed_usec += 1000000;
+	}
+	assert (passed_usec > 0 && passed_usec < 1000000);
+	passed_sec -= serial_ms->tme_serial_ms_event_read_last.tv_sec;
+	if (passed_sec > 0) {
+	  passed_usec = 1000000;
+	}
+
+	/* if not enough microseconds have passed since the last event
+	   was read: */
+	rate_sleep_usec = serial_ms->tme_serial_ms_rate_usec;
+	if (passed_usec < (long) rate_sleep_usec) {
+
+	  /* set the sleep time and wake up the rate thread: */
+	  serial_ms->tme_serial_ms_rate_sleep_usec = rate_sleep_usec - passed_usec;
+	  tme_cond_notify(&serial_ms->tme_serial_ms_rate_cond, FALSE);
+	}
+
+	/* reload any sleep time: */
+	rate_sleep_usec = serial_ms->tme_serial_ms_rate_sleep_usec;
+      }
+
+      /* if we're doing a rate-limiting sleep: */
+      if (rate_sleep_usec != 0) {
+
+	/* read no events: */
+	rc = 0;
+      }
+
+      /* otherwise, we're not doing a rate-limiting sleep: */
+      else {
+
+	/* set the time that the last event was read: */
+	serial_ms->tme_serial_ms_event_read_last = now;
+
+	/* unlock the mutex: */
+	tme_mutex_unlock(&serial_ms->tme_serial_ms_mutex);
+
+	/* if we're rate-limiting, only read one event, otherwise
+	   read as many as we can: */
+	rc = (serial_ms->tme_serial_ms_rate_usec ? 1 : TME_ARRAY_ELS(buffer_events));
+
+	/* do the read: */
+	rc = (conn_mouse != NULL
+	      ? ((*conn_mouse->tme_mouse_connection_read)
+		 (conn_mouse,
+		  buffer_events,
+		  rc))
+	      : ENOENT);
 	  
-      /* lock the mutex: */
-      tme_mutex_lock(&serial_ms->tme_serial_ms_mutex);
+	/* lock the mutex: */
+	tme_mutex_lock(&serial_ms->tme_serial_ms_mutex);
+      }
 	
       /* if the read was successful: */
       if (rc > 0) {
@@ -276,6 +334,58 @@ _tme_serial_ms_callout(struct tme_serial_ms *serial_ms, int new_callouts)
   
   /* put in any later callouts, and clear that callouts are running: */
   serial_ms->tme_serial_ms_callout_flags = later_callouts;
+}
+
+/* the serial mouse rate-limiting thread: */
+static void
+_tme_serial_ms_th_rate(void *_serial_ms)
+{
+  struct tme_serial_ms *serial_ms;
+
+  /* recover our data structure: */
+  serial_ms = _serial_ms;
+
+  /* lock our mutex: */
+  tme_mutex_lock(&serial_ms->tme_serial_ms_mutex);
+
+  /* loop forever: */
+  for (;;) {
+
+    /* if we need to call out a mouse event read: */
+    if (serial_ms->tme_serial_ms_rate_do_callout) {
+
+      /* we no longer need to call out a mouse event read or sleep: */
+      serial_ms->tme_serial_ms_rate_do_callout = FALSE;
+      serial_ms->tme_serial_ms_rate_sleep_usec = 0;
+
+      /* call out the mouse event read: */
+      _tme_serial_ms_callout(serial_ms,
+			     TME_SERIAL_MS_CALLOUT_MOUSE_READ);
+    }
+
+    /* if we need to sleep: */
+    if (serial_ms->tme_serial_ms_rate_sleep_usec != 0) {
+
+      /* after we sleep, we need to call out a mouse event read: */
+      serial_ms->tme_serial_ms_rate_do_callout = TRUE;
+
+      /* unlock our mutex: */
+      tme_mutex_unlock(&serial_ms->tme_serial_ms_mutex);
+
+      /* sleep: */
+      tme_thread_sleep_yield(0, serial_ms->tme_serial_ms_rate_sleep_usec);
+	
+      /* lock our mutex: */
+      tme_mutex_lock(&serial_ms->tme_serial_ms_mutex);
+    }
+
+    /* otherwise, we need to wait on the condition: */
+    else {
+      tme_cond_wait_yield(&serial_ms->tme_serial_ms_rate_cond,
+			  &serial_ms->tme_serial_ms_mutex);
+    }
+  }
+  /* NOTREACHED */
 }
 
 /* the mouse control function: */
@@ -657,6 +767,12 @@ TME_ELEMENT_X_NEW_DECL(tme_serial_,kb,mouse) {
   tme_serial_buffer_init(&serial_ms->tme_serial_ms_serial_buffer, 
 			 TME_SERIAL_MS_BUFFER_SIZE);
   (*ms_init)(serial_ms);
+
+  /* start any rate-limiting thread: */
+  if (serial_ms->tme_serial_ms_rate_usec > 0) {
+    tme_cond_init(&serial_ms->tme_serial_ms_rate_cond);
+    tme_thread_create(_tme_serial_ms_th_rate, serial_ms);
+  }
 
   /* fill the element: */
   element->tme_element_private = serial_ms;

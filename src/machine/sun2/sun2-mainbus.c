@@ -1,4 +1,4 @@
-/* $Id: sun2-mainbus.c,v 1.17 2007/08/24 01:19:01 fredette Exp $ */
+/* $Id: sun2-mainbus.c,v 1.18 2009/08/30 14:32:29 fredette Exp $ */
 
 /* machine/sun2/sun2-mainbus.c - implementation of Sun 2 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun2-mainbus.c,v 1.17 2007/08/24 01:19:01 fredette Exp $");
+_TME_RCSID("$Id: sun2-mainbus.c,v 1.18 2009/08/30 14:32:29 fredette Exp $");
 
 /* includes: */
 #include "sun2-impl.h"
@@ -278,9 +278,6 @@ _tme_sun2_command(struct tme_element *element, const char * const * args, char *
 
   if (do_reset) {
 
-    /* reset the MMU: */
-    _tme_sun2_mmu_reset(sun2);
-
     /* reset the CPU: */
     (*sun2->tme_sun2_m68k->tme_m68k_bus_connection.tme_bus_signal)
       (&sun2->tme_sun2_m68k->tme_m68k_bus_connection,
@@ -347,7 +344,7 @@ _tme_sun2_connection_score(struct tme_connection *conn, unsigned int *_score)
 
     /* this must be an m68k chip, and not another bus: */
   case TME_CONNECTION_BUS_M68K:
-    if (conn_bus->tme_bus_tlb_set_allocate == NULL
+    if (conn_bus->tme_bus_tlb_set_add == NULL
 	&& conn_m68k->tme_m68k_bus_tlb_fill == NULL) {
       score = 10;
     }
@@ -355,7 +352,7 @@ _tme_sun2_connection_score(struct tme_connection *conn, unsigned int *_score)
 
     /* this must be a bus, and not a chip: */
   case TME_CONNECTION_BUS_GENERIC:
-    if (conn_bus->tme_bus_tlb_set_allocate != NULL
+    if (conn_bus->tme_bus_tlb_set_add != NULL
 	&& conn_bus->tme_bus_tlb_fill != NULL
 	&& sun2->tme_sun2_buses[conn_sun2->tme_sun2_bus_connection_which] == NULL) {
       score = 1;
@@ -443,7 +440,7 @@ _tme_sun2_connections_new(struct tme_element *element, const char * const *args,
     /* fill in the generic bus connection: */
     conn_bus->tme_bus_signal = _tme_sun2_bus_signal;
     conn_bus->tme_bus_intack = _tme_sun2_bus_intack;
-    conn_bus->tme_bus_tlb_set_allocate = _tme_sun2_mmu_tlb_set_allocate;
+    conn_bus->tme_bus_tlb_set_add = _tme_sun2_mmu_tlb_set_add;
 
     /* full in the m68k bus connection: */
     conn_m68k->tme_m68k_bus_tlb_fill = _tme_sun2_m68k_tlb_fill;
@@ -551,7 +548,7 @@ _tme_sun2_connections_new(struct tme_element *element, const char * const *args,
     }
     conn_bus->tme_bus_signal = _tme_sun2_bus_signal;
     conn_bus->tme_bus_intack = NULL;
-    conn_bus->tme_bus_tlb_set_allocate = _tme_sun2_mmu_tlb_set_allocate;
+    conn_bus->tme_bus_tlb_set_add = _tme_sun2_mmu_tlb_set_add;
     conn_bus->tme_bus_tlb_fill = _tme_sun2_bus_tlb_fill;
 
     /* fill in the sun2 connection: */
@@ -662,8 +659,8 @@ TME_ELEMENT_NEW_DECL(tme_machine_sun2) {
   sun2->tme_sun2_mbmem = NULL;
   sun2->tme_sun2_vmebus = NULL;
 
-  /* we don't have the CPU's reset TLBs yet: */
-  sun2->tme_sun2_reset_tlbs = NULL;
+  /* we don't have the CPU's bus context register yet: */
+  sun2->tme_sun2_m68k_bus_context = NULL;
 
   /* fill the element: */
   element->tme_element_private = sun2;

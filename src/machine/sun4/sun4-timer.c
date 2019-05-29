@@ -1,4 +1,4 @@
-/* $Id: sun4-timer.c,v 1.2 2006/11/16 02:42:16 fredette Exp $ */
+/* $Id: sun4-timer.c,v 1.3 2010/06/05 14:38:23 fredette Exp $ */
 
 /* machine/sun4/sun4-timer.c - implementation of Sun 4 timer emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun4-timer.c,v 1.2 2006/11/16 02:42:16 fredette Exp $");
+_TME_RCSID("$Id: sun4-timer.c,v 1.3 2010/06/05 14:38:23 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -172,9 +172,9 @@ _tme_sun4_timer_update(struct tme_sun4_timer *timer, struct timeval *now, struct
 		? 10
 		: 14),
 	       (timer->tme_sun4_timer_track_ints
-		/ (now->tv_sec
-		   - (timer->tme_sun4_timer_track_sample.tv_sec
-		      - TME_SUN4_TIMER_TRACK_INT_RATE)))));
+		/ (unsigned long) (now->tv_sec
+				   - (timer->tme_sun4_timer_track_sample.tv_sec
+				      - TME_SUN4_TIMER_TRACK_INT_RATE)))));
     }
 
     /* reset the sampling: */

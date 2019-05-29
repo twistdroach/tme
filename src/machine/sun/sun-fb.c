@@ -1,4 +1,4 @@
-/* $Id: sun-fb.c,v 1.4 2007/03/29 01:56:40 fredette Exp $ */
+/* $Id: sun-fb.c,v 1.6 2010/06/05 19:19:01 fredette Exp $ */
 
 /* machine/sun/sun-fb.c - Sun framebuffer emulation support: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun-fb.c,v 1.4 2007/03/29 01:56:40 fredette Exp $");
+_TME_RCSID("$Id: sun-fb.c,v 1.6 2010/06/05 19:19:01 fredette Exp $");
 
 /* includes: */
 #include "sun-fb.h"
@@ -102,6 +102,10 @@ _TME_RCSID("$Id: sun-fb.c,v 1.4 2007/03/29 01:56:40 fredette Exp $");
 #define _TME_SUNFB_IS_P4(sunfb)		((sunfb)->tme_sunfb_bus_handler_regs == tme_sunfb_bus_cycle_p4)
 #define _TME_SUNFB_IS_S4(sunfb)		((sunfb)->tme_sunfb_bus_handler_regs == tme_sunfb_bus_cycle_s4)
 #define _TME_SUNFB_HAS_BT458(sunfb)	((sunfb)->tme_sunfb_depth == 8)
+
+/* we fill writable TLB entries for framebuffer memory for this many
+   bytes at a time: */
+#define TME_SUNFB_UPDATE_SIZE		(1024)
 
 #if 0
 #define TME_SUNFB_DEBUG
@@ -326,7 +330,8 @@ _tme_sunfb_callout(struct tme_sunfb *sunfb)
       /* call out the bus interrupt signal edge: */
       rc = (*conn_bus->tme_bus_signal)
 	(conn_bus,
-	 TME_BUS_SIGNAL_INT_UNSPEC
+	 sunfb->tme_sunfb_bus_signal_int
+	 | TME_BUS_SIGNAL_EDGE
 	 | (int_asserted
 	    ? TME_BUS_SIGNAL_LEVEL_ASSERTED
 	    : TME_BUS_SIGNAL_LEVEL_NEGATED));
@@ -417,6 +422,7 @@ tme_sunfb_memory_update(struct tme_fb_connection *conn_fb)
 {
   struct tme_sunfb *sunfb;
   int int_asserted;
+  struct tme_token *tlb_token;
 
   /* recover our data structure: */
   sunfb = conn_fb->tme_fb_connection.tme_connection_element->tme_element_private;
@@ -444,6 +450,23 @@ tme_sunfb_memory_update(struct tme_fb_connection *conn_fb)
     tme_cond_notify(&sunfb->tme_sunfb_callout_cond, FALSE);
   }
       
+  /* set the offsets of the first and last bytes updated in the real
+     framebuffer memory: */
+  conn_fb->tme_fb_connection_offset_updated_first = sunfb->tme_sunfb_offset_updated_first;
+  conn_fb->tme_fb_connection_offset_updated_last = sunfb->tme_sunfb_offset_updated_last;
+
+  /* reset the offsets of the first and last bytes updated in the real
+     framebuffer memory: */
+  sunfb->tme_sunfb_offset_updated_first = 0 - (tme_uint32_t) 1;
+  sunfb->tme_sunfb_offset_updated_last = 0;
+  
+  /* invalidate any outstanding writable TLB entry: */
+  tlb_token = sunfb->tme_sunfb_tlb_token;
+  if (tlb_token != NULL) {
+    tme_token_invalidate(tlb_token);
+    sunfb->tme_sunfb_tlb_token = NULL;
+  }
+
   /* unlock the mutex: */
   tme_mutex_unlock(&sunfb->tme_sunfb_mutex);
 
@@ -511,7 +534,7 @@ tme_sunfb_bus_cycle_p4(void *_sunfb, struct tme_bus_cycle *cycle_init)
 {
   struct tme_sunfb *sunfb;
   tme_uint32_t p4_old, p4_new;
-  tme_bus_addr_t undecoded;
+  tme_bus_addr32_t undecoded;
 
   /* recover our data structure: */
   sunfb = (struct tme_sunfb *) _sunfb;
@@ -705,11 +728,18 @@ tme_sunfb_bus_cycle_bt458(void *_sunfb, struct tme_bus_cycle *cycle_init)
 	break;
 
       default:
-	abort();
+	break;
       }
+
+      /* the Bt458 datasheet says, "If an invalid address is loaded
+	 into the address register, data written to the device will
+	 be ignored and invalid data will be read by the MPU." */
+      if (bt458_address >= TME_BT458_REG_CONTROL_FIRST
+	  && bt458_address <= TME_BT458_REG_CONTROL_LAST) {
 	
-      /* write this register: */
-      bt458->tme_bt458_regs[bt458_address - TME_BT458_REG_CONTROL_FIRST] = value;
+	/* write this register: */
+	bt458->tme_bt458_regs[bt458_address - TME_BT458_REG_CONTROL_FIRST] = value;
+      }
     }
 
     /* this must be a write to the overlay map register: */
@@ -787,13 +817,15 @@ tme_sunfb_bus_cycle_bt458(void *_sunfb, struct tme_bus_cycle *cycle_init)
     /* if this is a read of the control register: */
     else if (reg == TME_SUNFB_S4_REG_BT458_CONTROL) {
 
-      if (bt458_address < TME_BT458_REG_CONTROL_FIRST
-	  || bt458_address > TME_BT458_REG_CONTROL_LAST) {
-	abort();
-      }
+      /* the Bt458 datasheet says, "If an invalid address is loaded
+	 into the address register, data written to the device will
+	 be ignored and invalid data will be read by the MPU." */
+      if (bt458_address >= TME_BT458_REG_CONTROL_FIRST
+	  && bt458_address <= TME_BT458_REG_CONTROL_LAST) {
 	
-      /* read this register: */
-      value_packed = bt458->tme_bt458_regs[bt458_address - TME_BT458_REG_CONTROL_FIRST];
+	/* read this register: */
+	value_packed = bt458->tme_bt458_regs[bt458_address - TME_BT458_REG_CONTROL_FIRST];
+      }
     }
 
     /* this must be a read of the overlay map register: */
@@ -861,7 +893,7 @@ int
 tme_sunfb_bus_cycle_s4(void *_sunfb, struct tme_bus_cycle *cycle_init)
 {
   struct tme_sunfb *sunfb;
-  tme_bus_addr_t undecoded;
+  tme_bus_addr32_t undecoded;
   tme_uint8_t sunfb_s4_status;
 
   /* if this bus cycle happened in the Bt458 registers: */
@@ -882,7 +914,7 @@ tme_sunfb_bus_cycle_s4(void *_sunfb, struct tme_bus_cycle *cycle_init)
      decoded) as the S4 registers: */
   undecoded
     = (cycle_init->tme_bus_cycle_address
-       & (((tme_bus_addr_t) 0)
+       & (((tme_bus_addr32_t) 0)
 	  - TME_SUNFB_S4_SIZ_REGS));
 
   /* save the status register: */
@@ -931,10 +963,15 @@ tme_sunfb_bus_cycle_s4(void *_sunfb, struct tme_bus_cycle *cycle_init)
 static int
 _tme_sunfb_tlb_fill(void *_sunfb,
 		    struct tme_bus_tlb *tlb, 
-		    tme_bus_addr_t address,
+		    tme_bus_addr_t address_wider,
 		    unsigned int cycles)
 {
   struct tme_sunfb *sunfb;
+  tme_bus_addr32_t address;
+  struct tme_token *tlb_token;
+  struct tme_token *tlb_token_other;
+  tme_uint32_t offset_updated_first;
+  tme_uint32_t offset_updated_last;
   unsigned int subregion_i;
 
   /* recover our data structure: */
@@ -942,6 +979,10 @@ _tme_sunfb_tlb_fill(void *_sunfb,
 
   /* initialize the TLB entry: */
   tme_bus_tlb_initialize(tlb);
+
+  /* get the normal-width address: */
+  address = address_wider;
+  assert (address == address_wider);
 
   /* if this address falls in the bus subregion for memory: */
   if ((sunfb->tme_sunfb_bus_subregion_memory.tme_bus_subregion_address_first
@@ -959,23 +1000,82 @@ _tme_sunfb_tlb_fill(void *_sunfb,
       /* bus cycles to this range are to the memory pad and can be
          fast: */
       tlb->tme_bus_tlb_cycle = _tme_sunfb_bus_cycle_memory_pad;
-      tlb->tme_bus_tlb_emulator_off_write = sunfb->tme_sunfb_memory_pad;
+      tlb->tme_bus_tlb_emulator_off_write
+	= (sunfb->tme_sunfb_memory_pad
+	   - tlb->tme_bus_tlb_addr_first);
     }
 
     /* otherwise, this address does not fall in the memory pad: */
     else {
 
+      /* if this TLB entry is not for writing: */
+      if ((cycles & TME_BUS_CYCLE_WRITE) == 0) {
+
+	/* this TLB entry covers this range: */
+	tlb->tme_bus_tlb_addr_first = sunfb->tme_sunfb_bus_subregion_memory.tme_bus_subregion_address_first;
+	tlb->tme_bus_tlb_addr_last = sunfb->tme_sunfb_memory_address_last_displayed;
+
+	/* this TLB entry allows only (fast) reading to the memory: */
+	tlb->tme_bus_tlb_emulator_off_read = sunfb->tme_sunfb_memory - tlb->tme_bus_tlb_addr_first;
+	tlb->tme_bus_tlb_rwlock = &sunfb->tme_sunfb_rwlock;
+	tlb->tme_bus_tlb_cycles_ok = TME_BUS_CYCLE_READ;
+	tlb->tme_bus_tlb_cycle = _tme_sunfb_bus_cycle_memory;
+	tlb->tme_bus_tlb_cycle_private = _sunfb;
+	return (TME_OK);
+      }
+
+      /* get the token for this writable TLB entry: */
+      tlb_token = tlb->tme_bus_tlb_token;
+
+      /* if a different writable TLB entry's token is outstanding: */
+      tlb_token_other = sunfb->tme_sunfb_tlb_token;
+      if (__tme_predict_true(tlb_token_other != NULL)) {
+	if (tlb_token_other != tlb_token) {
+
+	  /* invalidate this other TLB entry: */
+	  tme_token_invalidate(tlb_token_other);
+	}
+      }
+
+      /* save the token for this writable TLB entry: */
+      sunfb->tme_sunfb_tlb_token = tlb_token;
+
+      /* update the offsets of the first and last bytes updated in the
+	 real framebuffer memory: */
+      offset_updated_first = address;
+      offset_updated_first -= (tme_uint32_t) sunfb->tme_sunfb_bus_subregion_memory.tme_bus_subregion_address_first;
+      offset_updated_last = offset_updated_first + TME_SUNFB_UPDATE_SIZE;
+      offset_updated_first
+	= TME_MIN(offset_updated_first,
+		  sunfb->tme_sunfb_offset_updated_first);
+      offset_updated_last
+	= TME_MAX(offset_updated_last,
+		  sunfb->tme_sunfb_offset_updated_last);
+      offset_updated_last
+	= TME_MIN(offset_updated_last,
+		  (((tme_uint32_t)
+		    sunfb->tme_sunfb_memory_address_last_displayed)
+		   - ((tme_uint32_t)
+		      sunfb->tme_sunfb_bus_subregion_memory.tme_bus_subregion_address_first)));
+      sunfb->tme_sunfb_offset_updated_first = offset_updated_first;
+      sunfb->tme_sunfb_offset_updated_last = offset_updated_last;
+
       /* this TLB entry covers this range: */
-      tlb->tme_bus_tlb_addr_first = sunfb->tme_sunfb_bus_subregion_memory.tme_bus_subregion_address_first;
-      tlb->tme_bus_tlb_addr_last = sunfb->tme_sunfb_memory_address_last_displayed;
+      tlb->tme_bus_tlb_addr_first
+	= (sunfb->tme_sunfb_bus_subregion_memory.tme_bus_subregion_address_first
+	   + offset_updated_first);
+      tlb->tme_bus_tlb_addr_last
+	= (sunfb->tme_sunfb_bus_subregion_memory.tme_bus_subregion_address_first
+	   + offset_updated_last);
 
       /* bus cycles to this range are to the memory and can be fast: */
       tlb->tme_bus_tlb_cycle = _tme_sunfb_bus_cycle_memory;
-      tlb->tme_bus_tlb_emulator_off_write = sunfb->tme_sunfb_memory;
+      tlb->tme_bus_tlb_emulator_off_write
+	= (sunfb->tme_sunfb_memory
+	   - sunfb->tme_sunfb_bus_subregion_memory.tme_bus_subregion_address_first);
     }
 
     /* this TLB entry allows fast reading and writing: */
-    tlb->tme_bus_tlb_emulator_off_write -= tlb->tme_bus_tlb_addr_first;
     tlb->tme_bus_tlb_emulator_off_read = tlb->tme_bus_tlb_emulator_off_write;
   }
 
@@ -1018,6 +1118,55 @@ _tme_sunfb_tlb_fill(void *_sunfb,
 
   return (TME_OK);
 }
+
+#if TME_SUNFB_BUS_TRANSITION
+
+/* this is the bus cycle transition glue: */
+int
+tme_sunfb_bus_cycle_transition(void *_sunfb,
+			       struct tme_bus_cycle *master_cycle,
+			       void (*handler) _TME_P((struct tme_sunfb *,
+						       struct tme_bus_cycle *,
+						       tme_uint32_t *,
+						       struct tme_completion *)))
+{
+  struct tme_completion completion_buffer;
+  struct tme_sunfb *sunfb;
+  tme_uint32_t master_fast_cycle_types;
+
+  /* initialize the completion buffer: */
+  tme_completion_init(&completion_buffer);
+
+#ifndef NDEBUG
+
+  /* initialize the completion: */
+  completion_buffer.tme_completion_error = 0x71aa;
+
+#endif /* NDEBUG */
+
+  /* recover our data structure: */
+  sunfb = (struct tme_sunfb *) _sunfb;
+
+  /* lock the mutex: */
+  tme_mutex_lock(&sunfb->tme_sunfb_mutex);
+
+  /* run the cycle handler: */
+  (*handler)
+    (sunfb,
+     master_cycle,
+     &master_fast_cycle_types,
+     &completion_buffer);
+
+  /* unlock the mutex: */
+  tme_mutex_unlock(&sunfb->tme_sunfb_mutex);
+
+  /* check the completion: */
+  assert (completion_buffer.tme_completion_error != (int) 0x71aa);
+
+  return (completion_buffer.tme_completion_error);
+}
+
+#endif /* TME_SUNFB_BUS_TRANSITION */
 
 /* this makes a new framebuffer connection: */
 static int
@@ -1460,6 +1609,13 @@ tme_sunfb_new(struct tme_sunfb *sunfb,
 	    : TME_SUNFB_S4_STATUS_ID_COLOR));
   }
 
+  /* make sure that the interrupt signal has been defined.  no known
+     framebuffer uses a priority zero interrupt: */
+#if TME_BUS_SIGNAL_INT(0) != 0
+#error "TME_BUS_SIGNAL_INT() changed"
+#endif
+  assert (sunfb->tme_sunfb_bus_signal_int != TME_BUS_SIGNAL_INT(0));
+
   /* if this is a color framebuffer: */
   if (!_TME_SUNFB_IS_BWTWO(sunfb)) {
 
@@ -1519,6 +1675,7 @@ tme_sun_cgthree(struct tme_element *element, const char * const *args, char **_o
   sunfb->tme_sunfb_flags
     |= (TME_SUNFB_FLAG_BT458_CMAP_PACKED
 	| TME_SUNFB_FLAG_BT458_BYTE_D0_D7);
+  sunfb->tme_sunfb_bus_signal_int = TME_BUS_SIGNAL_INT(5);
 
   /* if the generic initialization fails: */
   rc = tme_sunfb_new(sunfb, args, _output);

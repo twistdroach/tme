@@ -1,4 +1,4 @@
-/* $Id: common.h,v 1.13 2007/01/18 02:15:49 fredette Exp $ */
+/* $Id: common.h,v 1.16 2010/02/18 01:23:20 fredette Exp $ */
 
 /* tme/common.h - header file for common things: */
 
@@ -64,7 +64,7 @@
 /* RCS IDs: */
 #ifdef notyet
 #define _TME_RCSID(x) static const char _tme_rcsid[] = x
-_TME_RCSID("$Id: common.h,v 1.13 2007/01/18 02:15:49 fredette Exp $");
+_TME_RCSID("$Id: common.h,v 1.16 2010/02/18 01:23:20 fredette Exp $");
 #else  /* !_TME_IMPL */
 #define _TME_RCSID(x)
 #endif /* !_TME_IMPL */
@@ -144,6 +144,16 @@ _TME_RCSID("$Id: common.h,v 1.13 2007/01/18 02:15:49 fredette Exp $");
 #define TME_MIN(a, b)		(((a) < (b)) ? (a) : (b))
 #define TME_MAX(a, b)		(((a) > (b)) ? (a) : (b))
 
+/* shifts: */
+/* NB: count is evaluated multiple times and must be greater than
+   zero: */
+#define TME_SHIFT(type, value, shift, count)	\
+  ((type)					\
+   ((((type) (value))				\
+     shift TME_MIN((count) - 1,			\
+		   (sizeof(type) * 8) - 1))	\
+    shift 1))
+
 /* sign extension: */
 #define TME_EXT_S8_S16(x)	((tme_int16_t) _tme_audit_type(x, tme_int8_t))
 #define TME_EXT_S8_S32(x)	((tme_int32_t) _tme_audit_type(x, tme_int8_t))
@@ -198,18 +208,24 @@ tme_bswap_u32(tme_uint32_t x)
 #ifndef _TME_WORDS_BIGENDIAN
 #define tme_htobe_u16(x) tme_bswap_u16(x)
 #define tme_htobe_u32(x) tme_bswap_u32(x)
+#define tme_htobe_u64(x) tme_bswap_u64(x)
 #define tme_htole_u16(x) (x)
 #define tme_htole_u32(x) (x)
+#define tme_htole_u64(x) (x)
 #else  /* _TME_WORDS_BIGENDIAN */
 #define tme_htobe_u16(x) (x)
 #define tme_htobe_u32(x) (x)
+#define tme_htobe_u64(x) (x)
 #define tme_htole_u16(x) tme_bswap_u16(x)
 #define tme_htole_u32(x) tme_bswap_u32(x)
+#define tme_htole_u64(x) tme_bswap_u64(x)
 #endif /* _TME_WORDS_BIGENDIAN */
 #define tme_betoh_u16(x) tme_htobe_u16(x)
 #define tme_betoh_u32(x) tme_htobe_u32(x)
+#define tme_betoh_u64(x) tme_htobe_u64(x)
 #define tme_letoh_u16(x) tme_htole_u16(x)
 #define tme_letoh_u32(x) tme_htole_u32(x)
+#define tme_letoh_u64(x) tme_htole_u64(x)
 
 /* i18n: */
 #define _(x) x
@@ -223,6 +239,8 @@ tme_bswap_u32(tme_uint32_t x)
 #if defined(__GNUC__) && (__GNUC__ >= 2) && (_TME_SIZEOF_INT == 4)
 #define TME_HAVE_INT64_T
 #define _TME_ALIGNOF_INT64_T _TME_ALIGNOF_INT32_T
+#define _TME_SHIFTMAX_INT64_T (63)
+#define _TME_PRI64 "ll"
 typedef signed long long int tme_int64_t;
 typedef unsigned long long int tme_uint64_t;
 #endif /* __GNUC__ && __GNUC__ >= 2 */
@@ -238,13 +256,13 @@ union tme_value64 {
 #ifndef _TME_WORDS_BIGENDIAN
 #define tme_value64_int32_lo tme_value64_int32s[0]
 #define tme_value64_int32_hi tme_value64_int32s[1]
-#define tme_value64_uint32_lo tme_value64_int32s[0]
-#define tme_value64_uint32_hi tme_value64_int32s[1]
+#define tme_value64_uint32_lo tme_value64_uint32s[0]
+#define tme_value64_uint32_hi tme_value64_uint32s[1]
 #else  /* _TME_WORDS_BIGENDIAN */
 #define tme_value64_int32_lo tme_value64_int32s[1]
 #define tme_value64_int32_hi tme_value64_int32s[0]
-#define tme_value64_uint32_lo tme_value64_int32s[1]
-#define tme_value64_uint32_hi tme_value64_int32s[0]
+#define tme_value64_uint32_lo tme_value64_uint32s[1]
+#define tme_value64_uint32_hi tme_value64_uint32s[0]
 #endif /* _TME_WORDS_BIGENDIAN */
 };
 
@@ -262,9 +280,35 @@ union tme_value64 *_tme_value64_set _TME_P((union tme_value64 *, _tme_const tme_
 #define tme_value64_imul(a, b) (((a)->tme_value64_int *= (b)->tme_value64_int), (a))
 #define tme_value64_idiv(a, b) (((a)->tme_value64_int /= (b)->tme_value64_int), (a))
 #define tme_value64_set(a, b) (((b) >= 0) ? ((a)->tme_value64_uint = (b), (a)) : ((a)->tme_value64_int = (b), (a)))
+#define tme_value64_cmp(a, cmp, b) ((a)->tme_value64_uint cmp (b)->tme_value64_uint)
 #else  /* !TME_HAVE_INT64_T */
 #define tme_value64_set(a, b) _tme_value64_set(a, (_tme_const tme_uint8_t *) &(b), ((b) >= 0 ? sizeof(b) : -sizeof(b)))
+#define _tme_value64_cmp32(half, a, cmp, b)			\
+  ((a)->tme_value64_uint._TME_CONCAT(tme_value64_uint32_,half)	\
+   cmp (b)->tme_value64_uint._TME_CONCAT(tme_value64_uint32_,half))
+#define tme_value64_cmp(a, cmp, b)				\
+  (((2 cmp 1)							\
+    ? _tme_value32_cmp32(hi, a, >, b)				\
+    : (1 cmp 2)							\
+    ? _tme_value32_cmp32(hi, a, <, b)				\
+    : FALSE)							\
+   || (_tme_value32_cmp32(hi, a, ==, b)				\
+       && _tme_value32_cmp32(lo, a, cmp, b)))
 #endif /* !TME_HAVE_INT64_T */
+
+/* 64-bit byte swapping: */
+#ifdef TME_HAVE_INT64_T
+#ifdef _TME_HAVE_BSWAP64
+#define tme_bswap_u64(x) ((tme_uint64_t) bswap64((tme_uint64_t) (x)))
+#else  /* !_TME_HAVE_BSWAP64 */
+static _tme_inline tme_uint64_t
+tme_bswap_u64(tme_uint64_t x)
+{
+  return ((((tme_uint64_t) tme_bswap_u32((tme_uint32_t) x)) << 32)
+	  | tme_bswap_u32((tme_uint32_t) (x >> 32)));
+}
+#endif /* !_TME_HAVE_BSWAP64 */
+#endif /* TME_HAVE_INT64_T */
 
 /* versions: */
 #define TME_X_VERSION(current, age)	(((current) << 10) | (age))
@@ -275,6 +319,14 @@ union tme_value64 *_tme_value64_set _TME_P((union tme_value64 *, _tme_const tme_
 		     TME_X_VERSION_CURRENT(vneed),				\
 		     TME_X_VERSION_CURRENT(vimpl) - TME_X_VERSION_AGE(vimpl),	\
 		     TME_X_VERSION_CURRENT(vimpl))
+
+/* printf formats: */
+#define _TME_PRI8 ""
+#define _TME_PRI16 ""
+#define TME_PRIx8 _TME_PRI8 "x"
+#define TME_PRIx16 _TME_PRI16 "x"
+#define TME_PRIx32 _TME_PRI32 "x"
+#define TME_PRIx64 _TME_PRI64 "x"
 
 /* miscellaneous: */
 #define TME_ARRAY_ELS(x)	(sizeof(x) / sizeof(x[0]))

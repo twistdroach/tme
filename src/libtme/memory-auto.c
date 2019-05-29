@@ -35,7 +35,7 @@
 #include <tme/memory.h>
 
 
-_TME_RCSID("$Id: memory-auto.sh,v 1.1 2006/09/30 12:43:37 fredette Exp $");
+_TME_RCSID("$Id: memory-auto.sh,v 1.2 2010/02/15 15:16:28 fredette Exp $");
 
 /* undefine the macro version of tme_memory_bus_read16: */
 #undef tme_memory_bus_read16
@@ -1871,20 +1871,20 @@ tme_memory_bus_read_buffer(_tme_const tme_shared tme_uint8_t *mem, tme_uint8_t *
   unsigned int count_misaligned;
   unsigned int bits_misaligned;
 #ifdef TME_HAVE_INT64_T
-  tme_shared tme_uint64_t *parts64;
+  _tme_const tme_shared tme_uint64_t *parts64;
   tme_uint64_t part64_buffer;
   tme_uint64_t part64;
   tme_uint64_t part64_next;
 #endif /* TME_HAVE_INT64_T */
-  tme_shared tme_uint32_t *parts32;
+  _tme_const tme_shared tme_uint32_t *parts32;
   tme_uint32_t part32_buffer;
   tme_uint32_t part32;
   tme_uint32_t part32_next;
-  tme_shared tme_uint16_t *parts16;
+  _tme_const tme_shared tme_uint16_t *parts16;
   tme_uint16_t part16_buffer;
   tme_uint16_t part16;
   tme_uint16_t part16_next;
-  tme_shared tme_uint8_t *parts8;
+  _tme_const tme_shared tme_uint8_t *parts8;
   tme_uint8_t part8_buffer;
   tme_uint8_t part8;
   tme_uint8_t part8_next;
@@ -1915,7 +1915,7 @@ tme_memory_bus_read_buffer(_tme_const tme_shared tme_uint8_t *mem, tme_uint8_t *
   else if (host_boundary == sizeof(tme_uint64_t)) {
 
     /* make a 64-bit pointer to the memory: */
-    parts64 = (tme_shared tme_uint64_t *) mem;
+    parts64 = (_tme_const tme_shared tme_uint64_t *) mem;
 
     /* if this pointer is not 64-bit aligned: */
     if (__tme_predict_false((((unsigned long) parts64) % sizeof(tme_uint64_t)) != 0)) {
@@ -1924,7 +1924,7 @@ tme_memory_bus_read_buffer(_tme_const tme_shared tme_uint8_t *mem, tme_uint8_t *
       count_misaligned = ((unsigned long) parts64) % sizeof(tme_uint64_t);
 
       /* truncate this pointer to the previous 64-bit boundary: */
-      parts64 = (tme_shared tme_uint64_t *) (((unsigned long) parts64) & (((unsigned long) 0) - sizeof(tme_uint64_t)));
+      parts64 = (_tme_const tme_shared tme_uint64_t *) (((unsigned long) parts64) & (((unsigned long) 0) - sizeof(tme_uint64_t)));
 
       /* get the number of bytes to read in the first 64-bit memory part: */
       count_done = sizeof(tme_uint64_t) - count_misaligned;
@@ -2056,7 +2056,7 @@ tme_memory_bus_read_buffer(_tme_const tme_shared tme_uint8_t *mem, tme_uint8_t *
   else if (host_boundary == sizeof(tme_uint32_t)) {
 
     /* make a 32-bit pointer to the memory: */
-    parts32 = (tme_shared tme_uint32_t *) mem;
+    parts32 = (_tme_const tme_shared tme_uint32_t *) mem;
 
     /* if this pointer is not 32-bit aligned: */
     if (__tme_predict_false((((unsigned long) parts32) % sizeof(tme_uint32_t)) != 0)) {
@@ -2065,7 +2065,7 @@ tme_memory_bus_read_buffer(_tme_const tme_shared tme_uint8_t *mem, tme_uint8_t *
       count_misaligned = ((unsigned long) parts32) % sizeof(tme_uint32_t);
 
       /* truncate this pointer to the previous 32-bit boundary: */
-      parts32 = (tme_shared tme_uint32_t *) (((unsigned long) parts32) & (((unsigned long) 0) - sizeof(tme_uint32_t)));
+      parts32 = (_tme_const tme_shared tme_uint32_t *) (((unsigned long) parts32) & (((unsigned long) 0) - sizeof(tme_uint32_t)));
 
       /* get the number of bytes to read in the first 32-bit memory part: */
       count_done = sizeof(tme_uint32_t) - count_misaligned;
@@ -2195,7 +2195,7 @@ tme_memory_bus_read_buffer(_tme_const tme_shared tme_uint8_t *mem, tme_uint8_t *
   else if (host_boundary == sizeof(tme_uint16_t)) {
 
     /* make a 16-bit pointer to the memory: */
-    parts16 = (tme_shared tme_uint16_t *) mem;
+    parts16 = (_tme_const tme_shared tme_uint16_t *) mem;
 
     /* if this pointer is not 16-bit aligned: */
     if (__tme_predict_false((((unsigned long) parts16) % sizeof(tme_uint16_t)) != 0)) {
@@ -2204,7 +2204,7 @@ tme_memory_bus_read_buffer(_tme_const tme_shared tme_uint8_t *mem, tme_uint8_t *
       count_misaligned = ((unsigned long) parts16) % sizeof(tme_uint16_t);
 
       /* truncate this pointer to the previous 16-bit boundary: */
-      parts16 = (tme_shared tme_uint16_t *) (((unsigned long) parts16) & (((unsigned long) 0) - sizeof(tme_uint16_t)));
+      parts16 = (_tme_const tme_shared tme_uint16_t *) (((unsigned long) parts16) & (((unsigned long) 0) - sizeof(tme_uint16_t)));
 
       /* get the number of bytes to read in the first 16-bit memory part: */
       count_done = sizeof(tme_uint16_t) - count_misaligned;
@@ -2334,7 +2334,7 @@ tme_memory_bus_read_buffer(_tme_const tme_shared tme_uint8_t *mem, tme_uint8_t *
   else {
 
     /* make a 8-bit pointer to the memory: */
-    parts8 = (tme_shared tme_uint8_t *) mem;
+    parts8 = (_tme_const tme_shared tme_uint8_t *) mem;
 
     /* if this pointer is not 8-bit aligned: */
     if (__tme_predict_false((((unsigned long) parts8) % sizeof(tme_uint8_t)) != 0)) {
@@ -2343,7 +2343,7 @@ tme_memory_bus_read_buffer(_tme_const tme_shared tme_uint8_t *mem, tme_uint8_t *
       count_misaligned = ((unsigned long) parts8) % sizeof(tme_uint8_t);
 
       /* truncate this pointer to the previous 8-bit boundary: */
-      parts8 = (tme_shared tme_uint8_t *) (((unsigned long) parts8) & (((unsigned long) 0) - sizeof(tme_uint8_t)));
+      parts8 = (_tme_const tme_shared tme_uint8_t *) (((unsigned long) parts8) & (((unsigned long) 0) - sizeof(tme_uint8_t)));
 
       /* get the number of bytes to read in the first 8-bit memory part: */
       count_done = sizeof(tme_uint8_t) - count_misaligned;

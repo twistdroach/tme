@@ -1,4 +1,4 @@
-/* $Id: am7990.c,v 1.3 2007/03/25 21:18:50 fredette Exp $ */
+/* $Id: am7990.c,v 1.4 2010/06/05 14:33:45 fredette Exp $ */
 
 /* ic/am7990.c - implementation of Am7990 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: am7990.c,v 1.3 2007/03/25 21:18:50 fredette Exp $");
+_TME_RCSID("$Id: am7990.c,v 1.4 2010/06/05 14:33:45 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -158,12 +158,12 @@ struct tme_am7990 {
   int tme_am7990_callout_flags;
 
   /* our DMA TLB hash: */
-  struct tme_bus_tlb * tme_shared tme_am7990_tlb_hash;
-  tme_rwlock_t tme_am7990_tlb_hash_rwlock;
+  struct tme_bus_tlb tme_am7990_tlb_hash[TME_AM7990_TLB_HASH_SIZE];
+  int tme_am7990_tlb_hash_added;
 
   /* our bus addresses: */
-  tme_bus_addr_t tme_am7990_offset_rap;
-  tme_bus_addr_t tme_am7990_offset_rdp;
+  tme_bus_addr32_t tme_am7990_offset_rap;
+  tme_bus_addr32_t tme_am7990_offset_rdp;
 
   /* registers: */
   tme_uint16_t tme_am7990_rap;
@@ -250,10 +250,8 @@ _tme_am7990_tlb_hash(void *_am7990,
   am7990 = (struct tme_am7990 *) _am7990;
 
   /* return the TLB entry: */
-  return (tme_memory_atomic_pointer_read(struct tme_bus_tlb *,
-					 am7990->tme_am7990_tlb_hash,
-					 &am7990->tme_am7990_tlb_hash_rwlock)
-	  + ((linear_address >> 10) & (TME_AM7990_TLB_HASH_SIZE - 1)));
+  return (am7990->tme_am7990_tlb_hash
+	  + ((((tme_bus_addr32_t) linear_address) >> 10) & (TME_AM7990_TLB_HASH_SIZE - 1)));
 }
 
 /* this locks the mutex: */
@@ -1485,7 +1483,7 @@ static int
 _tme_am7990_bus_cycle(void *_am7990, struct tme_bus_cycle *cycle_init)
 {
   struct tme_am7990 *am7990;
-  tme_bus_addr_t address, am7990_address_last;
+  tme_bus_addr32_t address, am7990_address_last;
   tme_uint16_t value;
   tme_uint32_t reg;
   tme_uint16_t csr0_old;
@@ -1683,7 +1681,7 @@ _tme_am7990_tlb_fill(void *_am7990,
 		     unsigned int cycles)
 {
   struct tme_am7990 *am7990;
-  tme_bus_addr_t am7990_address_last;
+  tme_bus_addr32_t am7990_address_last;
 
   /* recover our data structure: */
   am7990 = (struct tme_am7990 *) _am7990;
@@ -1763,9 +1761,7 @@ _tme_am7990_connection_make_bus(struct tme_connection *conn,
      hash yet, allocate it: */
   if (rc == TME_OK
       && state == TME_CONNECTION_FULL
-      && tme_memory_atomic_pointer_read(struct tme_bus_tlb *,
-					am7990->tme_am7990_tlb_hash,
-					&am7990->tme_am7990_tlb_hash_rwlock) == NULL) {
+      && !am7990->tme_am7990_tlb_hash_added) {
 
     /* get our bus connection: */
     conn_bus
@@ -1773,14 +1769,12 @@ _tme_am7990_connection_make_bus(struct tme_connection *conn,
 				       am7990->tme_am7990_device.tme_bus_device_connection,
 				       &am7990->tme_am7990_device.tme_bus_device_connection_rwlock);
 
-    /* allocate the TLB set: */
-    rc = ((*conn_bus->tme_bus_tlb_set_allocate)
-	  (conn_bus,
-	   TME_AM7990_TLB_HASH_SIZE, 
-	   sizeof(struct tme_bus_tlb),
-	   &am7990->tme_am7990_tlb_hash,
-	   &am7990->tme_am7990_device.tme_bus_device_connection_rwlock));
+    /* add the TLB set: */
+    rc = tme_bus_device_tlb_set_add(&am7990->tme_am7990_device,
+				    TME_AM7990_TLB_HASH_SIZE,
+				    am7990->tme_am7990_tlb_hash);
     assert (rc == TME_OK);
+    am7990->tme_am7990_tlb_hash_added = TRUE;
   }
 
   return (rc);

@@ -1,4 +1,4 @@
-/* $Id: sun44c-cache.c,v 1.2 2007/03/29 01:34:44 fredette Exp $ */
+/* $Id: sun44c-cache.c,v 1.3 2009/08/30 14:04:24 fredette Exp $ */
 
 /* machine/sun4/sun44c-cache.c - implementation of Sun 4/4c cache emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun44c-cache.c,v 1.2 2007/03/29 01:34:44 fredette Exp $");
+_TME_RCSID("$Id: sun44c-cache.c,v 1.3 2009/08/30 14:04:24 fredette Exp $");
 
 /* includes: */
 #include "sun4-impl.h"
@@ -389,7 +389,7 @@ _tme_sun44c_cache_cycle_bus(void *_conn_bus_init,
      while the cache is visible (addresses can suddenly become
      cacheable): */
   assert (sun4->tme_sun4_memtest_tlb != NULL);
-  tme_bus_tlb_invalidate(sun4->tme_sun4_memtest_tlb);
+  tme_token_invalidate(sun4->tme_sun4_memtest_tlb->tme_bus_tlb_token);
   sun4->tme_sun4_memtest_tlb = NULL;
 
   /* get the cache actions for this access: */
@@ -619,7 +619,7 @@ _tme_sun44c_tlb_fill_cache(const struct tme_bus_connection *conn_bus_init,
   /* invalidate any other memory test TLB entry: */
   if (sun4->tme_sun4_memtest_tlb != NULL
       && sun4->tme_sun4_memtest_tlb != tlb) {
-    tme_bus_tlb_invalidate(sun4->tme_sun4_memtest_tlb);
+    tme_token_invalidate(sun4->tme_sun4_memtest_tlb->tme_bus_tlb_token);
   }
   sun4->tme_sun4_memtest_tlb = NULL;
 
@@ -954,4 +954,6 @@ _tme_sun44c_cache_new(struct tme_sun4 *sun4)
   sun4->tme_sun4_cache_data = (tme_uint8_t *) tme_new(tme_uint32_t, (cache_size / sizeof(tme_uint32_t)));
   sun4->tme_sun44c_cache_tags = tme_new(tme_uint32_t, (cache_size / cache_size_line));
   tme_rwlock_init(&sun4->tme_sun4_cache_rwlock);
+  sun4->tme_sun4_cache_tlb_internal.tme_bus_tlb_token = &sun4->tme_sun4_cache_tlb_internal_token;
+  tme_token_init(sun4->tme_sun4_cache_tlb_internal.tme_bus_tlb_token);
 }

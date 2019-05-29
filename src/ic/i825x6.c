@@ -1,4 +1,4 @@
-/* $Id: i825x6.c,v 1.7 2007/08/25 21:09:06 fredette Exp $ */
+/* $Id: i825x6.c,v 1.8 2010/06/05 14:43:27 fredette Exp $ */
 
 /* ic/i825x6.c - implementation of the Intel 825x6 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: i825x6.c,v 1.7 2007/08/25 21:09:06 fredette Exp $");
+_TME_RCSID("$Id: i825x6.c,v 1.8 2010/06/05 14:43:27 fredette Exp $");
 
 /* XXX FIXME - TLB usage here is not thread-safe: */
 
@@ -165,8 +165,8 @@ struct tme_i825x6 {
   int tme_i825x6_callout_flags;
 
   /* our DMA TLB hash: */
-  struct tme_bus_tlb * tme_shared tme_i825x6_tlb_hash;
-  tme_rwlock_t tme_i825x6_tlb_hash_rwlock;
+  struct tme_bus_tlb tme_i825x6_tlb_hash[TME_I825X6_TLB_HASH_SIZE];
+  int tme_i825x6_tlb_hash_added;
 
   /* the i825x6 bus signals: */
   struct tme_bus_signals tme_i825x6_bus_signals;
@@ -291,10 +291,8 @@ _tme_i825x6_tlb_hash(void *_i825x6,
   i825x6 = (struct tme_i825x6 *) _i825x6;
 
   /* return the TLB entry: */
-  return (tme_memory_atomic_pointer_read(struct tme_bus_tlb *,
-					 i825x6->tme_i825x6_tlb_hash,
-					 &i825x6->tme_i825x6_tlb_hash_rwlock)
-	  + ((linear_address >> 10) & (TME_I825X6_TLB_HASH_SIZE - 1)));
+  return (i825x6->tme_i825x6_tlb_hash
+	  + ((((tme_bus_addr32_t) linear_address) >> 10) & (TME_I825X6_TLB_HASH_SIZE - 1)));
 }
 
 /* this locks the mutex: */
@@ -388,8 +386,8 @@ _tme_i825x6_rx_buffers_add(struct tme_i825x6 *i825x6,
   struct tme_i825x6_rx_buffer *rx_buffer, **_prev;
   struct tme_bus_tlb *tlb, tlb_local;
   struct tme_bus_connection *conn_bus;
-  tme_bus_addr_t count_minus_one, count;
-  tme_bus_addr_t tlb_addr_last;
+  tme_bus_addr32_t count_minus_one, count;
+  tme_bus_addr32_t tlb_addr_last;
   int err;
 
   /* recover the rx buffers list: */
@@ -413,7 +411,7 @@ _tme_i825x6_rx_buffers_add(struct tme_i825x6 *i825x6,
        if it doesn't allow writing, reload it: */
     tlb_addr_last = tlb->tme_bus_tlb_addr_last;
     if (tme_bus_tlb_is_invalid(tlb)
-	|| address_init < tlb->tme_bus_tlb_addr_first
+	|| address_init < (tme_bus_addr32_t) tlb->tme_bus_tlb_addr_first
 	|| address_init > tlb_addr_last
 	|| (tlb->tme_bus_tlb_emulator_off_write == TME_EMULATOR_OFF_UNDEF
 	    && !(tlb->tme_bus_tlb_cycles_ok & TME_BUS_CYCLE_WRITE))) {
@@ -421,9 +419,8 @@ _tme_i825x6_rx_buffers_add(struct tme_i825x6 *i825x6,
       /* unbusy this TLB entry for filling: */
       tme_bus_tlb_unbusy_fill(tlb);
       
-      /* reserve this TLB entry: */
-      tlb_local.tme_bus_tlb_global = tlb;
-      tlb = &tlb_local;
+      /* pass this TLB's token: */
+      tlb_local.tme_bus_tlb_token = tlb->tme_bus_tlb_token;
       
       /* get our bus connection: */
       conn_bus = tme_memory_atomic_pointer_read(struct tme_bus_connection *,
@@ -436,7 +433,7 @@ _tme_i825x6_rx_buffers_add(struct tme_i825x6 *i825x6,
       /* reload the TLB entry: */
       err = (*conn_bus->tme_bus_tlb_fill)
 	(conn_bus,
-	 tlb,
+	 &tlb_local,
 	 address_init,
 	 TME_BUS_CYCLE_WRITE);
       
@@ -450,7 +447,7 @@ _tme_i825x6_rx_buffers_add(struct tme_i825x6 *i825x6,
       }
       
       /* store the TLB entry: */
-      tme_bus_tlb_back(tlb);
+      *tlb = tlb_local;
       
       /* loop to check the newly filled TLB entry: */
       continue;
@@ -2093,9 +2090,7 @@ _tme_i825x6_connection_make_bus(struct tme_connection *conn,
      hash yet, allocate it and add our bus signals: */
   if (rc == TME_OK
       && state == TME_CONNECTION_FULL
-      && tme_memory_atomic_pointer_read(struct tme_bus_tlb *,
-					i825x6->tme_i825x6_tlb_hash,
-					&i825x6->tme_i825x6_tlb_hash_rwlock) == NULL) {
+      && !i825x6->tme_i825x6_tlb_hash_added) {
 
     /* get our bus connection: */
     conn_bus
@@ -2103,14 +2098,12 @@ _tme_i825x6_connection_make_bus(struct tme_connection *conn,
 				       i825x6->tme_i825x6_device.tme_bus_device_connection,
 				       &i825x6->tme_i825x6_device.tme_bus_device_connection_rwlock);
 
-    /* allocate the TLB set: */
-    rc = ((*conn_bus->tme_bus_tlb_set_allocate)
-	  (conn_bus,
-	   TME_I825X6_TLB_HASH_SIZE, 
-	   sizeof(struct tme_bus_tlb),
-	   &i825x6->tme_i825x6_tlb_hash,
-	   &i825x6->tme_i825x6_device.tme_bus_device_connection_rwlock));
+    /* add the TLB set: */
+    rc = tme_bus_device_tlb_set_add(&i825x6->tme_i825x6_device,
+				    TME_I825X6_TLB_HASH_SIZE, 
+				    i825x6->tme_i825x6_tlb_hash);
     assert (rc == TME_OK);
+    i825x6->tme_i825x6_tlb_hash_added = TRUE;
 
     /* add our bus signals: */
     i825x6->tme_i825x6_bus_signals = _tme_i825x6_bus_signals;

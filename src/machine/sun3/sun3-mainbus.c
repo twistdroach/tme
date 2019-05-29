@@ -1,4 +1,4 @@
-/* $Id: sun3-mainbus.c,v 1.6 2007/08/24 01:15:19 fredette Exp $ */
+/* $Id: sun3-mainbus.c,v 1.7 2009/08/30 14:17:53 fredette Exp $ */
 
 /* machine/sun3/sun3-mainbus.c - implementation of Sun 3 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun3-mainbus.c,v 1.6 2007/08/24 01:15:19 fredette Exp $");
+_TME_RCSID("$Id: sun3-mainbus.c,v 1.7 2009/08/30 14:17:53 fredette Exp $");
 
 /* includes: */
 #include "sun3-impl.h"
@@ -417,7 +417,7 @@ _tme_sun3_connection_score(struct tme_connection *conn, unsigned int *_score)
 
     /* this must be an m68k chip, and not another bus: */
   case TME_CONNECTION_BUS_M68K:
-    if (conn_bus->tme_bus_tlb_set_allocate == NULL
+    if (conn_bus->tme_bus_tlb_set_add == NULL
 	&& conn_m68k->tme_m68k_bus_tlb_fill == NULL
 	&& conn_m68k->tme_m68k_bus_m6888x_enable != NULL) {
       score = 10;
@@ -429,7 +429,7 @@ _tme_sun3_connection_score(struct tme_connection *conn, unsigned int *_score)
        the bus must still be free: */
   case TME_CONNECTION_BUS_GENERIC:
     if (((conn_sun3->tme_sun3_bus_connection_which != TME_SUN3_CONN_OBIO_MASTER)
-	 == (conn_bus->tme_bus_tlb_set_allocate != NULL
+	 == (conn_bus->tme_bus_tlb_set_add != NULL
 	     && conn_bus->tme_bus_tlb_fill != NULL))
 	&& (conn_sun3->tme_sun3_bus_connection_which >= TME_SUN3_CONN_BUS_COUNT
 	    || sun3->tme_sun3_buses[conn_sun3->tme_sun3_bus_connection_which] == NULL)) {
@@ -535,7 +535,7 @@ _tme_sun3_connections_new(struct tme_element *element, const char * const *args,
     /* fill in the generic bus connection: */
     conn_bus->tme_bus_signal = _tme_sun3_bus_signal;
     conn_bus->tme_bus_intack = _tme_sun3_bus_intack;
-    conn_bus->tme_bus_tlb_set_allocate = _tme_sun3_mmu_tlb_set_allocate;
+    conn_bus->tme_bus_tlb_set_add = _tme_sun3_mmu_tlb_set_add;
 
     /* full in the m68k bus connection: */
     conn_m68k->tme_m68k_bus_tlb_fill = _tme_sun3_m68k_tlb_fill;
@@ -559,7 +559,7 @@ _tme_sun3_connections_new(struct tme_element *element, const char * const *args,
   /* fill in the generic bus connection: */
   conn_bus->tme_bus_signal = _tme_sun3_bus_signal;
   conn_bus->tme_bus_intack = NULL;
-  conn_bus->tme_bus_tlb_set_allocate = _tme_sun3_mmu_tlb_set_allocate;
+  conn_bus->tme_bus_tlb_set_add = _tme_sun3_mmu_tlb_set_add;
   conn_bus->tme_bus_tlb_fill = _tme_sun3_bus_tlb_fill;
 
   /* if we have no argument: */

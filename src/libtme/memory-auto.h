@@ -31,7 +31,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-_TME_RCSID("$Id: memory-auto.sh,v 1.1 2006/09/30 12:43:37 fredette Exp $");
+_TME_RCSID("$Id: memory-auto.sh,v 1.2 2010/02/15 15:16:28 fredette Exp $");
 
 /* macros: */
 
@@ -52,7 +52,8 @@ _TME_RCSID("$Id: memory-auto.sh,v 1.1 2006/09/30 12:43:37 fredette Exp $");
     *((type_part *)							\
       (_tme_cast_pointer(tme_uint8_t *, type_whole *, mem)		\
        + (offset)))							\
-      = (((type_whole) (x))						\
+      = (type_part)							\
+        (((type_whole) (x))						\
 	 >> (8 * (TME_ENDIAN_NATIVE == TME_ENDIAN_BIG			\
 		  ? (sizeof(type_whole)					\
 		     - ((offset) + sizeof(type_part)))			\
@@ -176,10 +177,15 @@ tme_uint8_t tme_memory_atomic_cx8 _TME_P((tme_shared tme_uint8_t *, tme_uint8_t,
 /* the default 16-bit memory atomic read macro: */
 #define tme_memory_atomic_read16(mem, lock, align_min) \
   ( \
-   /* if we aren't locking for all memory accesses, and we can \
+   /* if threads are cooperative, do a plain read: */ \
+   (TME_THREADS_COOPERATIVE) \
+   ? \
+     tme_memory_read16((_tme_const tme_uint16_t *) _tme_audit_type(mem, tme_uint16_t *), align_min) \
+   /* otherwise, if we aren't locking for all memory accesses, and we can \
       make direct 16-bit accesses, and this memory is aligned \
       enough to make a single direct atomic access, do the single \
       direct atomic read: */ \
+   : \
    (__tme_predict_true(TME_MEMORY_ALIGNMENT_ATOMIC(TME_MEMORY_TYPE_COMMON) != 0 \
                        && TME_MEMORY_ALIGNMENT_ATOMIC(tme_uint16_t) != 0 \
                        && _tme_memory_address_test(mem, TME_MEMORY_ALIGNMENT_ATOMIC(tme_uint16_t) - 1, align_min) == 0)) \
@@ -194,10 +200,16 @@ tme_uint8_t tme_memory_atomic_cx8 _TME_P((tme_shared tme_uint8_t *, tme_uint8_t,
 #define tme_memory_atomic_write16(mem, x, lock, align_min) \
   do { \
     if \
-      /* if we aren't locking for all memory accesses, and we can \
+      /* if threads are cooperative, do a plain write: */ \
+      (TME_THREADS_COOPERATIVE) \
+      { \
+        tme_memory_write16((tme_uint16_t *) _tme_cast_pointer_shared(tme_uint16_t *, tme_uint16_t *, mem), x, align_min); \
+      /* otherwise, if we aren't locking for all memory accesses, and we can \
          make direct 16-bit accesses, and this memory is aligned \
          enough to make a single direct atomic access, do the single \
          direct atomic write: */ \
+      } \
+    else if \
       (__tme_predict_true(TME_MEMORY_ALIGNMENT_ATOMIC(TME_MEMORY_TYPE_COMMON) != 0 \
                           && TME_MEMORY_ALIGNMENT_ATOMIC(tme_uint16_t) != 0 \
                           && _tme_memory_address_test(mem, TME_MEMORY_ALIGNMENT_ATOMIC(tme_uint16_t) - 1, align_min) == 0)) \
@@ -404,10 +416,15 @@ void tme_memory_atomic_write16 _TME_P((tme_shared tme_uint16_t *, tme_uint16_t, 
 /* the default 32-bit memory atomic read macro: */
 #define tme_memory_atomic_read32(mem, lock, align_min) \
   ( \
-   /* if we aren't locking for all memory accesses, and we can \
+   /* if threads are cooperative, do a plain read: */ \
+   (TME_THREADS_COOPERATIVE) \
+   ? \
+     tme_memory_read32((_tme_const tme_uint32_t *) _tme_audit_type(mem, tme_uint32_t *), align_min) \
+   /* otherwise, if we aren't locking for all memory accesses, and we can \
       make direct 32-bit accesses, and this memory is aligned \
       enough to make a single direct atomic access, do the single \
       direct atomic read: */ \
+   : \
    (__tme_predict_true(TME_MEMORY_ALIGNMENT_ATOMIC(TME_MEMORY_TYPE_COMMON) != 0 \
                        && TME_MEMORY_ALIGNMENT_ATOMIC(tme_uint32_t) != 0 \
                        && _tme_memory_address_test(mem, TME_MEMORY_ALIGNMENT_ATOMIC(tme_uint32_t) - 1, align_min) == 0)) \
@@ -422,10 +439,16 @@ void tme_memory_atomic_write16 _TME_P((tme_shared tme_uint16_t *, tme_uint16_t, 
 #define tme_memory_atomic_write32(mem, x, lock, align_min) \
   do { \
     if \
-      /* if we aren't locking for all memory accesses, and we can \
+      /* if threads are cooperative, do a plain write: */ \
+      (TME_THREADS_COOPERATIVE) \
+      { \
+        tme_memory_write32((tme_uint32_t *) _tme_cast_pointer_shared(tme_uint32_t *, tme_uint32_t *, mem), x, align_min); \
+      /* otherwise, if we aren't locking for all memory accesses, and we can \
          make direct 32-bit accesses, and this memory is aligned \
          enough to make a single direct atomic access, do the single \
          direct atomic write: */ \
+      } \
+    else if \
       (__tme_predict_true(TME_MEMORY_ALIGNMENT_ATOMIC(TME_MEMORY_TYPE_COMMON) != 0 \
                           && TME_MEMORY_ALIGNMENT_ATOMIC(tme_uint32_t) != 0 \
                           && _tme_memory_address_test(mem, TME_MEMORY_ALIGNMENT_ATOMIC(tme_uint32_t) - 1, align_min) == 0)) \
@@ -676,10 +699,15 @@ void tme_memory_atomic_write32 _TME_P((tme_shared tme_uint32_t *, tme_uint32_t, 
 /* the default 64-bit memory atomic read macro: */
 #define tme_memory_atomic_read64(mem, lock, align_min) \
   ( \
-   /* if we aren't locking for all memory accesses, and we can \
+   /* if threads are cooperative, do a plain read: */ \
+   (TME_THREADS_COOPERATIVE) \
+   ? \
+     tme_memory_read64((_tme_const tme_uint64_t *) _tme_audit_type(mem, tme_uint64_t *), align_min) \
+   /* otherwise, if we aren't locking for all memory accesses, and we can \
       make direct 64-bit accesses, and this memory is aligned \
       enough to make a single direct atomic access, do the single \
       direct atomic read: */ \
+   : \
    (__tme_predict_true(TME_MEMORY_ALIGNMENT_ATOMIC(TME_MEMORY_TYPE_COMMON) != 0 \
                        && TME_MEMORY_ALIGNMENT_ATOMIC(tme_uint64_t) != 0 \
                        && _tme_memory_address_test(mem, TME_MEMORY_ALIGNMENT_ATOMIC(tme_uint64_t) - 1, align_min) == 0)) \
@@ -694,10 +722,16 @@ void tme_memory_atomic_write32 _TME_P((tme_shared tme_uint32_t *, tme_uint32_t, 
 #define tme_memory_atomic_write64(mem, x, lock, align_min) \
   do { \
     if \
-      /* if we aren't locking for all memory accesses, and we can \
+      /* if threads are cooperative, do a plain write: */ \
+      (TME_THREADS_COOPERATIVE) \
+      { \
+        tme_memory_write64((tme_uint64_t *) _tme_cast_pointer_shared(tme_uint64_t *, tme_uint64_t *, mem), x, align_min); \
+      /* otherwise, if we aren't locking for all memory accesses, and we can \
          make direct 64-bit accesses, and this memory is aligned \
          enough to make a single direct atomic access, do the single \
          direct atomic write: */ \
+      } \
+    else if \
       (__tme_predict_true(TME_MEMORY_ALIGNMENT_ATOMIC(TME_MEMORY_TYPE_COMMON) != 0 \
                           && TME_MEMORY_ALIGNMENT_ATOMIC(tme_uint64_t) != 0 \
                           && _tme_memory_address_test(mem, TME_MEMORY_ALIGNMENT_ATOMIC(tme_uint64_t) - 1, align_min) == 0)) \

@@ -1,4 +1,4 @@
-/* $Id: log-prf.c,v 1.3 2003/10/16 02:48:24 fredette Exp $ */
+/* $Id: log-prf.c,v 1.4 2009/08/30 16:56:42 fredette Exp $ */
 
 /* libtme/log-prf.c - a printf function body: */
 
@@ -48,7 +48,7 @@
   prf_agg = prf_format;
 
   /* to silence gcc -Wuninitialized: */
-  prf_flag_l = FALSE;
+  prf_flag_ls = (const char *) NULL;
   prf_flag_0 = FALSE;
   prf_width = -1;
 
@@ -106,7 +106,7 @@
       }
 
       /* reset all flags, precisions, etc., and enter state two: */
-      prf_flag_l = FALSE;
+      prf_flag_ls = "ll" + 2;
       prf_flag_0 = FALSE;
       prf_width = -1;
       prf_state = 2;
@@ -121,7 +121,7 @@
       switch (prf_char) {
 
 	/* the 'l' flag: */
-      case 'l': prf_flag_l = TRUE; break;
+      case 'l': prf_flag_ls -= (prf_flag_ls[0] == '\0' || prf_flag_ls[1] == '\0'); break;
 
 	/* a width: */
       case '0':
@@ -152,37 +152,46 @@
       case 'X':
 	if (prf_width < 0) {
 	  sprintf(prf_format_buffer,
-		  (prf_flag_l
-		   ? "%%l%c"
-		   : "%%%c"),
+		  "%%%s%c",
+		  prf_flag_ls,
 		  prf_char);
 	  prf_width = 0;
 	}
 	else {
 	  sprintf(prf_format_buffer, 
+		  "%%%s%d%s%c",
 		  (prf_flag_0
-		   ? (prf_flag_l
-		      ? "%%0%dl%c"
-		      : "%%0%d%c")
-		   : (prf_flag_l
-		      ? "%%%dl%c"
-		      : "%%%d%c")),
+		   ? "0"
+		   : ""),
 		  prf_width,
+		  prf_flag_ls,
 		  prf_char);
 	}
 	/* NB: we always allocate at least the specified field width,
 	   plus the worst-case number of characters needed to
 	   represent the value in decimal, plus one for the NUL.  this
 	   should avoid buffer overflows entirely: */
-	if (prf_flag_l) {
-	  prf_value_ld = va_arg(prf_args, long int);
-	  prf_value_buffer = tme_new(char, prf_width + ((sizeof(prf_value_ld) * 3) + 1));
-	  sprintf(prf_value_buffer, prf_format_buffer, prf_value_ld);
-	}
-	else {
+	if (prf_flag_ls[0] == '\0') {
 	  prf_value_d = va_arg(prf_args, int);
 	  prf_value_buffer = tme_new(char, prf_width + ((sizeof(prf_value_d) * 3) + 1));
 	  sprintf(prf_value_buffer, prf_format_buffer, prf_value_d);
+	  PRF_OUT_ARG_CODE(TME_LOG_ARG_CODE_INT);
+	}
+	else if (prf_flag_ls[1] == '\0') {
+	  prf_value_ld = va_arg(prf_args, long int);
+	  prf_value_buffer = tme_new(char, prf_width + ((sizeof(prf_value_ld) * 3) + 1));
+	  sprintf(prf_value_buffer, prf_format_buffer, prf_value_ld);
+	  PRF_OUT_ARG_CODE(TME_LOG_ARG_CODE_LONG_INT);
+	}
+	else {
+#if (0 prf_lld(+ 1))
+	  prf_value_lld = va_arg(prf_args, long long int);
+	  prf_value_buffer = tme_new(char, prf_width + ((sizeof(prf_value_lld) * 3) + 1));
+	  sprintf(prf_value_buffer, prf_format_buffer, prf_value_lld);
+	  PRF_OUT_ARG_CODE(TME_LOG_ARG_CODE_LONG_LONG_INT);
+#else  /* long long int not supported */
+	  abort();
+#endif /* long long int not supported */
 	}
 	PRF_OUT_MEM(prf_value_buffer, strlen(prf_value_buffer));
 	tme_free(prf_value_buffer);
@@ -195,6 +204,7 @@
 	/* the 's' conversion: */
       case 's':
 	prf_value_s = va_arg(prf_args, const char *);
+	PRF_OUT_ARG_CODE(TME_LOG_ARG_CODE_STRING);
 	PRF_OUT_MEM(prf_value_s, strlen(prf_value_s));
 
 	/* enter state zero: */
@@ -205,6 +215,7 @@
 	/* the 'c' conversion: */
       case 'c':
 	prf_value_c = va_arg(prf_args, int);
+	PRF_OUT_ARG_CODE(TME_LOG_ARG_CODE_CHAR);
 	PRF_OUT_CHAR(prf_value_c);
 
 	/* enter state zero: */

@@ -1,4 +1,4 @@
-/* $Id: sun-mmu.c,v 1.11 2006/11/16 02:37:05 fredette Exp $ */
+/* $Id: sun-mmu.c,v 1.12 2010/02/15 21:55:55 fredette Exp $ */
 
 /* machine/sun/sun-mmu.c - classic Sun MMU emulation implementation: */
 
@@ -34,13 +34,14 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun-mmu.c,v 1.11 2006/11/16 02:37:05 fredette Exp $");
+_TME_RCSID("$Id: sun-mmu.c,v 1.12 2010/02/15 21:55:55 fredette Exp $");
 
 /* includes: */
 #include <tme/machine/sun.h>
 
 /* macros: */
 #define TME_SUN_MMU_PMEG_TLBS	(16)
+#define TME_SUN_MMU_CONTEXT_TLBS	(8)
 
 /* structures: */
 
@@ -50,18 +51,8 @@ struct tme_sun_mmu_tlb_set {
   /* the next allocated TLB set: */
   struct tme_sun_mmu_tlb_set *tme_sun_mmu_tlb_set_next;
 
-  /* the user's pointer into the TLB set: */
-  struct tme_bus_tlb * tme_shared *tme_sun_mmu_tlb_set_pointer;
-  tme_rwlock_t *tme_sun_mmu_tlb_set_pointer_rwlock;
-
-  /* the base of this TLB set: */
-  struct tme_bus_tlb *tme_sun_mmu_tlb_set_base;
-
-  /* the size of one TLB entry: */
-  unsigned int tme_sun_mmu_tlb_set_sizeof_one;
-
-  /* the number of TLB entries per context in the set: */
-  unsigned int tme_sun_mmu_tlb_set_count;
+  /* the TLB set information: */
+  struct tme_bus_tlb_set_info tme_sun_mmu_tlb_set_info;
 };
 
 /* one PMEG in a classic two-level Sun MMU: */
@@ -69,7 +60,7 @@ struct tme_sun_mmu_pmeg {
 
   /* the current list of TLBs using a page table entry in this PMEG, and
      the head within that list: */
-  struct tme_bus_tlb *tme_sun_mmu_pmeg_tlbs[TME_SUN_MMU_PMEG_TLBS];
+  struct tme_token *tme_sun_mmu_pmeg_tlb_tokens[TME_SUN_MMU_PMEG_TLBS];
   unsigned int tme_sun_mmu_pmeg_tlbs_head;
 };
 
@@ -108,6 +99,11 @@ struct tme_sun_mmu {
 
   /* the allocated TLB sets: */
   struct tme_sun_mmu_tlb_set *tme_sun_mmu_tlb_sets;
+
+  /* the current list of TLBs that must be invalidated when the
+     context changes: */
+  struct tme_token *tme_sun_mmu_context_tlb_tokens[TME_SUN_MMU_CONTEXT_TLBS];
+  unsigned int tme_sun_mmu_context_tlbs_head;
 };
 
 /* this creates a classic two-level Sun MMU: */
@@ -217,17 +213,17 @@ _tme_sun_mmu_pmeg_invalidate(struct tme_sun_mmu *mmu, unsigned short segment_map
 {
   struct tme_sun_mmu_pmeg *pmeg;
   int tlb_i;
-  struct tme_bus_tlb *tlb;
+  struct tme_token *token;
 
   /* get the PMEG: */
   pmeg = mmu->tme_sun_mmu_pmegs + mmu->tme_sun_mmu_segment_map[segment_map_index];
 
   /* invalidate all of the TLBs: */
   for (tlb_i = 0; tlb_i < TME_SUN_MMU_PMEG_TLBS; tlb_i++) {
-    tlb = pmeg->tme_sun_mmu_pmeg_tlbs[tlb_i];
-    pmeg->tme_sun_mmu_pmeg_tlbs[tlb_i] = NULL;
-    if (tlb != NULL) {
-      tme_bus_tlb_invalidate(tlb);
+    token = pmeg->tme_sun_mmu_pmeg_tlb_tokens[tlb_i];
+    pmeg->tme_sun_mmu_pmeg_tlb_tokens[tlb_i] = NULL;
+    if (token != NULL) {
+      tme_token_invalidate(token);
     }
   }
 }
@@ -335,11 +331,12 @@ tme_sun_mmu_tlb_fill(void *_mmu, struct tme_bus_tlb *tlb,
   struct tme_sun_mmu *mmu;
   unsigned short segment_map_index;
   struct tme_sun_mmu_pte *pte;
-  tme_bus_addr_t addr_first, addr_last;
+  tme_bus_addr32_t addr_first, addr_last;
   unsigned short protection, protection_other, tlb_valid_for;
   tme_uint32_t physical_address;
   struct tme_sun_mmu_pmeg *pmeg;
-  struct tme_bus_tlb tlb_virtual, *tlb_old;
+  struct tme_bus_tlb tlb_virtual;
+  struct tme_token *token_old;
   int tlb_i;
 
   /* the access must be a read or write by the system or user: */
@@ -359,13 +356,13 @@ tme_sun_mmu_tlb_fill(void *_mmu, struct tme_bus_tlb *tlb,
   if (__tme_predict_true(pte != &mmu->tme_sun_mmu_address_hole_pte)) {
     pmeg = mmu->tme_sun_mmu_pmegs + mmu->tme_sun_mmu_segment_map[segment_map_index];
     tlb_i = pmeg->tme_sun_mmu_pmeg_tlbs_head;
-    tlb_old = pmeg->tme_sun_mmu_pmeg_tlbs[tlb_i];
-    if (tlb_old != NULL
-	&& tlb_old != tlb->tme_bus_tlb_global) {
-      tme_bus_tlb_invalidate(tlb_old);
+    token_old = pmeg->tme_sun_mmu_pmeg_tlb_tokens[tlb_i];
+    if (token_old != NULL
+	&& token_old != tlb->tme_bus_tlb_token) {
+      tme_token_invalidate(token_old);
     }
-    pmeg->tme_sun_mmu_pmeg_tlbs[tlb_i]
-      = tlb->tme_bus_tlb_global;
+    pmeg->tme_sun_mmu_pmeg_tlb_tokens[tlb_i]
+      = tlb->tme_bus_tlb_token;
     pmeg->tme_sun_mmu_pmeg_tlbs_head = (tlb_i + 1) & (TME_SUN_MMU_PMEG_TLBS - 1);
   }
 
@@ -477,8 +474,6 @@ tme_sun_mmu_tlbs_invalidate(void *_mmu)
 {
   struct tme_sun_mmu *mmu;
   struct tme_sun_mmu_tlb_set *tlb_set;
-  struct tme_bus_tlb *tlb;
-  unsigned long tlb_i;
 
   /* recover our MMU: */
   mmu = (struct tme_sun_mmu *) _mmu;
@@ -487,78 +482,126 @@ tme_sun_mmu_tlbs_invalidate(void *_mmu)
   for (tlb_set = mmu->tme_sun_mmu_tlb_sets;
        tlb_set != NULL;
        tlb_set = tlb_set->tme_sun_mmu_tlb_set_next) {
-    tlb = tlb_set->tme_sun_mmu_tlb_set_base;
-    tlb_i = ((unsigned long) tlb_set->tme_sun_mmu_tlb_set_count) * mmu->tme_sun_mmu_contexts;
-    for (; tlb_i-- > 0; ) {
-      tme_bus_tlb_invalidate(tlb);
-      tlb = (struct tme_bus_tlb *) (((tme_uint8_t *) tlb) + tlb_set->tme_sun_mmu_tlb_set_sizeof_one);
-    }
+    tme_bus_tlb_set_invalidate(&tlb_set->tme_sun_mmu_tlb_set_info);
   }
 }
 
-/* this sets the user context register: */
+/* this adds a TLB entry as dependent on the current context: */
 void
-tme_sun_mmu_tlbs_context_set(void *_mmu, tme_uint8_t context)
+tme_sun_mmu_context_add(void *_mmu,
+			const struct tme_bus_tlb *tlb)
 {
   struct tme_sun_mmu *mmu;
-  struct tme_sun_mmu_tlb_set *tlb_set;
+  tme_uint32_t address;
+  tme_uint32_t segment_bits;
+  tme_uint32_t segments_per_context;
+  signed long segment_map_index;
+  tme_uint32_t pmeg;
+  unsigned long tlb_i;
+  struct tme_token *token_old;
 
   /* recover our MMU: */
   mmu = (struct tme_sun_mmu *) _mmu;
 
-  /* we have to update each TLB set to reflect the context change: */
-  for (tlb_set = mmu->tme_sun_mmu_tlb_sets;
-       tlb_set != NULL;
-       tlb_set = tlb_set->tme_sun_mmu_tlb_set_next) {
-    tme_memory_atomic_pointer_write(struct tme_bus_tlb *,
-				    *tlb_set->tme_sun_mmu_tlb_set_pointer,
-				    (struct tme_bus_tlb *)
-				    (((tme_uint8_t *) tlb_set->tme_sun_mmu_tlb_set_base)
-				     + (((unsigned long) tlb_set->tme_sun_mmu_tlb_set_count)
-					* tlb_set->tme_sun_mmu_tlb_set_sizeof_one
-					* context)),
-				    tlb_set->tme_sun_mmu_tlb_set_pointer_rwlock);
-  }
+  /* get the address used with the MMU: */
+  /* NB: if there is an address hole, this address could be in it.  if
+     it is, it doesn't matter if we decide that this TLB entry is
+     valid in all contexts or not - this TLB entry never needs to be
+     invalidated because of a context change: */
+  address = tlb->tme_bus_tlb_addr_first;
+
+  /* get the number of bits in a segment number: */
+  segment_bits = mmu->tme_sun_mmu_segment_bits;
+
+  /* get the number of segment map entries per context: */
+  segments_per_context = 1 << segment_bits;
+
+  /* get the segment map index for this address in the last
+     context: */
+  segment_map_index
+    = (((address
+	 >> (mmu->tme_sun_mmu_pgoffset_bits
+	     + mmu->tme_sun_mmu_pteindex_bits))
+	& (segments_per_context - 1))
+       + ((mmu->tme_sun_mmu_contexts - 1)
+	  << segment_bits));
+
+  /* get the PMEG for this address in the last context: */
+  pmeg = mmu->tme_sun_mmu_segment_map[segment_map_index];
+
+  /* there must be at least two contexts: */
+  assert (mmu->tme_sun_mmu_contexts >= 2);
+
+  /* loop over the segment map indices for this address in all other
+     contexts: */
+  segment_map_index -= segments_per_context;
+  do {
+
+    /* if the PMEG for this address in this context is different: */
+    if (__tme_predict_false(mmu->tme_sun_mmu_segment_map[segment_map_index] != pmeg)) {
+
+      /* this address doesn't have the same mapping in all contexts,
+	 so we must invalidate this TLB entry when the context
+	 changes: */
+      tlb_i = mmu->tme_sun_mmu_context_tlbs_head;
+      token_old = mmu->tme_sun_mmu_context_tlb_tokens[tlb_i];
+      if (token_old != NULL
+	  && token_old != tlb->tme_bus_tlb_token) {
+	tme_token_invalidate(token_old);
+      }
+      mmu->tme_sun_mmu_context_tlb_tokens[tlb_i] = tlb->tme_bus_tlb_token;
+      mmu->tme_sun_mmu_context_tlbs_head = (tlb_i + 1) % TME_SUN_MMU_CONTEXT_TLBS;
+
+      return;
+    }
+
+  } while ((segment_map_index -= segments_per_context) >= 0);
+
+  /* this address has the same mapping in all contexts, so we don't
+     need to invalidate this TLB entry when the context changes: */
 }
 
-/* this allocates a new TLB set: */
-int
-tme_sun_mmu_tlb_set_allocate(void *_mmu,
-			     unsigned int count, unsigned int sizeof_one, 
-			     struct tme_bus_tlb * tme_shared *_tlbs,
-			     tme_rwlock_t *_tlbs_rwlock)
+/* this is called after a context switch, to invalidate TLB entries
+   that were dependent on the previous context: */
+void
+tme_sun_mmu_context_switched(void *_mmu)
 {
   struct tme_sun_mmu *mmu;
-  struct tme_bus_tlb *tlbs, *tlb;
-  unsigned long tlb_i;
+  signed long tlb_i;
+  struct tme_token *token;
+
+  /* recover our MMU: */
+  mmu = (struct tme_sun_mmu *) _mmu;
+
+  /* invalidate all of the TLBs that depended on the previous
+     context: */
+  tlb_i = TME_SUN_MMU_CONTEXT_TLBS - 1;
+  do {
+    token = mmu->tme_sun_mmu_context_tlb_tokens[tlb_i];
+    mmu->tme_sun_mmu_context_tlb_tokens[tlb_i] = NULL;
+    if (token != NULL) {
+      tme_token_invalidate(token);
+    }
+  } while (--tlb_i >= 0);
+}
+
+/* this adds a new TLB set: */
+int
+tme_sun_mmu_tlb_set_add(void *_mmu,
+			struct tme_bus_tlb_set_info *tlb_set_info)
+{
+  struct tme_sun_mmu *mmu;
   struct tme_sun_mmu_tlb_set *tlb_set;
 
   /* recover our mmu: */
   mmu = (struct tme_sun_mmu *) _mmu;
 
-  /* allocate and initialize a set of TLBs: */
-  tlb_i = ((unsigned long) mmu->tme_sun_mmu_contexts) * count;
-  tlbs = (struct tme_bus_tlb *) tme_malloc(tlb_i * sizeof_one);
-  tlb = tlbs;
-  for (; tlb_i-- > 0; ) {
-    tme_bus_tlb_construct(tlb);
-    tlb = (struct tme_bus_tlb *) (((tme_uint8_t *) tlb) + sizeof_one);
-  }
-
   /* remember this set: */
   tlb_set = tme_new0(struct tme_sun_mmu_tlb_set, 1);
   tlb_set->tme_sun_mmu_tlb_set_next = mmu->tme_sun_mmu_tlb_sets;
-  tlb_set->tme_sun_mmu_tlb_set_pointer = _tlbs;
-  tlb_set->tme_sun_mmu_tlb_set_pointer_rwlock = _tlbs_rwlock;
-  tlb_set->tme_sun_mmu_tlb_set_base = tlbs;
-  tlb_set->tme_sun_mmu_tlb_set_sizeof_one = sizeof_one;
-  tlb_set->tme_sun_mmu_tlb_set_count = count;
+  tlb_set->tme_sun_mmu_tlb_set_info = *tlb_set_info;
   mmu->tme_sun_mmu_tlb_sets = tlb_set;
   
-  tme_memory_atomic_pointer_write(struct tme_bus_tlb *,
-				  *_tlbs,
-				  tlbs,
-				  _tlbs_rwlock);
   return (TME_OK);
 }
 

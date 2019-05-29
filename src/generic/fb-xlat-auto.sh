@@ -1,6 +1,6 @@
 #! /bin/sh
 
-# $Id: fb-xlat-auto.sh,v 1.11 2007/03/29 01:02:43 fredette Exp $
+# $Id: fb-xlat-auto.sh,v 1.12 2009/08/30 21:51:53 fredette Exp $
 
 # generic/fb-xlat-auto.sh - automatically generates C code 
 # for many framebuffer translation functions:
@@ -198,7 +198,7 @@ cat <<EOF
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-_TME_RCSID("\$Id: fb-xlat-auto.sh,v 1.11 2007/03/29 01:02:43 fredette Exp $");
+_TME_RCSID("\$Id: fb-xlat-auto.sh,v 1.12 2009/08/30 21:51:53 fredette Exp $");
 
 /* the central feature of these translation functions is the "bit
    FIFO", a first-in, first-out stream of bits.  source bit FIFOs are
@@ -1399,6 +1399,13 @@ for src_key in ${src_all}; do
 		undef_macros="${undef_macros} dst_fifo1_may_be_unaligned"
 	    fi
 	fi
+
+	echo ""
+	echo "  /* declare src_offset_updated_first and src_offset_updated_last,"
+	echo "     which hold the offsets of the first and last updated bytes in"
+	echo "     the source image: */"
+	echo "  tme_uint32_t src_offset_updated_first;"
+	echo "  tme_uint32_t src_offset_updated_last;"
 	
 	echo ""
 	echo "  /* declare src_raw0_end.  when treating the source image as"
@@ -1439,8 +1446,24 @@ for src_key in ${src_all}; do
 	echo "     src_raw0 is actually part of the source primary bit FIFO, which"
 	echo "     is good, because when the fast comparison fails on a word, src_raw0"
 	echo "     is already primed and ready to work for that bit FIFO: */"
-	echo "  src_raw0 = ((const tme_uint32_t *) src->tme_fb_connection_buffer) - 1;"
-	echo "  src_raw0_end = (const tme_uint32_t *) (src->tme_fb_connection_buffer + src_bypb_real);"
+	echo "  src_offset_updated_first = src->tme_fb_connection_offset_updated_first;"
+	echo "  src_offset_updated_last = TME_MIN(src->tme_fb_connection_offset_updated_last, src_bypb_real - 1);"
+	echo "  src->tme_fb_connection_offset_updated_first = 0;"
+	echo "  src->tme_fb_connection_offset_updated_last = src_bypb_real - 1;"
+	echo "  if (src_offset_updated_first > src_offset_updated_last) {"
+	echo "    return (FALSE);"
+	echo "  }"
+	echo "  src_raw0"
+	echo "    = (((const tme_uint32_t *)"
+	echo "        (src->tme_fb_connection_buffer"
+	echo "         + (src_offset_updated_first"
+	echo "            & (0 - (tme_uint32_t) sizeof(tme_uint32_t)))))"
+	echo "       -1);"
+	echo "  src_raw0_end"
+	echo "    = ((const tme_uint32_t *)"
+	echo "       (src->tme_fb_connection_buffer"
+	echo "        + src_offset_updated_last"
+	echo "        + 1));"
 
 	echo ""
 	echo "  /* initialize xlat_run to -1.  it can never go negative inside the"

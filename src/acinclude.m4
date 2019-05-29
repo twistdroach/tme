@@ -1,4 +1,4 @@
-dnl $Id: acinclude.m4,v 1.9 2007/08/24 00:42:59 fredette Exp $
+dnl $Id: acinclude.m4,v 1.10 2010/02/15 14:51:50 fredette Exp $
 
 dnl acinclude.m4 - additional tme autoconf macros:
 
@@ -32,7 +32,7 @@ dnl ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 dnl POSSIBILITY OF SUCH DAMAGE.
 
 dnl AC_CHECK_ALIGNOF(BITS)
-AC_DEFUN(AC_CHECK_ALIGNOF,
+AC_DEFUN([AC_CHECK_ALIGNOF],
 [changequote(<<, >>)dnl
 dnl The name to #define.
 define(<<AC_TYPE_NAME>>, translit(alignof_int$1_t, [a-z *], [A-Z_P]))dnl
@@ -81,7 +81,7 @@ undefine([AC_CV_NAME])dnl
 ])
 
 dnl AC_CHECK_SHIFTMAX(BITS)
-AC_DEFUN(AC_CHECK_SHIFTMAX,
+AC_DEFUN([AC_CHECK_SHIFTMAX],
 [changequote(<<, >>)dnl
 dnl The name to #define.
 define(<<AC_TYPE_NAME>>, translit(shiftmax_int$1_t, [a-z *], [A-Z_P]))dnl
@@ -138,7 +138,7 @@ undefine([AC_CV_NAME])dnl
 ])
 
 dnl AC_CHECK_SHIFTSIGNED(BITS)
-AC_DEFUN(AC_CHECK_SHIFTSIGNED,
+AC_DEFUN([AC_CHECK_SHIFTSIGNED],
 [changequote(<<, >>)dnl
 dnl The name to #define.
 define(<<AC_TYPE_NAME>>, translit(shiftsigned_int$1_t, [a-z *], [A-Z_P]))dnl
@@ -219,7 +219,7 @@ undefine([AC_CV_NAME])dnl
 ])
 
 dnl AC_CHECK_FLOAT_FORMAT(TYPE)
-AC_DEFUN(AC_CHECK_FLOAT_FORMAT,
+AC_DEFUN([AC_CHECK_FLOAT_FORMAT],
 [changequote(<<, >>)dnl
 dnl The name to #define.
 define(<<AC_TYPE_NAME>>, translit(FLOAT_FORMAT_$1, [a-z *], [A-Z_P]))dnl
@@ -302,7 +302,7 @@ undefine([AC_CV_NAME])dnl
 ])
 
 dnl AC_CHECK_FLOAT_LIMITS(TYPE, LIMITS)
-AC_DEFUN(AC_CHECK_FLOAT_LIMITS,
+AC_DEFUN([AC_CHECK_FLOAT_LIMITS],
 [changequote(<<, >>)dnl
 dnl The names to #define.
 define(<<AC_TYPE_NAME_MAX>>, translit(FLOAT_MAX_$1, [a-z *], [A-Z_P]))dnl
@@ -337,7 +337,7 @@ undefine([AC_CV_NAME])dnl
 ])
 
 dnl AC_CHECK_FUNC_LONG(FUNC, FUNCTION-BODY, [INCLUDES, [LIBRARIES]])
-AC_DEFUN(AC_CHECK_FUNC_LONG,
+AC_DEFUN([AC_CHECK_FUNC_LONG],
 [changequote(<<, >>)dnl
 dnl The name to #define.
 define(<<AC_FUNC_NAME>>, translit(have_$1, [a-z *], [A-Z_P]))dnl
@@ -396,7 +396,7 @@ dnl documentation shall at all times remain with M.I.T., and USER agrees to
 dnl preserve same.
 
 dnl AC_HEADER_CHECK_PROTOTYPE(FUNCTION, INCLUDES, [ACTION-IF-FOUND [, ACTION-IF-NOT-FOUND]])
-AC_DEFUN(AC_HEADER_CHECK_PROTOTYPE, 
+AC_DEFUN([AC_HEADER_CHECK_PROTOTYPE], 
 [AC_MSG_CHECKING([for a prototype for $1])
 AC_CACHE_VAL(ac_cv_proto_$1,
 [AC_TRY_COMPILE($2 [
@@ -414,7 +414,7 @@ fi
 ])
 
 dnl AC_HEADER_CHECK_PROTOTYPES(INCLUDES, FUNCTION...)
-AC_DEFUN(AC_HEADER_CHECK_PROTOTYPES,
+AC_DEFUN([AC_HEADER_CHECK_PROTOTYPES],
 [for ac_func in $2
 do
 AC_HEADER_CHECK_PROTOTYPE($ac_func, $1, 
@@ -426,7 +426,7 @@ done
 ])
 
 dnl AC_SYS_SOCKADDR_SA_LEN
-AC_DEFUN(AC_SYS_SOCKADDR_SA_LEN,
+AC_DEFUN([AC_SYS_SOCKADDR_SA_LEN],
 [AC_MSG_CHECKING([for sa_len in struct sockaddr])
 AC_CACHE_VAL(ac_cv_sys_sockaddr_sa_len,
 [AC_TRY_COMPILE([

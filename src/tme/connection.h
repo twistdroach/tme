@@ -1,4 +1,4 @@
-/* $Id: connection.h,v 1.10 2006/11/16 02:51:19 fredette Exp $ */
+/* $Id: connection.h,v 1.11 2009/08/30 13:07:32 fredette Exp $ */
 
 /* tme/connection.h - public header file for connections: */
 
@@ -37,7 +37,7 @@
 #define _TME_CONNECTION_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: connection.h,v 1.10 2006/11/16 02:51:19 fredette Exp $");
+_TME_RCSID("$Id: connection.h,v 1.11 2009/08/30 13:07:32 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -58,6 +58,9 @@ struct tme_connection {
 
   /* a backpointer to the element: */
   struct tme_element *tme_connection_element;
+
+  /* the element's identifier for this connection: */
+  tme_uint32_t tme_connection_id;
 
   /* the type of this connection: */
   unsigned int tme_connection_type;
@@ -87,5 +90,6 @@ struct tme_connection {
 #define TME_CONNECTION_MOUSE		(8)
 #define TME_CONNECTION_TAPE		(9)
 #define TME_CONNECTION_BUS_SPARC	(10)
+#define TME_CONNECTION_BUS_UPA		(11)
 
 #endif /* !_TME_CONNECTION_H */

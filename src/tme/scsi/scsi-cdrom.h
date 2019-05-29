@@ -1,4 +1,4 @@
-/* $Id: scsi-cdrom.h,v 1.1 2007/01/19 00:40:06 fredette Exp $ */
+/* $Id: scsi-cdrom.h,v 1.2 2009/09/26 13:06:47 fredette Exp $ */
 
 /* tme/scsi/scsi-cdrom.h - header file for generic SCSI CD-ROM emulation: */
 
@@ -37,7 +37,7 @@
 #define _TME_SCSI_SCSI_CDROM_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: scsi-cdrom.h,v 1.1 2007/01/19 00:40:06 fredette Exp $");
+_TME_RCSID("$Id: scsi-cdrom.h,v 1.2 2009/09/26 13:06:47 fredette Exp $");
 
 /* includes: */
 /* NB: for now, CDROMs reuse the disk implementation directly: */
@@ -135,7 +135,7 @@ _TME_RCSID("$Id: scsi-cdrom.h,v 1.1 2007/01/19 00:40:06 fredette Exp $");
 					/* 0x4e reserved */
 					/* 0x4f reserved */
 					/* 0x50 reserved */
-					/* 0x51 reserved */
+#define TME_SCSI_CDB_CDROM_READ_DISC_INFORMATION (0x51)
 					/* 0x52 reserved */
 					/* 0x53 reserved */
 					/* 0x54 reserved */

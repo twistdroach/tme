@@ -6,7 +6,7 @@ AUTOMAKE_OPTIONS = 1.4 gnu
 INCLUDES = -I$(top_srcdir) -I$(srcdir) -I. -D_TME_IMPL
 
 SUBDIRS = @TME_IC_SUBDIRS@
-DIST_SUBDIRS = m68k ieee754 sparc
+DIST_SUBDIRS = m68k ieee754 sparc stp22xx
 
 pkglib_LTLIBRARIES = @TME_ICS@
 EXTRA_LTLIBRARIES = tme_ic_am9513.la \
@@ -15,6 +15,9 @@ EXTRA_LTLIBRARIES = tme_ic_am9513.la \
 	tme_ic_isil7170.la \
 	tme_ic_ncr5380.la \
 	tme_ic_ncr53c9x.la \
+	tme_ic_ncr89c105.la \
+	tme_ic_stp2024.la \
+	tme_ic_ad184x.la \
 	tme_ic_mk48txx.la \
 	tme_ic_nec765.la \
 	tme_ic_am7930.la \
@@ -55,6 +58,21 @@ tme_ic_ncr5380_la_LIBADD = $(top_builddir)/libtme/libtme.la \
 tme_ic_ncr53c9x_la_SOURCES = ncr53c9x.c
 tme_ic_ncr53c9x_la_LDFLAGS = -rpath $(pkglibdir) -module -version-info 0:0:0
 tme_ic_ncr53c9x_la_LIBADD = $(top_builddir)/libtme/libtme.la \
+	$(top_builddir)/generic/libtme-generic.la
+
+tme_ic_ncr89c105_la_SOURCES = ncr89c105.c
+tme_ic_ncr89c105_la_LDFLAGS = -rpath $(pkglibdir) -module -version-info 0:0:0
+tme_ic_ncr89c105_la_LIBADD = $(top_builddir)/libtme/libtme.la \
+	$(top_builddir)/generic/libtme-generic.la
+
+tme_ic_stp2024_la_SOURCES = stp2024.c
+tme_ic_stp2024_la_LDFLAGS = -rpath $(pkglibdir) -module -version-info 0:0:0
+tme_ic_stp2024_la_LIBADD = $(top_builddir)/libtme/libtme.la \
+	$(top_builddir)/generic/libtme-generic.la
+
+tme_ic_ad184x_la_SOURCES = ad184x.c
+tme_ic_ad184x_la_LDFLAGS = -rpath $(pkglibdir) -module -version-info 0:0:0
+tme_ic_ad184x_la_LIBADD = $(top_builddir)/libtme/libtme.la \
 	$(top_builddir)/generic/libtme-generic.la
 
 tme_ic_mk48txx_la_SOURCES = mk48txx.c

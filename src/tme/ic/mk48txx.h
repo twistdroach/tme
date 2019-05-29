@@ -1,4 +1,4 @@
-/* $Id: mk48txx.h,v 1.2 2006/11/26 16:37:19 fredette Exp $ */
+/* $Id: mk48txx.h,v 1.3 2009/08/29 21:22:47 fredette Exp $ */
 
 /* tme/ic/mk48txx.h - public header file for Mostek MK48Txx emulation */
 
@@ -37,7 +37,7 @@
 #define _TME_IC_MK48TXX_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: mk48txx.h,v 1.2 2006/11/26 16:37:19 fredette Exp $");
+_TME_RCSID("$Id: mk48txx.h,v 1.3 2009/08/29 21:22:47 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -53,7 +53,7 @@ struct tme_mk48txx_socket {
   unsigned int tme_mk48txx_socket_version;
 
   /* the address increment: */
-  tme_bus_addr_t tme_mk48txx_socket_addr_shift;
+  tme_bus_addr32_t tme_mk48txx_socket_addr_shift;
 
   /* the system bus byte lane the chip is wired to: */
   unsigned int tme_mk48txx_socket_port_least_lane;

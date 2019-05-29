@@ -1,4 +1,4 @@
-/* $Id: ncr53c9x.c,v 1.4 2007/09/06 23:31:03 fredette Exp $ */
+/* $Id: ncr53c9x.c,v 1.5 2010/06/05 15:50:40 fredette Exp $ */
 
 /* ic/ncr53c9x.c - implementation of NCR 53c9x emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: ncr53c9x.c,v 1.4 2007/09/06 23:31:03 fredette Exp $");
+_TME_RCSID("$Id: ncr53c9x.c,v 1.5 2010/06/05 15:50:40 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -302,11 +302,14 @@ struct tme_ncr53c9x {
   int tme_ncr53c9x_dma_running;
 
   /* our DMA TLB set: */
-  struct tme_bus_tlb * tme_shared tme_ncr53c9x_dma_tlb;
-  tme_rwlock_t tme_ncr53c9x_dma_tlb_rwlock;  
+  struct tme_bus_tlb tme_ncr53c9x_dma_tlb;
+  int tme_ncr53c9x_dma_tlb_added;
 
   /* our DMA pseudoaddress: */
-  tme_bus_addr_t tme_ncr53c9x_dma_address;
+  tme_bus_addr32_t tme_ncr53c9x_dma_address;
+
+  /* if this is nonzero, a SCSI reset is detected: */
+  int tme_ncr53c9x_detected_scsi_reset;
 
   /* the command sequence label for a SCSI BSY signal lost handler: */
   unsigned int tme_ncr53c9x_cmd_sequence_bsy_lost;
@@ -374,9 +377,7 @@ _tme_ncr53c9x_tlb_hash(void *_ncr53c9x,
   ncr53c9x = (struct tme_ncr53c9x *) _ncr53c9x;
 
   /* return the TLB entry: */
-  return (tme_memory_atomic_pointer_read(struct tme_bus_tlb *,
-					 ncr53c9x->tme_ncr53c9x_dma_tlb,
-					 &ncr53c9x->tme_ncr53c9x_dma_tlb_rwlock));
+  return (&ncr53c9x->tme_ncr53c9x_dma_tlb);
 }
 
 #define TME_NCR53C9X_DEBUG_REG_READ	(0)
@@ -1304,16 +1305,38 @@ _tme_ncr53c9x_update(struct tme_ncr53c9x *ncr53c9x)
     /* if RST is being asserted: */
     if ((scsi_control & TME_SCSI_SIGNAL_RST) != 0) {
 
-      /* if the active command isn't a bus reset: */
-      if ((cmd & TME_NCR53C9X_CMD_MASK) != TME_NCR53C9X_CMD_RESET_BUS
-	  || cmd_sequence == TME_NCR53C9X_CMD_SEQUENCE_DONE) {
+      /* if this SCSI reset hasn't already been detected: */
+      if (!ncr53c9x->tme_ncr53c9x_detected_scsi_reset) {
 
-	/* do an external SCSI reset: */
-	_tme_ncr53c9x_reset(ncr53c9x, TME_NCR53C9X_RESET_BUS);
+	/* this SCSI reset has been detected: */
+	ncr53c9x->tme_ncr53c9x_detected_scsi_reset = TRUE;
 
-	/* stop now: */
-	break;
+	/* if SCSI reset reporting hasn't been disabled: */
+	if (!(ncr53c9x->tme_ncr53c9x_regs[TME_NCR53C9X_REG_CONTROL1]
+	      & TME_NCR53C9X_CONTROL1_DISR)) {
+
+	  /* issue a SCSI reset interrupt: */
+	  _TME_NCR53C9X_CS_INT(TME_NCR53C9X_INST_SRST);
+	}
+
+	/* if the active command isn't a bus reset: */
+	if ((cmd & TME_NCR53C9X_CMD_MASK) != TME_NCR53C9X_CMD_RESET_BUS
+	    || cmd_sequence == TME_NCR53C9X_CMD_SEQUENCE_DONE) {
+
+	  /* do an external SCSI reset: */
+	  _tme_ncr53c9x_reset(ncr53c9x, TME_NCR53C9X_RESET_BUS);
+
+	  /* stop now: */
+	  break;
+	}
       }
+    }
+
+    /* otherwise, RST is not being asserted: */
+    else {
+
+      /* no SCSI reset is detected: */
+      ncr53c9x->tme_ncr53c9x_detected_scsi_reset = FALSE;
     }
 
     /* if we are idle: */
@@ -1444,10 +1467,6 @@ _tme_ncr53c9x_update(struct tme_ncr53c9x *ncr53c9x)
 	  _TME_NCR53C9X_CS(2):	_TME_NCR53C9X_CS_WAIT;
 	  _TME_NCR53C9X_CS(3):	_TME_NCR53C9X_CS_SCSI_OUT(0);
 				_tme_ncr53c9x_disconnect(ncr53c9x);
-				if (!(ncr53c9x->tme_ncr53c9x_regs[TME_NCR53C9X_REG_CONTROL1]
-				      & TME_NCR53C9X_CONTROL1_DISR)) {
-				  _TME_NCR53C9X_CS_INT(TME_NCR53C9X_INST_SRST);
-				}
 				_TME_NCR53C9X_CS_DONE;
 	}
 	break;
@@ -1867,7 +1886,7 @@ _tme_ncr53c9x_callout(struct tme_ncr53c9x *ncr53c9x)
   unsigned int fifo_head;
   unsigned int fifo_tail;
   int callouts_blocked;
-  tme_bus_addr_t address;
+  tme_bus_addr32_t address;
   tme_uint32_t reg_ctc;
   tme_uint32_t resid;
   unsigned int cycle_type;
@@ -1959,7 +1978,11 @@ _tme_ncr53c9x_callout(struct tme_ncr53c9x *ncr53c9x)
       assert (reg_ctc == _tme_ncr53c9x_ctc_read(ncr53c9x));
 
       /* update the FIFO tail, DMA address and CTC register: */
-      ncr53c9x->tme_ncr53c9x_fifo_data_tail += resid;
+      ncr53c9x->tme_ncr53c9x_fifo_data_tail
+	= ((ncr53c9x->tme_ncr53c9x_fifo_data_tail
+	    + resid)
+	   % TME_ARRAY_ELS(ncr53c9x->tme_ncr53c9x_fifo_data));
+      _tme_ncr53c9x_fifo_data_update(ncr53c9x);
       ncr53c9x->tme_ncr53c9x_dma_address += resid;
       reg_ctc -= resid;
       _tme_ncr53c9x_ctc_write(ncr53c9x, reg_ctc);
@@ -2170,9 +2193,7 @@ _tme_ncr53c9x_callout(struct tme_ncr53c9x *ncr53c9x)
 	  assert (_tme_ncr53c9x_ctc_read(ncr53c9x) > 0);
 
 	  /* get our TLB entry: */
-	  tlb = tme_memory_atomic_pointer_read(struct tme_bus_tlb *,
-					       ncr53c9x->tme_ncr53c9x_dma_tlb, 
-					       &ncr53c9x->tme_ncr53c9x_dma_tlb_rwlock);
+	  tlb = &ncr53c9x->tme_ncr53c9x_dma_tlb;
 
 	  /* busy this TLB entry: */
 	  tme_bus_tlb_busy(tlb);
@@ -2180,8 +2201,8 @@ _tme_ncr53c9x_callout(struct tme_ncr53c9x *ncr53c9x)
 	  /* if the TLB entry is valid, covers this address and allows
 	     the needed access: */
 	  if (tme_bus_tlb_is_valid(tlb)
-	      && address >= tlb->tme_bus_tlb_addr_first
-	      && address <= tlb->tme_bus_tlb_addr_last
+	      && address >= (tme_bus_addr32_t) tlb->tme_bus_tlb_addr_first
+	      && address <= (tme_bus_addr32_t) tlb->tme_bus_tlb_addr_last
 	      && (((cycle_type == TME_BUS_CYCLE_READ
 		    ? tlb->tme_bus_tlb_emulator_off_read
 		    : tlb->tme_bus_tlb_emulator_off_write) != TME_EMULATOR_OFF_UNDEF)
@@ -2198,8 +2219,8 @@ _tme_ncr53c9x_callout(struct tme_ncr53c9x *ncr53c9x)
 	    /* unbusy this TLB entry for filling: */
 	    tme_bus_tlb_unbusy_fill(tlb);
 
-	    /* set the global TLB entry: */
-	    tlb_local.tme_bus_tlb_global = tlb;
+	    /* pass this TLB's token: */
+	    tlb_local.tme_bus_tlb_token = tlb->tme_bus_tlb_token;
 
 	    /* get our bus connection: */
 	    conn_bus = tme_memory_atomic_pointer_read(struct tme_bus_connection *,
@@ -2248,7 +2269,7 @@ _tme_ncr53c9x_callout(struct tme_ncr53c9x *ncr53c9x)
 	    }
 	  
 	    /* copy the local TLB entry into the global TLB entry: */
-	    tme_bus_tlb_back(&tlb_local);
+	    *tlb = tlb_local;
 	  }
 	}
 
@@ -2323,7 +2344,7 @@ _tme_ncr53c9x_callout(struct tme_ncr53c9x *ncr53c9x)
 		   stopping at least at the end of this TLB entry: */
 		/* XXX FIXME - this breaks volatile: */
 		scsi_dma_buffer.tme_scsi_dma_in = (tme_uint8_t *) (tlb->tme_bus_tlb_emulator_off_write + address);
-		scsi_dma_buffer.tme_scsi_dma_resid = (tlb->tme_bus_tlb_addr_last - address) + 1;
+		scsi_dma_buffer.tme_scsi_dma_resid = (((tme_bus_addr32_t) tlb->tme_bus_tlb_addr_last) - address) + 1;
 	      }
 
 	      /* otherwise, this TLB entry doesn't support fast writing: */
@@ -2363,14 +2384,18 @@ _tme_ncr53c9x_callout(struct tme_ncr53c9x *ncr53c9x)
 	  scsi_dma_buffer.tme_scsi_dma_in = NULL;
 #endif /* NDEBUG */
 
-	  /* we may not have any data to transfer yet: */
-	  scsi_dma_buffer.tme_scsi_dma_out = NULL;
-	  scsi_dma_buffer.tme_scsi_dma_resid = 0;
+	  /* if DMA is not running: */
+	  if (!ncr53c9x->tme_ncr53c9x_dma_running) {
 
-	  /* if DMA is running, and there isn't any data in the FIFO
-             that needs to be transferred first: */
-	  if (ncr53c9x->tme_ncr53c9x_dma_running
-	      && fifo_tail == fifo_head) {
+	    /* unless the FIFO is not empty, which we check below, we
+	       don't have any data to transfer now: */
+	    scsi_dma_buffer.tme_scsi_dma_out = NULL;
+	    scsi_dma_buffer.tme_scsi_dma_resid = 0;
+	  }
+
+	  /* otherwise, DMA is running.  if there isn't any data in
+	     the FIFO that needs to be transferred first: */
+	  else if (fifo_tail == fifo_head) {
 
 	    /* get the DMA address and the CTC register: */
 	    address = ncr53c9x->tme_ncr53c9x_dma_address;
@@ -2383,7 +2408,7 @@ _tme_ncr53c9x_callout(struct tme_ncr53c9x *ncr53c9x)
 		 at least at the end of this TLB entry: */
 	      /* XXX FIXME - this breaks volatile: */
 	      scsi_dma_buffer.tme_scsi_dma_out = (const tme_uint8_t *) (tlb->tme_bus_tlb_emulator_off_read + address);
-	      scsi_dma_buffer.tme_scsi_dma_resid = (tlb->tme_bus_tlb_addr_last - address) + 1;
+	      scsi_dma_buffer.tme_scsi_dma_resid = (((tme_bus_addr32_t) tlb->tme_bus_tlb_addr_last) - address) + 1;
 
 	      /* don't transfer more than CTC bytes: */
 	      if (reg_ctc < scsi_dma_buffer.tme_scsi_dma_resid) {
@@ -2446,14 +2471,18 @@ _tme_ncr53c9x_callout(struct tme_ncr53c9x *ncr53c9x)
 	      assert (reg_ctc == _tme_ncr53c9x_ctc_read(ncr53c9x));
 
 	      /* update the FIFO head, DMA address and CTC register: */
-	      fifo_head += resid;
+	      fifo_head = (fifo_head + resid) % TME_ARRAY_ELS(ncr53c9x->tme_ncr53c9x_fifo_data);
 	      ncr53c9x->tme_ncr53c9x_fifo_data_head = fifo_head;
+	      _tme_ncr53c9x_fifo_data_update(ncr53c9x);
 	      ncr53c9x->tme_ncr53c9x_dma_address += resid;
 	      reg_ctc -= resid;
 	      _tme_ncr53c9x_ctc_write(ncr53c9x, reg_ctc);
 
 	      /* reload the data FIFO tail: */
 	      fifo_tail = ncr53c9x->tme_ncr53c9x_fifo_data_tail;
+
+	      /* the data FIFO must not be empty: */
+	      assert (fifo_head != fifo_tail);
 	    }
 	  }
 
@@ -3335,9 +3364,7 @@ _tme_ncr53c9x_connection_make_bus(struct tme_connection *conn,
      set yet, allocate it: */
   if (rc == TME_OK
       && state == TME_CONNECTION_FULL
-      && tme_memory_atomic_pointer_read(struct tme_bus_tlb *,
-					ncr53c9x->tme_ncr53c9x_dma_tlb,
-					&ncr53c9x->tme_ncr53c9x_dma_tlb_rwlock) == NULL) {
+      && !ncr53c9x->tme_ncr53c9x_dma_tlb_added) {
 
     /* get our bus connection: */
     conn_bus
@@ -3346,13 +3373,11 @@ _tme_ncr53c9x_connection_make_bus(struct tme_connection *conn,
 				       &ncr53c9x->tme_ncr53c9x_device.tme_bus_device_connection_rwlock);
 
     /* allocate the TLB set: */
-    rc = ((*conn_bus->tme_bus_tlb_set_allocate)
-	  (conn_bus,
-	   1, 
-	   sizeof(struct tme_bus_tlb),
-	   &ncr53c9x->tme_ncr53c9x_dma_tlb,
-	   &ncr53c9x->tme_ncr53c9x_dma_tlb_rwlock));
+    rc = tme_bus_device_tlb_set_add(&ncr53c9x->tme_ncr53c9x_device,
+				    1, 
+				    &ncr53c9x->tme_ncr53c9x_dma_tlb);
     assert (rc == TME_OK);
+    ncr53c9x->tme_ncr53c9x_dma_tlb_added = TRUE;
   }
 
   return (rc);

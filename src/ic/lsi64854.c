@@ -1,4 +1,4 @@
-/* $Id: lsi64854.c,v 1.1 2006/11/15 22:54:32 fredette Exp $ */
+/* $Id: lsi64854.c,v 1.2 2010/06/05 14:53:16 fredette Exp $ */
 
 /* ic/lsi64854.c - LSI 64854 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: lsi64854.c,v 1.1 2006/11/15 22:54:32 fredette Exp $");
+_TME_RCSID("$Id: lsi64854.c,v 1.2 2010/06/05 14:53:16 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -47,6 +47,8 @@ _TME_RCSID("$Id: lsi64854.c,v 1.1 2006/11/15 22:54:32 fredette Exp $");
 /* channels: */
 #define TME_LSI64854_CHANNEL_NULL		(0)
 #define TME_LSI64854_CHANNEL_SCSI		(1)
+#define TME_LSI64854_CHANNEL_ENET		(2)
+#define TME_LSI64854_CHANNEL_PPRT		(3)
 
 /* register offsets: */
 #define TME_LSI64854_REG_X_CSR			(sizeof(tme_uint32_t) * 0)
@@ -54,10 +56,24 @@ _TME_RCSID("$Id: lsi64854.c,v 1.1 2006/11/15 22:54:32 fredette Exp $");
 #define TME_LSI64854_REG_SG_COUNT		(sizeof(tme_uint32_t) * 2)
 #define TME_LSI64854_REG_SCSI_TEST		(sizeof(tme_uint32_t) * 3)
 #define TME_LSI64854_SIZ_SCSI			(sizeof(tme_uint32_t) * 4)
+#define TME_LSI64854_REG_ENET_TEST		(sizeof(tme_uint32_t) * 1)
+#define TME_LSI64854_REG_ENET_CACHE_VALID	(sizeof(tme_uint32_t) * 2)
+#define TME_LSI64854_REG_ENET_BASE		(sizeof(tme_uint32_t) * 3)
+#define TME_LSI64854_REG_ENET_CSR_OTHER		(sizeof(tme_uint32_t) * 4)
+#define TME_LSI64854_SIZ_ENET			(sizeof(tme_uint32_t) * 5)
+#define TME_LSI64854_REG_PPRT_HCR		(0x10)
+#define TME_LSI64854_REG_PPRT_OCR		(0x12)
+#define TME_LSI64854_REG_PPRT_DR		(0x14)
+#define TME_LSI64854_REG_PPRT_TCR		(0x15)
+#define TME_LSI64854_REG_PPRT_OR		(0x16)
+#define TME_LSI64854_REG_PPRT_IR		(0x17)
+#define TME_LSI64854_REG_PPRT_ICR		(0x18)
+#define TME_LSI64854_SIZ_PPRT			(0x1a)
 #define TME_LSI64854_SIZ_X			(sizeof(tme_uint32_t) * 4)
 
 /* master registers: */
 #define TME_LSI64854_SIZ_NCR53C9X		(sizeof(tme_uint32_t) * 0x10)
+#define TME_LSI64854_SIZ_AM7990			(sizeof(tme_uint16_t) * 2)
 
 /* the common CSR: */
 #define TME_LSI64854_CSR_X_INT_PENDING		(0x00000001)
@@ -72,6 +88,7 @@ _TME_RCSID("$Id: lsi64854.c,v 1.1 2006/11/15 22:54:32 fredette Exp $");
 #define TME_LSI64843_CSR_X_REQ_PENDING		(0x00000400)
 #define TME_LSI64854_CSR_X_REV_MASK		(0xf0000000)
 #define  TME_LSI64854_CSR_X_REV_1PLUS		 (0x90000000)
+#define  TME_LSI64854_CSR_X_REV_2		 (0xa0000000)
 
 /* the common scatter/gather CSR: */
 #define TME_LSI64854_CSR_SG_COUNT_ENABLE	(0x00002000)
@@ -90,11 +107,11 @@ _TME_RCSID("$Id: lsi64854.c,v 1.1 2006/11/15 22:54:32 fredette Exp $");
 
 /* predicates: */
 #define TME_LSI64854_CHANNEL_HAS_MASTER(lsi64854)	\
-  (TRUE)
+  ((lsi64854)->tme_lsi64854_channel != TME_LSI64854_CHANNEL_PPRT)
 #define TME_LSI64854_REV_HAS_SLAVE_ERROR(lsi64854)	\
   (TRUE)
 #define TME_LSI64854_CHANNEL_HAS_SG(lsi64854)		\
-  (TRUE)
+  ((lsi64854)->tme_lsi64854_channel != TME_LSI64854_CHANNEL_ENET)
 #define TME_LSI64854_CHANNEL_HAS_SG_CHAINING(lsi64854)	\
   (TRUE)
 
@@ -149,10 +166,14 @@ struct tme_lsi64854 {
   int tme_lsi64854_int_asserted;
 
   /* any outstanding master TLB entry: */
-  struct tme_bus_tlb *tme_lsi64854_master_tlb;
+  struct tme_token *tme_lsi64854_master_tlb_token;
 
   /* a CSR subset between the channel and master: */
   tme_uint32_t tme_lsi64854_csr_master;
+
+  /* parallel-port specific registers: */
+  tme_uint16_t tme_lsi64854_pprt_hcr;
+  tme_uint16_t tme_lsi64854_pprt_icr;
 };
 
 /* a lsi64854 internal bus connection: */
@@ -238,6 +259,12 @@ _tme_lsi64854_reset(struct tme_lsi64854 *lsi64854)
 
   /* clear all pending callouts: */
   lsi64854->tme_lsi64854_callout_flags &= TME_LSI64854_CALLOUTS_MASK;
+
+  /* an Ethernet channel apparently comes out of reset with its
+     address register set to this: */
+  if (lsi64854->tme_lsi64854_channel == TME_LSI64854_CHANNEL_ENET) {
+    lsi64854->tme_lsi64854_address = 0xff000000;
+  }
 }
 
 /* this returns the count of bytes that the master can DMA: */
@@ -366,6 +393,7 @@ _tme_lsi64854_callout(struct tme_lsi64854 *lsi64854)
 	    ? ((*conn_bus->tme_bus_signal)
 	       (conn_bus,
 		TME_BUS_SIGNAL_INT_UNSPEC
+		| TME_BUS_SIGNAL_EDGE
 		| (int_asserted
 		   ? TME_BUS_SIGNAL_LEVEL_ASSERTED
 		   : TME_BUS_SIGNAL_LEVEL_NEGATED)))
@@ -387,7 +415,9 @@ _tme_lsi64854_bus_cycle_regs(void *_lsi64854,
 			     struct tme_bus_cycle *cycle_init)
 {
   struct tme_lsi64854 *lsi64854;
-  tme_bus_addr_t reg;
+  tme_bus_addr32_t reg;
+  tme_uint8_t value8;
+  tme_uint16_t value16;
   tme_uint32_t value;
   tme_uint32_t csr_old;
   tme_uint32_t csr_mask;
@@ -396,15 +426,98 @@ _tme_lsi64854_bus_cycle_regs(void *_lsi64854,
   /* recover our data structure: */
   lsi64854 = (struct tme_lsi64854 *) _lsi64854;
 
-  /* we only emulate aligned 32-bit accesses: */
+  /* we only emulate aligned 8-, 16, and 32-bit accesses: */
   reg = cycle_init->tme_bus_cycle_address;
-  if ((reg % sizeof(tme_uint32_t))
-      || cycle_init->tme_bus_cycle_size != sizeof(tme_uint32_t)) {
+  if (cycle_init->tme_bus_cycle_size > sizeof(tme_uint32_t)
+      || cycle_init->tme_bus_cycle_size == (sizeof(tme_uint16_t) + sizeof(tme_uint8_t))
+      || (reg & (cycle_init->tme_bus_cycle_size - 1)) != 0) {
     abort();
   }
 
   /* lock the mutex: */
   tme_mutex_lock(&lsi64854->tme_lsi64854_mutex);
+
+  /* if this is an 8- or 16-bit access: */
+  if (cycle_init->tme_bus_cycle_size < sizeof(tme_uint32_t)) {
+
+    /* this must be a parallel channel: */
+    if (lsi64854->tme_lsi64854_channel != TME_LSI64854_CHANNEL_PPRT) {
+      abort();
+    }
+
+    /* if this is a write: */
+    if (cycle_init->tme_bus_cycle_type == TME_BUS_CYCLE_WRITE) {
+
+      /* run the bus cycle: */
+      if (cycle_init->tme_bus_cycle_size != sizeof(tme_uint16_t)) {
+	abort();
+      }
+      tme_bus_cycle_xfer_reg(cycle_init, 
+			     &value16,
+			     TME_BUS16_LOG2);
+
+      /* dispatch on the register: */
+      switch (reg) {
+      default: abort();
+      case TME_LSI64854_REG_PPRT_HCR:
+	lsi64854->tme_lsi64854_pprt_hcr = value16;
+	break;
+      case TME_LSI64854_REG_PPRT_ICR:
+	lsi64854->tme_lsi64854_pprt_icr = value16;
+	break;
+      }
+    }
+
+    /* otherwise, this must be a read: */
+    else {
+      assert (cycle_init->tme_bus_cycle_type == TME_BUS_CYCLE_READ);
+
+      /* dispatch on the register: */
+      switch (reg) {
+      default: abort();
+      case TME_LSI64854_REG_PPRT_HCR:
+	value16 = lsi64854->tme_lsi64854_pprt_hcr;
+	break;
+      case TME_LSI64854_REG_PPRT_OCR:
+	value16 = 0;
+	break;
+      case TME_LSI64854_REG_PPRT_DR:
+	value16 = 0;
+	break;
+      case TME_LSI64854_REG_PPRT_TCR:
+	value16 = 0;
+	break;
+      case TME_LSI64854_REG_PPRT_OR:
+	value16 = 0;
+	break;
+      case TME_LSI64854_REG_PPRT_IR:
+	value16 = 0;
+	break;
+      case TME_LSI64854_REG_PPRT_ICR:
+	value16 = lsi64854->tme_lsi64854_pprt_icr;
+	break;
+      }
+
+      /* run the bus cycle: */
+      if (cycle_init->tme_bus_cycle_size == sizeof(tme_uint8_t)) {
+	value8 = value16;
+	tme_bus_cycle_xfer_reg(cycle_init, 
+			       &value8,
+			       TME_BUS8_LOG2);
+      }
+      else {
+	tme_bus_cycle_xfer_reg(cycle_init, 
+			       &value16,
+			       TME_BUS16_LOG2);
+      }
+    }
+
+    /* unlock the mutex: */
+    tme_mutex_unlock(&lsi64854->tme_lsi64854_mutex);
+
+    /* no faults: */
+    return (TME_OK);
+  }
 
   /* if this is a write: */
   if (cycle_init->tme_bus_cycle_type == TME_BUS_CYCLE_WRITE) {
@@ -495,6 +608,17 @@ _tme_lsi64854_bus_cycle_regs(void *_lsi64854,
       }
     }
 
+    /* otherwise, if this is an Ethernet channel and this is a write
+       to the base register: */
+    else if (lsi64854->tme_lsi64854_channel == TME_LSI64854_CHANNEL_ENET
+	     && reg == TME_LSI64854_REG_ENET_BASE) {
+
+      /* write the address register: */
+      value &= 0xff000000;
+      _tme_lsi64854_debug_reg(lsi64854, &lsi64854->tme_lsi64854_address, TME_LSI64854_DEBUG_REG_WRITE, value);
+      lsi64854->tme_lsi64854_address = value;
+    }
+
     /* any other register: */
     else {
       abort();
@@ -568,6 +692,39 @@ _tme_lsi64854_bus_cycle_regs(void *_lsi64854,
       }
     }
 
+    /* otherwise, if this is an Ethernet channel: */
+    else if (lsi64854->tme_lsi64854_channel == TME_LSI64854_CHANNEL_ENET) {
+
+      /* if this is a read of the undocumented other CSR: */
+      if (reg == TME_LSI64854_REG_ENET_CSR_OTHER) {
+
+	/* return a good value: */
+	value = (lsi64854->tme_lsi64854_csr & TME_LSI64854_CSR_X_REV_MASK);
+      }
+
+      /* any other register: */
+      else {
+	abort();
+      }
+    }
+
+    /* otherwise, if this is a parallel channel: */
+    else if (lsi64854->tme_lsi64854_channel == TME_LSI64854_CHANNEL_PPRT) {
+
+      /* if this is a read of HCR and OCR: */
+      if (reg == TME_LSI64854_REG_PPRT_HCR) {
+
+	/* read HCR and OCR: */
+	value = lsi64854->tme_lsi64854_pprt_hcr;
+	value <<= 16;
+      }
+
+      /* any other register: */
+      else {
+	abort();
+      }
+    }
+
     /* any other register: */
     else {
       abort();
@@ -610,6 +767,12 @@ _tme_lsi64854_tlb_fill_regs(struct tme_bus_connection *conn_bus,
   case TME_LSI64854_CHANNEL_SCSI:
     tlb->tme_bus_tlb_addr_last = TME_LSI64854_SIZ_SCSI - 1;
     break;
+  case TME_LSI64854_CHANNEL_ENET:
+    tlb->tme_bus_tlb_addr_last = TME_LSI64854_SIZ_ENET - 1;
+    break;
+  case TME_LSI64854_CHANNEL_PPRT:
+    tlb->tme_bus_tlb_addr_last = TME_LSI64854_SIZ_PPRT - 1;
+    break;
   }
 
   /* the address must be within range: */
@@ -635,7 +798,7 @@ _tme_lsi64854_tlb_fill_regs_master(struct tme_bus_connection *conn_bus,
 {
   struct tme_lsi64854 *lsi64854;
   struct tme_bus_connection *conn_master;
-  tme_bus_addr_t address_mask;
+  tme_bus_addr32_t address_mask;
   int address_shift;
   int rc;
 
@@ -653,6 +816,13 @@ _tme_lsi64854_tlb_fill_regs_master(struct tme_bus_connection *conn_bus,
     /* each 8-bit NCR 53c9x register is at a 32-bit aligned address: */
     address_mask = TME_LSI64854_SIZ_NCR53C9X - 1;
     address_shift = 2; /* log2(sizeof(tme_uint32_t)) */
+    break;
+
+  case TME_LSI64854_CHANNEL_ENET:
+
+    /* each 16-bit am7990 register is at a 16-bit aligned address: */
+    address_mask = TME_LSI64854_SIZ_AM7990 - 1;
+    address_shift = 0;
     break;
   }
 
@@ -745,13 +915,14 @@ _tme_lsi64854_bus_fault_handler(void *_lsi64854,
 static int
 _tme_lsi64854_tlb_fill(struct tme_bus_connection *conn_bus,
 		       struct tme_bus_tlb *tlb, 
-		       tme_bus_addr_t master_address, 
+		       tme_bus_addr_t master_address_wider,
 		       unsigned int cycles)
 {
   struct tme_lsi64854 *lsi64854;
+  tme_bus_addr_t master_address;
   tme_uint32_t csr;
-  tme_bus_addr_t dma_address;
-  tme_bus_addr_t dma_count;
+  tme_bus_addr32_t dma_address;
+  tme_bus_addr32_t dma_count;
   tme_uint32_t bpr;
   unsigned int bpr_count;
 #ifdef TME_LSI64854_STRICT_PACK
@@ -769,16 +940,20 @@ _tme_lsi64854_tlb_fill(struct tme_bus_connection *conn_bus,
   /* lock our mutex: */
   tme_mutex_lock(&lsi64854->tme_lsi64854_mutex);
 
+  /* get the normal-width address: */
+  master_address = master_address_wider;
+  assert (master_address == master_address_wider);
+
   /* if the master already has an outstanding TLB entry, and it
      doesn't happen to be this TLB entry, invalidate it: */
-  if (lsi64854->tme_lsi64854_master_tlb != NULL
+  if (lsi64854->tme_lsi64854_master_tlb_token != NULL
       && (tlb == NULL
-	  || (lsi64854->tme_lsi64854_master_tlb 
-	      != tlb->tme_bus_tlb_global))) {
-    tme_bus_tlb_invalidate(lsi64854->tme_lsi64854_master_tlb);
+	  || (lsi64854->tme_lsi64854_master_tlb_token 
+	      != tlb->tme_bus_tlb_token))) {
+    tme_token_invalidate(lsi64854->tme_lsi64854_master_tlb_token);
 
     /* the master doesn't have any outstanding TLB entry: */
-    lsi64854->tme_lsi64854_master_tlb = NULL;
+    lsi64854->tme_lsi64854_master_tlb_token = NULL;
   }
 
   /* get the CSR value: */
@@ -851,6 +1026,15 @@ _tme_lsi64854_tlb_fill(struct tme_bus_connection *conn_bus,
       break;
     }
     break;
+
+  case TME_LSI64854_CHANNEL_ENET:
+
+    /* get the DMA address register, plus the am7990 address: */
+    dma_address = lsi64854->tme_lsi64854_address + master_address;
+
+    /* the am7990 has a 24-bit address space: */
+    dma_count = (1 << 24);
+    break;
   }
 
   /* if DMA is not ready for some reason: */
@@ -876,8 +1060,8 @@ _tme_lsi64854_tlb_fill(struct tme_bus_connection *conn_bus,
   if (cycles != TME_BUS_CYCLE_UNDEF) {
 
     /* the master now has this outstanding TLB entry: */
-    lsi64854->tme_lsi64854_master_tlb
-      = tlb->tme_bus_tlb_global;
+    lsi64854->tme_lsi64854_master_tlb_token
+      = tlb->tme_bus_tlb_token;
   }
 
   /* unlock our mutex: */
@@ -930,13 +1114,10 @@ _tme_lsi64854_tlb_fill(struct tme_bus_connection *conn_bus,
   return (rc);
 }
 
-/* the lsi64854 TLB allocator for the master DMA: */
+/* the lsi64854 TLB adder for the master DMA: */
 static int
-_tme_lsi64854_tlb_set_allocate(struct tme_bus_connection *conn_bus,
-			       unsigned int count,
-			       unsigned int sizeof_one, 
-			       struct tme_bus_tlb * tme_shared *_tlbs,
-			       tme_rwlock_t *_tlbs_rwlock)
+_tme_lsi64854_tlb_set_add(struct tme_bus_connection *conn_bus,
+			  struct tme_bus_tlb_set_info *tlb_set_info)
 {
   struct tme_lsi64854 *lsi64854;
 
@@ -946,11 +1127,8 @@ _tme_lsi64854_tlb_set_allocate(struct tme_bus_connection *conn_bus,
   /* pass the lsi64854's request through: */
   conn_bus = lsi64854->tme_lsi64854_conn_regs;
   return (conn_bus != NULL
-	  ? (*conn_bus->tme_bus_tlb_set_allocate)(conn_bus, 
-						  count,
-						  sizeof_one,
-						  _tlbs,
-						  _tlbs_rwlock)
+	  ? (*conn_bus->tme_bus_tlb_set_add)(conn_bus, 
+					     tlb_set_info)
 	  : ENXIO);
 }
 
@@ -1151,7 +1329,7 @@ _tme_lsi64854_connections_new(struct tme_element *element,
     conn_bus->tme_bus_subregions.tme_bus_subregion_address_last = ((tme_bus_addr_t) 0) - 1;
     conn_bus->tme_bus_signals_add = NULL;
     conn_bus->tme_bus_signal = _tme_lsi64854_bus_signal;
-    conn_bus->tme_bus_tlb_set_allocate = _tme_lsi64854_tlb_set_allocate;
+    conn_bus->tme_bus_tlb_set_add = _tme_lsi64854_tlb_set_add;
     conn_bus->tme_bus_tlb_fill = _tme_lsi64854_tlb_fill;
     break;
   case TME_LSI64854_CONN_REGS_MASTER:
@@ -1161,6 +1339,9 @@ _tme_lsi64854_connections_new(struct tme_element *element,
     case TME_LSI64854_CHANNEL_SCSI:
       conn_bus->tme_bus_subregions.tme_bus_subregion_address_last = TME_LSI64854_SIZ_NCR53C9X - 1;
       break;
+    case TME_LSI64854_CHANNEL_ENET:
+      conn_bus->tme_bus_subregions.tme_bus_subregion_address_last = TME_LSI64854_SIZ_AM7990 - 1;
+      break;
     }
     break;
   case TME_LSI64854_CONN_REGS:
@@ -1169,6 +1350,12 @@ _tme_lsi64854_connections_new(struct tme_element *element,
     default: assert(FALSE);
     case TME_LSI64854_CHANNEL_SCSI:
       conn_bus->tme_bus_subregions.tme_bus_subregion_address_last = TME_LSI64854_SIZ_SCSI - 1;
+      break;
+    case TME_LSI64854_CHANNEL_ENET:
+      conn_bus->tme_bus_subregions.tme_bus_subregion_address_last = TME_LSI64854_SIZ_ENET - 1;
+      break;
+    case TME_LSI64854_CHANNEL_PPRT:
+      conn_bus->tme_bus_subregions.tme_bus_subregion_address_last = TME_LSI64854_SIZ_PPRT - 1;
       break;
     }
     break;
@@ -1202,6 +1389,12 @@ TME_ELEMENT_NEW_DECL(tme_ic_lsi64854) {
       if (TME_ARG_IS(args[arg_i + 1], "scsi")) {
 	channel = TME_LSI64854_CHANNEL_SCSI;
       }
+      else if (TME_ARG_IS(args[arg_i + 1], "ethernet")) {
+	channel = TME_LSI64854_CHANNEL_ENET;
+      }
+      else if (TME_ARG_IS(args[arg_i + 1], "parallel")) {
+	channel = TME_LSI64854_CHANNEL_PPRT;
+      }
       else {
 	usage = TRUE;
 	break;
@@ -1213,6 +1406,9 @@ TME_ELEMENT_NEW_DECL(tme_ic_lsi64854) {
     else if (TME_ARG_IS(args[arg_i + 0], "revision")) {
       if (TME_ARG_IS(args[arg_i + 1], "1+")) {
 	rev = TME_LSI64854_CSR_X_REV_1PLUS;
+      }
+      else if (TME_ARG_IS(args[arg_i + 1], "2")) {
+	rev = TME_LSI64854_CSR_X_REV_2;
       }
       else {
 	usage = TRUE;
@@ -1247,7 +1443,7 @@ TME_ELEMENT_NEW_DECL(tme_ic_lsi64854) {
 
   if (usage) {
     tme_output_append_error(_output, 
-			    "%s %s channel { scsi } revision { 1+ }",
+			    "%s %s channel { scsi | ethernet | parallel } revision { 1+ | 2 }",
 			    _("usage:"),
 			    args[0]);
     return (EINVAL);

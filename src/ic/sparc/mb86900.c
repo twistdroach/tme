@@ -1,4 +1,4 @@
-/* $Id: mb86900.c,v 1.2 2006/11/15 22:29:37 fredette Exp $ */
+/* $Id: mb86900.c,v 1.4 2010/02/14 14:00:58 fredette Exp $ */
 
 /* ic/m68k/mb86900.c - implementation of Fujitsu SPARC MB86900 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: mb86900.c,v 1.2 2006/11/15 22:29:37 fredette Exp $");
+_TME_RCSID("$Id: mb86900.c,v 1.4 2010/02/14 14:00:58 fredette Exp $");
 
 /* includes: */
 #include "sparc-impl.h"
@@ -234,6 +234,9 @@ TME_ELEMENT_X_NEW_DECL(tme_ic_,sparc,mb86900) {
   ic = tme_new0(struct tme_sparc, 1);
   ic->tme_sparc_element = element;
 
+  /* initialize the synchronization parts of the structure: */
+  tme_sparc_sync_init(ic);
+
   /* fill in the mb86900-specific parts of the structure: */
   psr = 0;
   TME_FIELD_MASK_DEPOSITU(psr, TME_SPARC32_PSR_IMPL, 0);
@@ -241,10 +244,19 @@ TME_ELEMENT_X_NEW_DECL(tme_ic_,sparc,mb86900) {
   ic->tme_sparc32_ireg_psr = psr;
   ic->tme_sparc_version = TME_SPARC_VERSION(ic);
   ic->tme_sparc_nwindows = TME_SPARC_NWINDOWS(ic);
+  ic->_tme_sparc32_execute_opmap = _TME_SPARC_EXECUTE_OPMAP;
   ic->_tme_sparc_execute = _tme_sparc_execute_mb86900;
   ic->_tme_sparc_fpu_ver = _tme_sparc_fpu_ver_mb86900;
-  ic->_tme_sparc_bus_fault = tme_sparc32_bus_fault;
-  ic->_tme_sparc_fetch_slow = tme_sparc32_fetch_slow;
+  ic->_tme_sparc_external_check = tme_sparc32_external_check;
+  ic->_tme_sparc_ls_address_map = tme_sparc32_ls_address_map;
+  ic->_tme_sparc_ls_bus_cycle = tme_sparc32_ls_bus_cycle;
+  ic->_tme_sparc_ls_bus_fault = tme_sparc_ls_bus_fault;
+  ic->_tme_sparc_ls_trap = tme_sparc32_ls_trap;
+  ic->tme_sparc_timing_loop_cycles_each = (1 + 1);
+#ifdef _TME_SPARC_RECODE_VERIFY
+  ic->tme_sparc_recode_verify_ic_size = sizeof(struct tme_sparc);
+  ic->tme_sparc_recode_verify_ic_size_total = sizeof(struct tme_sparc);
+#endif /* _TME_SPARC_RECODE_VERIFY */
 
   /* call the common sparc new function: */
   return (tme_sparc_new(ic, args, extra, _output));

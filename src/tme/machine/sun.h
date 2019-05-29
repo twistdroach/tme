@@ -1,4 +1,4 @@
-/* $Id: sun.h,v 1.12 2007/08/24 01:09:40 fredette Exp $ */
+/* $Id: sun.h,v 1.13 2009/08/30 13:54:40 fredette Exp $ */
 
 /* tme/machine/sun.h - public header file for Sun emulation: */
 
@@ -37,7 +37,7 @@
 #define _TME_MACHINE_SUN_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun.h,v 1.12 2007/08/24 01:09:40 fredette Exp $");
+_TME_RCSID("$Id: sun.h,v 1.13 2009/08/30 13:54:40 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -155,8 +155,9 @@ void tme_sun_mmu_segmap_set _TME_P((void *, tme_uint8_t, tme_uint32_t, unsigned 
 unsigned short tme_sun_mmu_segmap_get _TME_P((void *, tme_uint8_t, tme_uint32_t));
 unsigned short tme_sun_mmu_tlb_fill _TME_P((void *, struct tme_bus_tlb *, tme_uint8_t, tme_uint32_t, unsigned short));
 void tme_sun_mmu_tlbs_invalidate _TME_P((void *));
-void tme_sun_mmu_tlbs_context_set _TME_P((void *, tme_uint8_t));
-int tme_sun_mmu_tlb_set_allocate _TME_P((void *, unsigned int, unsigned int, struct tme_bus_tlb * tme_shared *, tme_rwlock_t *));
+void tme_sun_mmu_context_add _TME_P((void *, _tme_const struct tme_bus_tlb *));
+void tme_sun_mmu_context_switched _TME_P((void *));
+int tme_sun_mmu_tlb_set_add _TME_P((void *, struct tme_bus_tlb_set_info *));
 
 /* onboard Intel Ethernet support: */
 int tme_sun_obie _TME_P((struct tme_element *, _tme_const char * _tme_const *, char **));
@@ -172,5 +173,8 @@ int tme_sun_cgtwo _TME_P((struct tme_element *, _tme_const char * _tme_const *, 
 
 /* cgthree support: */
 int tme_sun_cgthree _TME_P((struct tme_element *, _tme_const char * _tme_const *, char **));
+
+/* cgsix support: */
+int tme_sun_cgsix _TME_P((struct tme_element *, _tme_const char * _tme_const *, char **));
 
 #endif /* !_TME_MACHINE_SUN_H */

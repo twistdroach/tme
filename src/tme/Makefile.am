@@ -3,7 +3,7 @@
 
 AUTOMAKE_OPTIONS = 1.4 gnu
 
-SUBDIRS = generic ic machine scsi
+SUBDIRS = generic ic machine scsi host bus
 
 pkginclude_HEADERS = memory.h \
 	common.h \
@@ -15,6 +15,10 @@ pkginclude_HEADERS = memory.h \
 	tme.h \
 	misc.h \
 	hash.h \
+	recode.h \
+	token.h \
+	completion.h \
+	runlength.h \
 	tmesh.h
 
 install-exec-local:

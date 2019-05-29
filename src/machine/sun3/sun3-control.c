@@ -1,4 +1,4 @@
-/* $Id: sun3-control.c,v 1.2 2005/02/18 03:58:07 fredette Exp $ */
+/* $Id: sun3-control.c,v 1.3 2009/08/30 14:20:59 fredette Exp $ */
 
 /* machine/sun3/sun3-control.c - implementation of Sun 3 emulation control space: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun3-control.c,v 1.2 2005/02/18 03:58:07 fredette Exp $");
+_TME_RCSID("$Id: sun3-control.c,v 1.3 2009/08/30 14:20:59 fredette Exp $");
 
 /* includes: */
 #include "sun3-impl.h"
@@ -475,7 +475,7 @@ _tme_sun3_memerr_test_cycle_handler(void *_sun3, struct tme_bus_cycle *cycle_ini
     _tme_sun3_memerr_callout(sun3);
 
     /* invalidate the memory test TLB entry: */
-    tme_bus_tlb_invalidate(tlb);
+    tme_token_invalidate(tlb->tme_bus_tlb_token);
     sun3->tme_sun3_memerr_tlb = NULL;
 
     /* tell the CPU that a synchronous event of some kind has happened

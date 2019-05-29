@@ -1,4 +1,4 @@
-/* $Id: threads.h,v 1.8 2007/08/24 01:12:44 fredette Exp $ */
+/* $Id: threads.h,v 1.10 2010/06/05 19:36:35 fredette Exp $ */
 
 /* tme/threads.h - header file for threads: */
 
@@ -37,7 +37,7 @@
 #define _TME_THREADS_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: threads.h,v 1.8 2007/08/24 01:12:44 fredette Exp $");
+_TME_RCSID("$Id: threads.h,v 1.10 2010/06/05 19:36:35 fredette Exp $");
 
 /* includes: */
 #include <errno.h>
@@ -62,6 +62,8 @@ void tme_sjlj_threads_init _TME_P((void));
 #ifdef _TME_HAVE_GTK
 void tme_sjlj_threads_gtk_init _TME_P((void));
 #define tme_threads_gtk_init tme_sjlj_threads_gtk_init
+void tme_sjlj_threads_gtk_yield _TME_P((void));
+#define tme_threads_gtk_yield tme_sjlj_threads_gtk_yield
 #endif /* _TME_HAVE_GTK */
 void tme_sjlj_threads_run _TME_P((void));
 #define tme_threads_run tme_sjlj_threads_run
@@ -165,6 +167,12 @@ ssize_t tme_sjlj_write_yield _TME_P((int, void *, size_t));
 #define tme_thread_select_yield tme_sjlj_select_yield
 #define tme_thread_read_yield tme_sjlj_read_yield
 #define tme_thread_write_yield tme_sjlj_write_yield
+
+/* time: */
+void tme_sjlj_gettimeofday _TME_P((struct timeval *));
+#define tme_gettimeofday tme_sjlj_gettimeofday
+extern int tme_sjlj_thread_short;
+#define tme_thread_long() do { tme_sjlj_thread_short = FALSE; } while (/* CONSTCOND */ 0)
 
 #endif /* TME_THREADS_SJLJ */
 

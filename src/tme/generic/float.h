@@ -1,4 +1,4 @@
-/* $Id: float.h,v 1.4 2007/08/24 01:10:41 fredette Exp $ */
+/* $Id: float.h,v 1.5 2009/08/29 21:19:43 fredette Exp $ */
 
 /* tme/generic/float.h - public header file for floating-point emulation */
 
@@ -37,7 +37,7 @@
 #define _TME_GENERIC_FLOAT_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: float.h,v 1.4 2007/08/24 01:10:41 fredette Exp $");
+_TME_RCSID("$Id: float.h,v 1.5 2009/08/29 21:19:43 fredette Exp $");
 
 /* includes: */
 #include <tme/threads.h>
@@ -57,6 +57,7 @@ _TME_RCSID("$Id: float.h,v 1.4 2007/08/24 01:10:41 fredette Exp $");
 
 /* floating-point formats.  even though these are individual bits, we
    can't use TME_BIT() because these are used in preprocessor ifs: */
+#define TME_FLOAT_FORMAT_NULL				(0)
 #ifndef TME_FLOAT_FORMAT_FLOAT
 #define TME_FLOAT_FORMAT_FLOAT				(1)
 #endif /* !TME_FLOAT_FORMAT_FLOAT */

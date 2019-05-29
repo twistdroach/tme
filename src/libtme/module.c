@@ -1,4 +1,4 @@
-/* $Id: module.c,v 1.9 2007/02/21 01:31:12 fredette Exp $ */
+/* $Id: module.c,v 1.10 2010/06/05 19:04:42 fredette Exp $ */
 
 /* libtme/module.c - module management: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: module.c,v 1.9 2007/02/21 01:31:12 fredette Exp $");
+_TME_RCSID("$Id: module.c,v 1.10 2010/06/05 19:04:42 fredette Exp $");
 
 /* includes: */
 #include <tme/threads.h>
@@ -61,6 +61,12 @@ _TME_RCSID("$Id: module.c,v 1.9 2007/02/21 01:31:12 fredette Exp $");
 #error "installed libtool is too old"
 #endif /* !lt_ptr_t */
 #endif /* !lt_ptr */
+
+/* similarly, the installed libltdl may be so recent that its ltdl.h
+   renames lt_preloaded_symbols with a macro, to a name different from
+   what our libtool script makes.  it's possible that the renaming
+   macro is meant to be undefined to handle this problem: */
+#undef lt_preloaded_symbols
 
 /* types: */
 struct tme_module {

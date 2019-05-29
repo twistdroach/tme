@@ -1,4 +1,4 @@
-/* $Id: serial-ms.h,v 1.3 2006/09/30 12:35:01 fredette Exp $ */
+/* $Id: serial-ms.h,v 1.4 2010/02/14 00:36:11 fredette Exp $ */
 
 /* serial/serial-ms.h - implementation header file for serial mouse
    emulation: */
@@ -38,7 +38,7 @@
 #define _SERIAL_SERIAL_MS_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: serial-ms.h,v 1.3 2006/09/30 12:35:01 fredette Exp $");
+_TME_RCSID("$Id: serial-ms.h,v 1.4 2010/02/14 00:36:11 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/mouse.h>
@@ -113,6 +113,22 @@ struct tme_serial_ms {
 
   /* our current serial control outputs: */
   unsigned int tme_serial_ms_serial_ctrl;
+
+  /* the time when the last events were read: */
+  struct timeval tme_serial_ms_event_read_last;
+
+  /* if nonzero, the rate-limiting microseconds per event: */
+  unsigned long tme_serial_ms_rate_usec;
+
+  /* if nonzero, the rate-limiting current sleep time: */
+  unsigned long tme_serial_ms_rate_sleep_usec;
+
+  /* if nonzero, the rate-limiting thread needs to call out an event
+     read: */
+  int tme_serial_ms_rate_do_callout;
+
+  /* our rate-limiting thread condition: */
+  tme_cond_t tme_serial_ms_rate_cond;
 };
 
 /* prototypes: */

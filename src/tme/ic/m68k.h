@@ -1,4 +1,4 @@
-/* $Id: m68k.h,v 1.7 2006/09/30 12:43:39 fredette Exp $ */
+/* $Id: m68k.h,v 1.8 2009/08/29 18:02:48 fredette Exp $ */
 
 /* tme/ic/m68k.h - public header file for Motorola 68k emulation */
 
@@ -37,7 +37,7 @@
 #define _TME_IC_M68K_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: m68k.h,v 1.7 2006/09/30 12:43:39 fredette Exp $");
+_TME_RCSID("$Id: m68k.h,v 1.8 2009/08/29 18:02:48 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -61,39 +61,17 @@ _TME_RCSID("$Id: m68k.h,v 1.7 2006/09/30 12:43:39 fredette Exp $");
 #define TME_M68K_IPL_MAX	(7)
 #define TME_M68K_IPL_NMI	(7)
 
-/* given a TLB entry, a function code, and an address range, this
-   evaulates to nonzero iff the TLB entry is valid, covers the address
-   range, and allows fast (memory) read access: */
-#define TME_M68K_TLB_OK_FAST_READ(tlb, function_code, address_first, address_last)	\
-  (((tlb)->tme_m68k_tlb_function_codes_mask & TME_BIT(function_code))			\
-   && TME_BUS_TLB_OK_FAST_READ(&(tlb)->tme_m68k_tlb_bus_tlb, address_first, address_last))
-
-/* given a TLB entry and an address range, this evaulates to nonzero
-   iff the TLB entry is valid, covers the address range, and allows
-   fast (memory) write access: */
-#define TME_M68K_TLB_OK_FAST_WRITE(tlb, function_code, address_first, address_last)	\
-  (((tlb)->tme_m68k_tlb_function_codes_mask & TME_BIT(function_code))			\
-   && TME_BUS_TLB_OK_FAST_WRITE(&(tlb)->tme_m68k_tlb_bus_tlb, address_first, address_last))
-
-/* given a TLB entry and an address range, this evaulates to nonzero
-   iff the TLB entry is valid, covers the address range, and allows
-   slow (function call) read access: */
-#define TME_M68K_TLB_OK_SLOW_READ(tlb, function_code, address_first)		\
-  (((tlb)->tme_m68k_tlb_function_codes_mask & TME_BIT(function_code))		\
-   && TME_BUS_TLB_OK_SLOW_READ(&(tlb)->tme_m68k_tlb_bus_tlb, address_first))
-
-/* given a TLB entry and an address range, this evaulates to nonzero
-   iff the TLB entry is valid, covers the address range, and allows
-   slow (function call) write access: */
-#define TME_M68K_TLB_OK_SLOW_WRITE(tlb, function_code, address_first)		\
-  (((tlb)->tme_m68k_tlb_function_codes_mask & TME_BIT(function_code))		\
-   && TME_BUS_TLB_OK_SLOW_WRITE(&(tlb)->tme_m68k_tlb_bus_tlb, address_first))
-
 /* these busy and unbusy a TLB entry: */
 #define tme_m68k_tlb_busy(tlb)					\
-  tme_bus_tlb_busy(&(tlb)->tme_m68k_tlb_bus_tlb)
+  tme_token_busy(&(tlb)->tme_m68k_tlb_token)
 #define tme_m68k_tlb_unbusy(tlb)				\
-  tme_bus_tlb_unbusy(&(tlb)->tme_m68k_tlb_bus_tlb)
+  tme_token_unbusy(&(tlb)->tme_m68k_tlb_token)
+
+/* these test the validity of a TLB entry: */
+#define tme_m68k_tlb_is_valid(tlb)				\
+  tme_token_is_valid(&(tlb)->tme_m68k_tlb_token)
+#define tme_m68k_tlb_is_invalid(tlb)				\
+  tme_token_is_invalid(&(tlb)->tme_m68k_tlb_token)
 
 /* this indexes an m68k bus router array for an m68k with a port size
    of 8 * (2 ^ siz_lg2) bits: */
@@ -130,6 +108,12 @@ struct tme_m68k_tlb {
 #define tme_m68k_tlb_addr_shift tme_m68k_tlb_bus_tlb.tme_bus_tlb_addr_shift
 #define tme_m68k_tlb_emulator_off_read tme_m68k_tlb_bus_tlb.tme_bus_tlb_emulator_off_read
 #define tme_m68k_tlb_emulator_off_write tme_m68k_tlb_bus_tlb.tme_bus_tlb_emulator_off_write
+
+  /* the token for this TLB entry: */
+  struct tme_token tme_m68k_tlb_token;
+
+  /* the bus context for this TLB entry: */
+  tme_bus_context_t tme_m68k_tlb_bus_context;
 
   /* the function codes handled by this entry: */
   unsigned int tme_m68k_tlb_function_codes_mask;

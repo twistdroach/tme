@@ -1,4 +1,4 @@
-/* $Id: bus-el.c,v 1.17 2007/03/25 21:17:01 fredette Exp $ */
+/* $Id: bus-el.c,v 1.18 2009/08/29 17:59:17 fredette Exp $ */
 
 /* generic/bus-el.c - a real generic bus element: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: bus-el.c,v 1.17 2007/03/25 21:17:01 fredette Exp $");
+_TME_RCSID("$Id: bus-el.c,v 1.18 2009/08/29 17:59:17 fredette Exp $");
 
 /* includes: */
 #define TME_BUS_VERSION TME_X_VERSION(0, 0)
@@ -475,12 +475,10 @@ _tme_bus_tlb_fill(struct tme_bus_connection *conn_bus_asker,
   return (rc);
 }
 
-/* this allocates a new TLB set: */
+/* this adds a new TLB set: */
 static int
-_tme_bus_tlb_set_allocate(struct tme_bus_connection *conn_bus_asker,
-			  unsigned int count, unsigned int sizeof_one, 
-			  struct tme_bus_tlb * tme_shared *_tlbs,
-			  tme_rwlock_t *_tlbs_rwlock)
+_tme_bus_tlb_set_add(struct tme_bus_connection *conn_bus_asker,
+		     struct tme_bus_tlb_set_info *tlb_set_info)
 {
   struct tme_bus *bus;
   struct tme_bus_connection_int *conn_int;
@@ -497,11 +495,9 @@ _tme_bus_tlb_set_allocate(struct tme_bus_connection *conn_bus_asker,
   }
 
   /* call the generic bus support function: */
-  rc = tme_bus_tlb_set_allocate(bus,
-				conn_int,
-				count, sizeof_one, 
-				_tlbs,
-				_tlbs_rwlock);
+  rc = tme_bus_tlb_set_add(bus,
+			   conn_int,
+			   tlb_set_info);
 
   /* unlock the bus: */
   tme_rwlock_unlock(&bus->tme_bus_rwlock);
@@ -776,7 +772,7 @@ _tme_bus_connections_new(struct tme_element *element,
   conn_bus->tme_bus_signals_add = _tme_bus_signals_add;
   conn_bus->tme_bus_signal = _tme_bus_signal;
   conn_bus->tme_bus_intack = _tme_bus_intack;
-  conn_bus->tme_bus_tlb_set_allocate = _tme_bus_tlb_set_allocate;
+  conn_bus->tme_bus_tlb_set_add = _tme_bus_tlb_set_add;
   conn_bus->tme_bus_tlb_fill = _tme_bus_tlb_fill;
 
   /* fill in the generic connection: */

@@ -1,4 +1,4 @@
-/* $Id: scsi-cdrom.c,v 1.2 2007/03/29 01:19:41 fredette Exp $ */
+/* $Id: scsi-cdrom.c,v 1.3 2009/09/26 13:07:39 fredette Exp $ */
 
 /* scsi/scsi-cdrom.c - implementation of SCSI CD-ROM emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: scsi-cdrom.c,v 1.2 2007/03/29 01:19:41 fredette Exp $");
+_TME_RCSID("$Id: scsi-cdrom.c,v 1.3 2009/09/26 13:07:39 fredette Exp $");
 
 /* includes: */
 #include <tme/scsi/scsi-cdrom.h>
@@ -609,6 +609,12 @@ TME_ELEMENT_SUB_NEW_DECL(tme_scsi,cdrom) {
 			 tme_scsi_cdrom_cdb_read_toc);
   TME_SCSI_DEVICE_DO_CDB(scsi_device,
 			 TME_SCSI_CDB_CDROM_PLAY_AUDIO2,
+			 tme_scsi_device_cdb_illegal);
+  TME_SCSI_DEVICE_DO_CDB(scsi_device,
+			 TME_SCSI_CDB_CDROM_READ_DISC_INFORMATION,
+			 tme_scsi_device_cdb_illegal);
+  TME_SCSI_DEVICE_DO_CDB(scsi_device,
+			 TME_SCSI_CDB_CDROM_CACHE_SYNC,
 			 tme_scsi_device_cdb_illegal);
 
   /* call the type-specific initialization function: */

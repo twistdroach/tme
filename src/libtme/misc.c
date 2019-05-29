@@ -1,4 +1,4 @@
-/* $Id: misc.c,v 1.5 2007/01/21 15:43:52 fredette Exp $ */
+/* $Id: misc.c,v 1.8 2010/06/05 19:02:38 fredette Exp $ */
 
 /* libtme/misc.c - miscellaneous: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: misc.c,v 1.5 2007/01/21 15:43:52 fredette Exp $");
+_TME_RCSID("$Id: misc.c,v 1.8 2010/06/05 19:02:38 fredette Exp $");
 
 /* includes: */
 #include <tme/threads.h>
@@ -239,25 +239,35 @@ _tme_misc_number_parse(const char *string,
 
   /* get any units: */
   units = 1;
-  if (!strcmp(string, "GB")
-      || !strcasecmp(string, "G")) {
+  if (!strcmp(string, "GB")) {
     units = 1024 * 1024 * 1024;
   }
-  else if (!strcmp(string, "MB")
-	   || !strcasecmp(string, "M")) {
+  else if (!strcmp(string, "MB")) {
     units = 1024 * 1024;
   }
-  else if (!strcmp(string, "KB")
-	   || !strcasecmp(string, "K")) {
+  else if (!strcmp(string, "KB")) {
     units = 1024;
+  }
+  else if (!strcmp(string, "G")) {
+    units = 1000000000;
+  }
+  else if (!strcmp(string, "M")) {
+    units = 1000000;
+  }
+  else if (!strcmp(string, "K")) {
+    units = 1000;
   }
   else if (*string != '\0') {
     failed = TRUE;
   }
 
+  /* return any simple conversion failure: */
+  if (failed) {
+    return (0);
+  }
+
   /* return ERANGE if the units cause an overflow: */
-  if (!failed
-      && value > (max / units)) {
+  if (value > (max / units)) {
     errno = ERANGE;
     return (negative ? underflow : max_positive);
   }
@@ -322,4 +332,194 @@ tme_misc_number_parse(const char *string,
   return (failed ? failure_value : value);
 }
 
-    
+/* this returns a scaled cycle counter: */
+union tme_value64
+tme_misc_cycles_scaled(const tme_misc_cycles_scaling_t *scaling,
+		       const union tme_value64 *_cycles_u)
+{
+  tme_misc_cycles_scaling_t two_to_the_thirtysecond;
+  tme_misc_cycles_scaling_t cycles;
+  tme_misc_cycles_scaling_t cycles_scaled;
+  union tme_value64 cycles_u;
+
+  /* make 2^32: */
+  two_to_the_thirtysecond = 65536;
+  two_to_the_thirtysecond *= 65536;
+
+  /* get the cycles: */
+#ifdef TME_HAVE_INT64_T
+  cycles
+    = (_cycles_u == NULL
+       ? tme_misc_cycles().tme_value64_uint
+       : _cycles_u->tme_value64_uint);
+#else  /* !TME_HAVE_INT64_T */
+  if (_cycles_u == NULL) {
+    cycles_u = tme_misc_cycles();
+    _cycles_u = &cycles_u;
+  }
+  cycles = _cycles_u->tme_value64_uint32_hi * two_to_the_thirtysecond;
+  cycles += _cycles_u->tme_value64_uint32_lo;
+#endif /* !TME_HAVE_INT64_T */
+
+  /* return the scaled cycles: */
+  cycles_scaled = cycles * *scaling;
+#ifdef TME_HAVE_INT64_T
+  cycles_u.tme_value64_uint = cycles_scaled;
+#else  /* !TME_HAVE_INT64_T */
+  cycles_u.tme_value64_uint32_lo = (cycles_scaled % two_to_the_thirtysecond);
+  cycles_u.tme_value64_uint32_hi = (cycles_scaled / two_to_the_thirtysecond);
+#endif /* !TME_HAVE_INT64_T */
+  return (cycles_u);
+}
+
+/* this returns a scaling factor for the cycle counter: */
+void
+tme_misc_cycles_scaling(tme_misc_cycles_scaling_t *scaling,
+			tme_uint32_t numerator,
+			tme_uint32_t denominator)
+{
+  *scaling = numerator;
+  *scaling /= denominator;
+}
+
+#ifndef TME_HAVE_MISC_CYCLES_PER_MS
+
+/* this returns the cycle counter rate per millisecond: */
+int tme_misc_cycles_per_ms_spin;
+tme_uint32_t
+tme_misc_cycles_per_ms(void)
+{
+  union tme_value64 cycles_start;
+  struct timeval timeval_start;
+  union tme_value64 cycles_finish;
+  struct timeval timeval_finish;
+  tme_uint32_t ms_elapsed;
+  tme_misc_cycles_scaling_t cycles_elapsed;
+
+  /* sample the cycle counter and the current time: */
+  cycles_start = tme_misc_cycles();
+  gettimeofday(&timeval_start, NULL);
+
+  /* spin until at least a second has passed: */
+  do {
+    tme_misc_cycles_per_ms_spin++;
+    cycles_finish = tme_misc_cycles();
+    gettimeofday(&timeval_finish, NULL);
+  } while ((timeval_finish.tv_sec == timeval_start.tv_sec)
+	   || (timeval_finish.tv_sec == (timeval_start.tv_sec + 1)
+	       && timeval_finish.tv_usec < timeval_start.tv_usec));
+
+  /* return the approximate cycle counter rate per millisecond: */
+  timeval_finish.tv_sec--;
+  timeval_finish.tv_usec += 1000000;
+  ms_elapsed = (timeval_finish.tv_sec - timeval_start.tv_sec) * 1000;
+  ms_elapsed += (timeval_finish.tv_usec - timeval_start.tv_usec) / 1000;
+  (void) tme_value64_sub(&cycles_finish, &cycles_start);
+  cycles_elapsed = cycles_finish.tme_value64_uint32_hi;
+  cycles_elapsed *= 65536;
+  cycles_elapsed *= 65536;
+  cycles_elapsed += cycles_finish.tme_value64_uint32_lo;
+  return (cycles_elapsed / ms_elapsed);
+}
+
+#endif /* !TME_HAVE_MISC_CYCLES_PER_MS */
+
+#ifndef TME_HAVE_MISC_CYCLES
+
+/* this returns the cycle counter: */
+union tme_value64
+tme_misc_cycles(void)
+{
+#ifdef TME_HAVE_INT64_T */
+  struct timeval now;
+  tme_uint64_t cycles;
+  union tme_value64 value;
+
+  gettimeofday(&now, NULL);
+  cycles = now.tv_sec;
+  cycles *= 1000000;
+  cycles += now.tv_usec;
+  value.tme_value64_uint = cycles;
+  return (value);
+#else  /* !TME_HAVE_INT64_T */
+  struct timeval now;
+  tme_misc_cycles_scaling_t two_to_the_thirtysecond;
+  tme_misc_cycles_scaling_t cycles_sec;
+  tme_uint32_t cycles_lo;
+  tme_uint32_t usec;
+  union tme_value64 value;
+
+  /* get the current time: */
+  gettimeofday(&now, NULL);
+
+  /* make 2^32: */
+  two_to_the_thirtysecond = 65536;
+  two_to_the_thirtysecond *= 65536;
+
+  /* get the seconds part of the cycles: */
+  cycles_sec = now.tv_sec;
+  cycles_sec *= 1000000;
+
+  /* return the cycles: */
+  cycles_lo = (cycles_sec % two_to_the_thirtysecond);
+  usec = now.tv_usec;
+  value.tme_value64_uint32_hi
+    = (((tme_uint32_t) (cycles / two_to_the_thirtysecond))
+       + (usec > ~cycles_lo));
+  value.tme_value64_uint32_lo = cycles_lo + usec;
+  return (value);
+#endif /* !TME_HAVE_INT64_T */
+}
+
+#endif /* !defined(TME_HAVE_MISC_CYCLES) */
+
+/* this spins until the cycle counter reaches a threshold: */
+void
+tme_misc_cycles_spin_until(const union tme_value64 *cycles_until)
+{
+  union tme_value64 cycles;
+
+  do {
+    cycles = tme_misc_cycles();
+  } while (tme_value64_cmp(&cycles, <, cycles_until));
+}
+
+/* this adds two 64-bit values: */
+#undef tme_value64_add
+union tme_value64 *
+tme_value64_add(union tme_value64 *a,
+		const union tme_value64 *b)
+{
+  tme_uint32_t a_part;
+  tme_uint32_t b_part;
+
+  /* do the addition: */
+  a_part = a->tme_value64_uint32_lo;
+  b_part = b->tme_value64_uint32_lo;
+  a->tme_value64_uint32_lo = a_part + b_part;
+  a->tme_value64_uint32_hi
+    = (a->tme_value64_uint32_hi
+       + (b->tme_value64_uint32_hi
+	  + (b_part > ~a_part)));
+  return (a);
+}
+
+/* this subtracts two 64-bit values: */
+#undef tme_value64_sub
+union tme_value64 *
+tme_value64_sub(union tme_value64 *a,
+		const union tme_value64 *b)
+{
+  tme_uint32_t a_part;
+  tme_uint32_t b_part;
+
+  /* do the subtraction: */
+  a_part = a->tme_value64_uint32_lo;
+  b_part = b->tme_value64_uint32_lo;
+  a->tme_value64_uint32_lo = a_part - b_part;
+  a->tme_value64_uint32_hi
+    = (a->tme_value64_uint32_hi
+       - (b->tme_value64_uint32_hi
+	  + (b_part > a_part)));
+  return (a);
+}

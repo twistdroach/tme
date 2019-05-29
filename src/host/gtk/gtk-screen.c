@@ -1,4 +1,4 @@
-/* $Id: gtk-screen.c,v 1.9 2007/08/25 20:09:13 fredette Exp $ */
+/* $Id: gtk-screen.c,v 1.11 2009/08/30 21:39:03 fredette Exp $ */
 
 /* host/gtk/gtk-screen.c - GTK screen support: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: gtk-screen.c,v 1.9 2007/08/25 20:09:13 fredette Exp $");
+_TME_RCSID("$Id: gtk-screen.c,v 1.11 2009/08/30 21:39:03 fredette Exp $");
 
 /* we are aware of the problems with gdk_image_new_bitmap, and we cope
    with them, so we define GDK_ENABLE_BROKEN to get its prototype
@@ -87,6 +87,18 @@ _tme_gtk_screen_th_update(struct tme_gtk_display *display)
       if (conn_fb_other->tme_fb_connection_update != NULL) {
 	rc = (*conn_fb_other->tme_fb_connection_update)(conn_fb_other);
 	assert (rc == TME_OK);
+      }
+
+      /* if this framebuffer needs a full redraw: */
+      if (screen->tme_gtk_screen_full_redraw) {
+
+	/* force the next translation to retranslate the entire buffer: */
+	tme_fb_xlat_redraw(conn_fb_other);
+	conn_fb_other->tme_fb_connection_offset_updated_first = 0;
+	conn_fb_other->tme_fb_connection_offset_updated_last = 0 - (tme_uint32_t) 1;
+
+	/* clear the full redraw flag: */
+	screen->tme_gtk_screen_full_redraw = FALSE;
       }
 
       /* translate this framebuffer's contents: */
@@ -475,7 +487,7 @@ _tme_gtk_screen_mode_change(struct tme_fb_connection *conn_fb)
   screen->tme_gtk_screen_fb_xlat = fb_xlat_a->tme_fb_xlat_func;
 
   /* force the next translation to do a complete redraw: */
-  tme_fb_xlat_redraw(conn_fb_other);
+  screen->tme_gtk_screen_full_redraw = TRUE;
 
   /* unlock our mutex: */
   tme_mutex_unlock(&display->tme_gtk_display_mutex);
@@ -630,7 +642,7 @@ _tme_gtk_screen_new(struct tme_gtk_display *display)
   screen->tme_gtk_screen_window
     = gtk_window_new(GTK_WINDOW_TOPLEVEL);
   gtk_window_set_policy(GTK_WINDOW(screen->tme_gtk_screen_window),
-			TRUE, TRUE, TRUE);
+			FALSE, FALSE, TRUE);
 
   /* create the outer vertical packing box: */
   screen->tme_gtk_screen_vbox0

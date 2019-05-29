@@ -1,4 +1,4 @@
-/* $Id: gtk-display.h,v 1.9 2007/08/25 19:52:23 fredette Exp $ */
+/* $Id: gtk-display.h,v 1.10 2009/08/28 01:29:47 fredette Exp $ */
 
 /* host/gtk/gtk-display.h - header file for GTK display support: */
 
@@ -37,7 +37,7 @@
 #define _HOST_GTK_GTK_DISPLAY_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: gtk-display.h,v 1.9 2007/08/25 19:52:23 fredette Exp $");
+_TME_RCSID("$Id: gtk-display.h,v 1.10 2009/08/28 01:29:47 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/fb.h>
@@ -124,6 +124,9 @@ struct tme_gtk_screen {
 
   /* when mouse mode is on, the last tme buttons state: */
   unsigned int tme_gtk_screen_mouse_buttons_last;
+
+  /* if nonzero, the screen needs a full redraw: */
+  int tme_gtk_screen_full_redraw;
 };
 
 /* a GTK bad keysym: */

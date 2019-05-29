@@ -1,4 +1,4 @@
-/* $Id: bus.c,v 1.13 2007/02/12 23:36:18 fredette Exp $ */
+/* $Id: bus.c,v 1.14 2009/08/29 17:41:17 fredette Exp $ */
 
 /* generic/gen-bus.c - generic bus support: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: bus.c,v 1.13 2007/02/12 23:36:18 fredette Exp $");
+_TME_RCSID("$Id: bus.c,v 1.14 2009/08/29 17:41:17 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus.h>
@@ -238,22 +238,18 @@ tme_bus_tlb_fill(struct tme_bus *bus,
   return (rc);
 }
 
-/* this allocates a new TLB set: */
+/* this adds a new TLB set: */
 int
-tme_bus_tlb_set_allocate(struct tme_bus *bus,
-			 struct tme_bus_connection_int *conn_int_asker,
-			 unsigned int count, unsigned int sizeof_one, 
-			 struct tme_bus_tlb * tme_shared *_tlbs,
-			 tme_rwlock_t *_tlbs_rwlock)
+tme_bus_tlb_set_add(struct tme_bus *bus,
+		    struct tme_bus_connection_int *conn_int_asker,
+		    struct tme_bus_tlb_set_info *tlb_set_info)
 {
   struct tme_bus_connection *conn_bus_other, *conn_bus_dma;
   int conn_int_i;
   int rc;
-  struct tme_bus_tlb *tlbs, *tlb;
-  unsigned int tlb_i;
 
   /* at most one of our addressable connections may provide a TLB set
-     allocator.  generally, this means that connection is
+     add function.  generally, this means that connection is a
      DMA-controller-like connection to the bus, where it may need to
      invalidate at any later time the TLBs it fills out, due to sudden
      changes in how the DMA region on the bus is mapped: */
@@ -266,9 +262,9 @@ tme_bus_tlb_set_allocate(struct tme_bus *bus,
        bus->tme_bus_addressables[conn_int_i].tme_bus_addressable_connection
        ->tme_bus_connection_int.tme_bus_connection.tme_connection_other);
 
-    /* if this bus connection offers a TLB set allocator, it is
+    /* if this bus connection offers a TLB set add function, it is
        a DMA-controller-like connection to the bus: */
-    if (conn_bus_other->tme_bus_tlb_set_allocate != NULL) {
+    if (conn_bus_other->tme_bus_tlb_set_add != NULL) {
 
       /* if there is more than one of these, it is likely a
 	 configuration error.  if we had some way of specifying which
@@ -283,26 +279,43 @@ tme_bus_tlb_set_allocate(struct tme_bus *bus,
   }
 
   /* if there is a DMA-controller-like connection to the bus, 
-     let it allocate the TLB set: */
+     let it add the TLB set: */
   if (conn_bus_dma != NULL) {
-    rc = (*conn_bus_dma->tme_bus_tlb_set_allocate)
-      (conn_bus_dma, count, sizeof_one, _tlbs, _tlbs_rwlock);
+    rc = (*conn_bus_dma->tme_bus_tlb_set_add)
+      (conn_bus_dma, tlb_set_info);
   }
 
-  /* otherwise, allocate and initialize a singleton set ourselves: */
+  /* otherwise, handle the add ourselves: */
   else {
-    tlbs = (struct tme_bus_tlb *) tme_malloc(count * sizeof_one);
-    tlb = tlbs;
-    for (tlb_i = 0; tlb_i < count; tlb_i++) {
-      tme_bus_tlb_construct(tlb);
-      tlb = (struct tme_bus_tlb *) (((tme_uint8_t *) tlb) + sizeof_one);
+    
+    /* if this TLB set provides a bus context register: */
+    if (tlb_set_info->tme_bus_tlb_set_info_bus_context != NULL) {
+
+      /* this bus only has one context: */
+      (*tlb_set_info->tme_bus_tlb_set_info_bus_context) = 0;
+      tlb_set_info->tme_bus_tlb_set_info_bus_context_max = 0;
     }
-    tme_memory_atomic_pointer_write(struct tme_bus_tlb *, *_tlbs, tlbs, _tlbs_rwlock);
     rc = TME_OK;
   }
       
   /* done: */
   return (rc);
+}
+
+/* this invalidates a TLB set: */
+void
+tme_bus_tlb_set_invalidate(const struct tme_bus_tlb_set_info *tlb_set_info)
+{
+  struct tme_token *token;
+  unsigned long token_count;
+
+  /* invalidate the tokens in the TLB set: */
+  token = tlb_set_info->tme_bus_tlb_set_info_token0;
+  token_count = tlb_set_info->tme_bus_tlb_set_info_token_count;
+  do {
+    tme_token_invalidate(token);
+    token = (struct tme_token *) (((tme_uint8_t *) token) + tlb_set_info->tme_bus_tlb_set_info_token_stride);
+  } while (--token_count > 0);
 }
 
 /* this returns nonzero if the connection's address space is available: */
@@ -481,7 +494,7 @@ tme_bus_tlb_map(struct tme_bus_tlb *tlb0, tme_bus_addr_t addr0,
 {
   tme_bus_addr_t extra_before0, extra_after0;
   tme_bus_addr_t extra_before1, extra_after1;
-  long addr_offset;
+  tme_bus_addr_t addr_offset;
   unsigned int cycles_ok;
 
   /* get the address offset: */
@@ -515,94 +528,6 @@ tme_bus_tlb_map(struct tme_bus_tlb *tlb0, tme_bus_addr_t addr0,
   tlb0->tme_bus_tlb_addr_offset -= addr_offset;
 }
 
-/* this constructs a new global TLB entry: */
-void
-tme_bus_tlb_construct(struct tme_bus_tlb *tlb)
-{
-  /* a new global TLB entry is invalid and not busy: */
-  tlb->tme_bus_tlb_invalid = TRUE;
-  tme_rwlock_init(&tlb->tme_bus_tlb_invalid_rwlock);
-  tlb->tme_bus_tlb_busy = FALSE;
-  tme_rwlock_init(&tlb->tme_bus_tlb_busy_rwlock);
-  tlb->tme_bus_tlb_global = tlb;
-}
-
-/* this saves a bus TLB entry in automatic storage into a backing
-   global bus TLB entry: */
-void
-tme_bus_tlb_back(const struct tme_bus_tlb *tlb_local)
-{
-  struct tme_bus_tlb *tlb_backing;
-
-  /* get the backing TLB entry: */
-  tlb_backing = tlb_local->tme_bus_tlb_global;
-
-#define TLB_BACK(f) tlb_backing->f = tlb_local->f
-
-  /* the first address covered: */
-  TLB_BACK(tme_bus_tlb_addr_first);
-
-  /* the last address covered: */
-  TLB_BACK(tme_bus_tlb_addr_last);
-
-  /* the fast (memory) transfers: */
-  TLB_BACK(tme_bus_tlb_emulator_off_read);
-  TLB_BACK(tme_bus_tlb_emulator_off_write);
-
-  /* fast (memory) reads and writes are protected by this rwlock: */
-  TLB_BACK(tme_bus_tlb_rwlock);
-
-  /* when one or both of TLB_BUS_CYCLE_READ and TLB_BUS_CYCLE_WRITE
-     are set in this value, this TLB entry allows slow (function call)
-     reads of and/or writes to the bus region: */
-  TLB_BACK(tme_bus_tlb_cycles_ok);
-
-  /* adding an address in the bus region to this offset, and then
-     shifting that result to the right (shift > 0) or to the left
-     (shift < 0) yields an address for the bus cycle handler: */
-  TLB_BACK(tme_bus_tlb_addr_offset);
-  TLB_BACK(tme_bus_tlb_addr_shift);
-
-  /* the bus cycle handler: */
-  TLB_BACK(tme_bus_tlb_cycle_private);
-  TLB_BACK(tme_bus_tlb_cycle);
-
-  /* the bus fault handlers: */
-  TLB_BACK(tme_bus_tlb_fault_handler_count);
-  memcpy (&tlb_backing->tme_bus_tlb_fault_handlers[0],
-	  &tlb_local->tme_bus_tlb_fault_handlers[0],
-	  sizeof (tlb_local->tme_bus_tlb_fault_handlers[0])
-	  * tlb_local->tme_bus_tlb_fault_handler_count);
-
-#undef TLB_BACK
-}
-
-/* this invalidates a bus TLB entry: */
-void
-tme_bus_tlb_invalidate(struct tme_bus_tlb *tlb)
-{
-
-  /* lock this TLB entry for invalidation: */
-  tme_rwlock_wrlock(&tlb->tme_bus_tlb_invalid_rwlock);
-
-  /* invalidate this TLB entry: */
-  tlb->tme_bus_tlb_invalid = TRUE;
-
-#if TME_THREADS_COOPERATIVE
-#ifndef TME_NO_DEBUG_LOCKS
-  assert(!tme_memory_atomic_read_flag(&tlb->tme_bus_tlb_busy,
-				      &tlb->tme_bus_tlb_busy_rwlock));
-#endif /* !TME_NO_DEBUG_LOCKS */
-#else  /* !TME_THREADS_COOPERATIVE */
-  /* spin while the TLB entry is busy: */
-  do { } while(tme_memory_atomic_read_flag(&tlb->tme_bus_tlb_busy,
-				           &tlb->tme_bus_tlb_busy_rwlock));
-#endif /* !TME_THREADS_COOPERATIVE */
-
-  /* unlock this TLB entry for invalidation: */
-  tme_rwlock_unlock(&tlb->tme_bus_tlb_invalid_rwlock);
-}
-
 /* this initializes a bus TLB entry: */
 void
 tme_bus_tlb_initialize(struct tme_bus_tlb *tlb)
@@ -625,6 +550,9 @@ tme_bus_tlb_initialize(struct tme_bus_tlb *tlb)
   /* no address offset or shift: */
   tlb->tme_bus_tlb_addr_offset = 0;
   tlb->tme_bus_tlb_addr_shift = 0;
+
+  /* not cacheable: */
+  tlb->tme_bus_tlb_cacheable = NULL;
 
   /* no bus cycle handler: */
   tlb->tme_bus_tlb_cycle_private = NULL;

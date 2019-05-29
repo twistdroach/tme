@@ -1,4 +1,4 @@
-/* $Id: z8530.h,v 1.4 2007/08/24 01:09:06 fredette Exp $ */
+/* $Id: z8530.h,v 1.5 2009/08/29 21:22:47 fredette Exp $ */
 
 /* tme/ic/z8530.h - public header file for Zilog 8530 emulation */
 
@@ -37,7 +37,7 @@
 #define _TME_IC_Z8530_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: z8530.h,v 1.4 2007/08/24 01:09:06 fredette Exp $");
+_TME_RCSID("$Id: z8530.h,v 1.5 2009/08/29 21:22:47 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -59,16 +59,16 @@ struct tme_z8530_socket {
   unsigned int tme_z8530_socket_flags;
 
   /* the bus address of channel A: */
-  tme_bus_addr_t tme_z8530_socket_address_chan_a;
+  tme_bus_addr32_t tme_z8530_socket_address_chan_a;
 
   /* the bus address of channel B: */
-  tme_bus_addr_t tme_z8530_socket_address_chan_b;
+  tme_bus_addr32_t tme_z8530_socket_address_chan_b;
 
   /* within each channel, the offset of the csr register: */
-  tme_bus_addr_t tme_z8530_socket_offset_csr;
+  tme_bus_addr32_t tme_z8530_socket_offset_csr;
 
   /* within each channel, the offset of the data register: */
-  tme_bus_addr_t tme_z8530_socket_offset_data;
+  tme_bus_addr32_t tme_z8530_socket_offset_data;
 
   /* the system bus byte lane the chip is wired to: */
   unsigned int tme_z8530_socket_port_least_lane;

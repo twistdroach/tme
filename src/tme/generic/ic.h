@@ -1,4 +1,4 @@
-/* $Id: ic.h,v 1.4 2006/11/15 23:02:51 fredette Exp $ */
+/* $Id: ic.h,v 1.5 2009/08/29 21:19:57 fredette Exp $ */
 
 /* tme/generic/ic/ic-impl.h - header file for generic IC support: */
 
@@ -37,7 +37,7 @@
 #define _TME_GENERIC_IC_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: ic.h,v 1.4 2006/11/15 23:02:51 fredette Exp $");
+_TME_RCSID("$Id: ic.h,v 1.5 2009/08/29 21:19:57 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus.h>
@@ -45,7 +45,7 @@ _TME_RCSID("$Id: ic.h,v 1.4 2006/11/15 23:02:51 fredette Exp $");
 /* macros: */
 
 /* the maximum size, in bytes, of an IC's register file: */
-#define TME_IC_REGS_SIZE	(512 * sizeof(tme_uint32_t))
+#define TME_IC_REGS_SIZE	(1024 * sizeof(tme_uint32_t))
 
 /* in many cases it can be useful to think of an IC's register file as
    addressable memory on a bus, with a given port size and endianness.

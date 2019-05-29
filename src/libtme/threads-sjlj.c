@@ -1,4 +1,4 @@
-/* $Id: threads-sjlj.c,v 1.15 2007/08/25 23:12:31 fredette Exp $ */
+/* $Id: threads-sjlj.c,v 1.18 2010/06/05 19:10:28 fredette Exp $ */
 
 /* libtme/threads-sjlj.c - implementation of setjmp/longjmp threads: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: threads-sjlj.c,v 1.15 2007/08/25 23:12:31 fredette Exp $");
+_TME_RCSID("$Id: threads-sjlj.c,v 1.18 2010/06/05 19:10:28 fredette Exp $");
 
 /* includes: */
 #include <tme/threads.h>
@@ -64,11 +64,6 @@ typedef void *gpointer;
 #define TME_SJLJ_THREAD_STATE_BLOCKED		(1)
 #define TME_SJLJ_THREAD_STATE_RUNNABLE		(2)
 #define TME_SJLJ_THREAD_STATE_DISPATCHING	(3)
-
-/* dispatcher longjmp values, different from the normal TRUE and FALSE
-   because you can't call longjmp with a value of zero: */
-#define TME_SJLJ_DISPATCHER_FALSE		(1)
-#define TME_SJLJ_DISPATCHER_TRUE		(2)
 
 /* types: */
 
@@ -105,13 +100,9 @@ struct tme_sjlj_thread {
   struct timeval tme_sjlj_thread_timeout;
   struct tme_sjlj_thread *timeout_next;
   struct tme_sjlj_thread **timeout_prev;
-#ifdef HAVE_GTK
-  /* the current timeout thread handle: */
-  struct tme_sjlj_thread **tme_sjlj_thread_timeout_handle;
 
-  /* space for a small number of immediate timeout thread handles: */
-  struct tme_sjlj_thread *tme_sjlj_thread_timeout_handles[3];
-#endif /* HAVE_GTK */
+  /* the last dispatch number for this thread: */
+  tme_uint32_t tme_sjlj_thread_dispatch_number;
 };
 
 /* globals: */
@@ -155,8 +146,14 @@ static struct {
   struct tme_sjlj_thread *tme_sjlj_fd_thread_except;
 } tme_sjlj_fd_thread[FD_SETSIZE];
 
-/* what, if any, thread timeout caused this dispatch: */
-static struct tme_sjlj_thread *tme_sjlj_thread_dispatched_timeout;
+/* the dispatch number: */
+static tme_uint32_t _tme_sjlj_thread_dispatch_number;
+
+/* a reasonably current time: */
+static struct timeval _tme_sjlj_now;
+
+/* if nonzero, the last dispatched thread ran for only a short time: */
+int tme_sjlj_thread_short;
 
 #ifdef HAVE_GTK
 
@@ -168,10 +165,14 @@ static gint tme_sjlj_fd_tag[FD_SETSIZE];
 
 /* this set iff the idle callback is set: */
 static int tme_sjlj_idle_set;
-#endif /* HAVE_GTK */
 
-/* prototypes: */
-static int tme_sjlj_dispatch _TME_P((int));
+/* any timeout source ID: */
+static guint _tme_sjlj_gtk_timeout_id;
+
+/* any timeout time: */
+static struct timeval _tme_sjlj_gtk_timeout;
+
+#endif /* HAVE_GTK */
 
 /* this initializes the threads system: */
 void
@@ -210,9 +211,6 @@ tme_sjlj_threads_init(void)
   tme_sjlj_thread_blocked.tme_sjlj_thread_max_fd = -1;
   tme_sjlj_thread_blocked.tme_sjlj_thread_sleep.tv_sec = 0;
   tme_sjlj_thread_blocked.tme_sjlj_thread_sleep.tv_usec = 0;
-
-  /* any dispatch is not a timeout dispatch: */
-  tme_sjlj_thread_dispatched_timeout = NULL;
 }
 
 #ifdef HAVE_GTK
@@ -244,27 +242,43 @@ tme_sjlj_threads_gtk_init(void)
 }
 #endif /* HAVE_GTK */
 
+/* this returns a reasonably current time: */
+void
+tme_sjlj_gettimeofday(struct timeval *now)
+{
+
+  /* if we need to, call gettimeofday(): */
+  if (__tme_predict_false(!tme_sjlj_thread_short)) {
+    gettimeofday(&_tme_sjlj_now, NULL);
+    tme_sjlj_thread_short = TRUE;
+  }
+
+  /* return the reasonably current time: */
+  *now = _tme_sjlj_now;
+}
+
 /* this changes a thread's state: */
 static void
 _tme_sjlj_change_state(struct tme_sjlj_thread *thread, int state)
 {
-  
-  /* if this thread is already the desired state, do nothing: */
-  if (thread->tme_sjlj_thread_state == state) {
-    return;
-  }
+  struct tme_sjlj_thread **_thread_prev;
+  struct tme_sjlj_thread *thread_next;
+
+  /* the active thread is the only thread that can become blocked.
+     the active thread cannot become runnable or dispatching: */
+  assert (state == TME_SJLJ_THREAD_STATE_BLOCKED
+	  ? (thread->state_next == tme_sjlj_thread_active)
+	  : (thread != tme_sjlj_thread_active));
 
   /* if the thread's current state is not BLOCKED: */
-  if (thread->tme_sjlj_thread_state
-      != TME_SJLJ_THREAD_STATE_BLOCKED) {
-
-    /* the thread must be on a state list: */
-    assert(thread->state_prev != NULL);
+  _thread_prev = thread->state_prev;
+  if (_thread_prev != NULL) {
 
     /* remove it from that list: */
-    *thread->state_prev = thread->state_next;
-    if (thread->state_next != NULL) {
-      thread->state_next->state_prev = thread->state_prev;
+    thread_next = thread->state_next;
+    *_thread_prev = thread_next;
+    if (thread_next != NULL) {
+      thread_next->state_prev = _thread_prev;
     }
 
     /* this thread is now on no list: */
@@ -272,121 +286,108 @@ _tme_sjlj_change_state(struct tme_sjlj_thread *thread, int state)
     thread->state_next = NULL;
   }
 
-  /* the thread must be on no state list: */
-  assert(thread->state_prev == NULL);
-
-  /* set the new state of the thread: */
-  thread->tme_sjlj_thread_state = state;
-
   /* if the thread's desired state is not BLOCKED: */
   if (state != TME_SJLJ_THREAD_STATE_BLOCKED) {
 
-    /* if the desired state is RUNNABLE, put this thread
-       at the front of the runnable list: */
-    if (state == TME_SJLJ_THREAD_STATE_RUNNABLE) {
-      thread->state_prev = &tme_sjlj_threads_runnable;
+    /* this thread must be runnable, or this thread must be
+       dispatching before threads are being dispatched: */
+    assert (state == TME_SJLJ_THREAD_STATE_RUNNABLE
+	    || (state == TME_SJLJ_THREAD_STATE_DISPATCHING
+		&& tme_sjlj_thread_active == NULL));
+
+    /* if threads are being dispatched, and this thread wasn't already
+       in this dispatch: */
+    if (tme_sjlj_thread_active != NULL
+	&& thread->tme_sjlj_thread_dispatch_number != _tme_sjlj_thread_dispatch_number) {
+
+      /* add this thread to the dispatching list after the current
+	 thread: */
+      _thread_prev = &tme_sjlj_thread_active->state_next;
     }
 
-    /* otherwise, the desired state must be DISPATCHING: */
+    /* otherwise, if this thread is dispatching: */
+    else if (state == TME_SJLJ_THREAD_STATE_DISPATCHING) {
+
+      /* add this thread to the dispatching list at the head: */
+      _thread_prev = &tme_sjlj_threads_dispatching;
+    }
+
+    /* otherwise, this thread is runnable: */
     else {
-      assert(state == TME_SJLJ_THREAD_STATE_DISPATCHING);
 
-      /* if there is an active thread, put this thread right after it,
-	 so it will run right after the active thread yields: */
-      if (tme_sjlj_thread_active != NULL) {
-	thread->state_prev = &tme_sjlj_thread_active->state_next;
-      }
-      else {
-	thread->state_prev = &tme_sjlj_threads_dispatching;
-      }
+      /* add this thread to the runnable list at the head: */
+      _thread_prev = &tme_sjlj_threads_runnable;
     }
 
-    /* finish linking the thread into the list: */
-    thread->state_next = *thread->state_prev;
-    *thread->state_prev = thread;
-    if (thread->state_next != NULL) {
-      thread->state_next->state_prev = &thread->state_next;
+    /* add this thread to the list: */
+    thread_next = *_thread_prev;
+    *_thread_prev = thread;
+    thread->state_prev = _thread_prev;
+    thread->state_next = thread_next;
+    if (thread_next != NULL) {
+      thread_next->state_prev = &thread->state_next;
     }
+
+    /* all nonblocked threads appear to be runnable: */
+    state = TME_SJLJ_THREAD_STATE_RUNNABLE;
   }
+
+  /* set the new state of the thread: */
+  thread->tme_sjlj_thread_state = state;
 }
 
-/* this dispatches a thread whose timeout has expired: */
-static gint
-tme_sjlj_dispatch_timeout(gpointer _data)
-{
-  struct tme_sjlj_thread *thread;
-  int rc;
-
-#ifdef HAVE_GTK
-  struct tme_sjlj_thread **timeout_handle;
-
-  /* if we're using GTK, the data is a handle to the thread: */
-  timeout_handle = (struct tme_sjlj_thread **) _data;
-  if (tme_sjlj_using_gtk) {
-
-    /* recover the thread: */
-    thread = *timeout_handle;
-
-    /* if this isn't the current timeout for the thread: */
-    if (timeout_handle != thread->tme_sjlj_thread_timeout_handle) {
-
-      /* we have been waiting for this old timeout to dispatch so we
-	 can finally remove it: */
-      *timeout_handle = NULL;
-      if ((timeout_handle
-	   < &thread->tme_sjlj_thread_timeout_handles[0])
-	  || (timeout_handle
-	      > &thread->tme_sjlj_thread_timeout_handles[TME_ARRAY_ELS(thread->tme_sjlj_thread_timeout_handles) - 1])) {
-	tme_free(timeout_handle);
-      }
-      return (FALSE);
-    }
-  }
-  else
-
-#endif /* !HAVE_GTK */
-
-    /* otherwise, the data is just the thread: */
-    thread = (struct tme_sjlj_thread *) _data;
-
-  /* set the timed-out thread indication: */
-  assert(tme_sjlj_thread_dispatched_timeout == NULL);
-  tme_sjlj_thread_dispatched_timeout = thread;
-
-  /* dispatch this thread: */
-  assert(tme_sjlj_threads_dispatching == NULL);
-  _tme_sjlj_change_state(thread, TME_SJLJ_THREAD_STATE_DISPATCHING);
-  rc = tme_sjlj_dispatch(1);
-  assert(tme_sjlj_threads_dispatching == NULL);
-
-  /* clear the timed-out thread indication: */
-  tme_sjlj_thread_dispatched_timeout = NULL;
-
-#ifdef HAVE_GTK
-  /* if we are using GTK and not reusing this timeout, free it: */
-  if (tme_sjlj_using_gtk && !rc) {
-    *timeout_handle = NULL;
-    if ((timeout_handle
-	 < &thread->tme_sjlj_thread_timeout_handles[0])
-	|| (timeout_handle
-	    > &thread->tme_sjlj_thread_timeout_handles[TME_ARRAY_ELS(thread->tme_sjlj_thread_timeout_handles) - 1])) {
-      tme_free(timeout_handle);
-    }
-  }
-#endif /* HAVE_GTK */
-
-  return (rc);
-}
-
-/* this dispatches a thread whose fd condition has been met: */
+/* this moves the runnable list to the dispatching list: */
 static void
-tme_sjlj_dispatch_fd(gpointer junk0, gint fd, GdkInputCondition fd_conditions)
+_tme_sjlj_threads_dispatching_runnable(void)
+{
+  struct tme_sjlj_thread *threads_dispatching;
+
+  /* the dispatching list must be empty: */
+  assert (tme_sjlj_threads_dispatching == NULL);
+
+  /* move the runnable list to the dispatching list: */
+  threads_dispatching = tme_sjlj_threads_runnable;
+  tme_sjlj_threads_runnable = NULL;
+  tme_sjlj_threads_dispatching = threads_dispatching;
+  if (threads_dispatching != NULL) {
+    threads_dispatching->state_prev = &tme_sjlj_threads_dispatching;
+  }
+}
+
+/* this moves all threads that have timed out to the dispatching list: */
+static void
+_tme_sjlj_threads_dispatching_timeout(void)
+{
+  struct timeval now;
+  struct tme_sjlj_thread *thread_timeout;
+
+  /* get the current time: */
+  tme_gettimeofday(&now);
+
+  /* loop over the timeout list: */
+  for (thread_timeout = tme_sjlj_threads_timeout;
+       thread_timeout != NULL;
+       thread_timeout = thread_timeout->timeout_next) {
+
+    /* if this timeout has not expired: */
+    if (thread_timeout->tme_sjlj_thread_timeout.tv_sec > now.tv_sec
+	|| (thread_timeout->tme_sjlj_thread_timeout.tv_sec == now.tv_sec
+	    && thread_timeout->tme_sjlj_thread_timeout.tv_usec > now.tv_usec)) {
+      break;
+    }
+
+    /* move this thread to the dispatching list: */
+    _tme_sjlj_change_state(thread_timeout, TME_SJLJ_THREAD_STATE_DISPATCHING);
+  }
+}
+
+/* this moves all threads with the given file descriptor conditions to
+   the dispatching list: */
+static void
+_tme_sjlj_threads_dispatching_fd(int fd,
+				 GdkInputCondition fd_conditions)
 {
   struct tme_sjlj_thread *thread;
-
-  /* nothing else should appear to be dispatching: */
-  assert(tme_sjlj_thread_dispatched_timeout == NULL);
-  assert(tme_sjlj_threads_dispatching == NULL);
 
   /* loop over all set conditions: */
   for (fd_conditions &= tme_sjlj_fd_thread[fd].tme_sjlj_fd_thread_conditions;
@@ -402,73 +403,98 @@ tme_sjlj_dispatch_fd(gpointer junk0, gint fd, GdkInputCondition fd_conditions)
     assert (thread != NULL);
     _tme_sjlj_change_state(thread, TME_SJLJ_THREAD_STATE_DISPATCHING);
   }
-
-  /* do the dispatch: */
-  tme_sjlj_dispatch(1);
-  assert(tme_sjlj_threads_dispatching == NULL);
 }
 
-/* this dispatches all runnable threads during an idle: */
-static int
-tme_sjlj_dispatch_idle(gpointer junk0)
+/* this makes the timeout time: */
+static void
+_tme_sjlj_timeout_time(struct timeval *timeout)
 {
-  struct tme_sjlj_thread *thread;
-  
-  /* if there are runnable threads, move them en masse to the
-     dispatching list, and do the dispatch: */
-  assert(tme_sjlj_threads_dispatching == NULL);
-  thread = tme_sjlj_threads_runnable;
-  if (thread != NULL) {
-    thread->state_prev = &tme_sjlj_threads_dispatching;
-    tme_sjlj_threads_dispatching = thread;
-    tme_sjlj_threads_runnable = NULL;
-    for (;
-	 thread != NULL;
-	 thread = thread->state_next) {
-      thread->tme_sjlj_thread_state = TME_SJLJ_THREAD_STATE_DISPATCHING;
-    }
-    tme_sjlj_dispatch(1);
-    assert(tme_sjlj_threads_dispatching == NULL);
+  struct timeval now;
+  struct tme_sjlj_thread *thread_timeout;
+  tme_int32_t usecs;
+  unsigned long secs;
+  unsigned long secs_other;
+
+  /* get the current time: */
+  tme_gettimeofday(&now);
+
+  /* the timeout list must not be empty: */
+  thread_timeout = tme_sjlj_threads_timeout;
+  assert (thread_timeout != NULL);
+
+  /* subtract the now microseconds from the timeout microseconds: */
+  assert (thread_timeout->tme_sjlj_thread_timeout.tv_usec < 1000000);
+  usecs = thread_timeout->tme_sjlj_thread_timeout.tv_usec;
+  assert (now.tv_usec < 1000000);
+  usecs -= now.tv_usec;
+
+  /* make any seconds carry: */
+  secs_other = (usecs < 0);
+  if (usecs < 0) {
+    usecs += 1000000;
   }
 
-  /* if there are still runnable threads, do not remove this idle
-     callback: */
-#ifdef HAVE_GTK
-  if (tme_sjlj_threads_runnable == NULL) {
-    tme_sjlj_idle_set = FALSE;
+  /* if the earliest timeout has already timed out: */
+  secs_other += now.tv_sec;
+  secs = thread_timeout->tme_sjlj_thread_timeout.tv_sec;
+  if (__tme_predict_false(secs_other > secs
+			  || ((secs -= secs_other) == 0
+			      && usecs == 0))) {
+
+    /* this thread is runnable: */
+    _tme_sjlj_change_state(thread_timeout, TME_SJLJ_THREAD_STATE_RUNNABLE);
+
+    /* make this a poll: */
+    secs = 0;
+    usecs = 0;
   }
-#endif /* HAVE_GTK */
-  return (tme_sjlj_threads_runnable != NULL);
+
+  /* return the timeout time: */
+  timeout->tv_sec = secs;
+  timeout->tv_usec = usecs;
 }
 
 /* this dispatches all dispatching threads: */
-static int
+static void
 tme_sjlj_dispatch(volatile int passes)
 {
   struct tme_sjlj_thread * volatile thread;
+  struct tme_sjlj_thread **_thread_timeout_prev;
+  struct tme_sjlj_thread *thread_timeout_next;
   struct tme_sjlj_thread *thread_other;
-  volatile int rc;
   int rc_one;
-  
-  /* assume we will return TRUE, indicating that the callback that
-     started this dispatching should not be removed: */
-  rc = TRUE;
 
   /* dispatch the given number of passes over the dispatching threads: */
   for (; passes-- > 0; ) {
     for (tme_sjlj_thread_active = tme_sjlj_threads_dispatching;
 	 (thread = tme_sjlj_thread_active) != NULL; ) {
+
+      /* if this thread is on the timeout list: */
+      _thread_timeout_prev = thread->timeout_prev;
+      assert ((_thread_timeout_prev != NULL)
+	      == (thread->tme_sjlj_thread_sleep.tv_sec != 0
+		  || thread->tme_sjlj_thread_sleep.tv_usec != 0));
+      if (_thread_timeout_prev != NULL) {
+
+	/* remove this thread from the timeout list: */
+	thread_timeout_next = thread->timeout_next;
+	*_thread_timeout_prev = thread_timeout_next;
+	if (thread_timeout_next != NULL) {
+	  thread_timeout_next->timeout_prev = _thread_timeout_prev;
+	}
+
+	/* this thread is no longer on the timeout list: */
+	thread->timeout_prev = NULL;
+	thread->timeout_next = NULL;
+      }
+
+      /* set the dispatch number on this thread: */
+      thread->tme_sjlj_thread_dispatch_number = _tme_sjlj_thread_dispatch_number;
       
       /* when this active thread yields, we'll return here, where we
 	 will continue the inner dispatching loop: */
       rc_one = setjmp(tme_sjlj_dispatcher_jmp);
       if (rc_one) {
-	if (rc_one == TME_SJLJ_DISPATCHER_FALSE) {
-	  rc = FALSE;
-	}
-	else {
-	  assert(rc_one == TME_SJLJ_DISPATCHER_TRUE);
-	}
 	continue;
       }
 
@@ -488,7 +514,6 @@ tme_sjlj_dispatch(volatile int passes)
     tme_sjlj_threads_runnable = thread;
     tme_sjlj_threads_dispatching = NULL;
     for (;; thread = thread->state_next) {
-      thread->tme_sjlj_thread_state = TME_SJLJ_THREAD_STATE_DISPATCHING;
       if (thread->state_next == NULL) {
 	thread->state_next = thread_other;
 	if (thread_other != NULL) {
@@ -499,43 +524,215 @@ tme_sjlj_dispatch(volatile int passes)
     }
   }
 
-#ifdef HAVE_GTK
-  
-  /* if threads are still runnable, but the idle callback isn't set,
-     set it: */
-  if (tme_sjlj_threads_runnable != NULL
-      && !tme_sjlj_idle_set) {
-    gtk_idle_add_priority(G_PRIORITY_DEFAULT_IDLE,
-			  tme_sjlj_dispatch_idle,
-			  NULL);
-    tme_sjlj_idle_set = TRUE;
-  }
-#endif /* HAVE_GTK */
-
-  return (rc);
+  /* the next dispatch will use the next number: */
+  _tme_sjlj_thread_dispatch_number++;
 }
+
+#ifdef HAVE_GTK
+
+/* this handles a GTK callback for a timeout: */
+static gint
+_tme_sjlj_gtk_callback_timeout(gpointer callback_pointer)
+{
+
+  /* we were in GTK for an unknown amount of time: */
+  tme_thread_long();
+
+  /* this GTK timeout will soon be removed, so forget it: */
+  _tme_sjlj_gtk_timeout_id = 0;
+
+  /* move all threads that have timed out to the dispatching list: */
+  _tme_sjlj_threads_dispatching_timeout();
+
+  /* dispatch: */
+  tme_sjlj_dispatch(1);
+
+  /* yield to GTK: */
+  tme_threads_gtk_yield();
+
+  /* remove this timeout: */
+  return (FALSE);
+
+  /* unused: */
+  callback_pointer = 0;
+}
+
+/* this handles a GTK callback for a file descriptor: */
+static void
+_tme_sjlj_gtk_callback_fd(gpointer callback_pointer,
+			  gint fd,
+			  GdkInputCondition fd_conditions)
+{
+
+  /* we were in GTK for an unknown amount of time: */
+  tme_thread_long();
+
+  /* move all threads that match the conditions on this file
+     descriptor to the dispatching list: */
+  _tme_sjlj_threads_dispatching_fd(fd, fd_conditions);
+
+  /* dispatch: */
+  tme_sjlj_dispatch(1);
+
+  /* yield to GTK: */
+  tme_threads_gtk_yield();
+
+  /* unused: */
+  callback_pointer = 0;
+}
+
+/* this handles a GTK callback for an idle: */
+static gint
+_tme_sjlj_gtk_callback_idle(gpointer callback_pointer)
+{
+
+  /* we were in GTK for an unknown amount of time: */
+  tme_thread_long();
+
+  /* move all runnable threads to the dispatching list: */
+  _tme_sjlj_threads_dispatching_runnable();
+
+  /* move all threads that have timed out to the dispatching list: */
+  _tme_sjlj_threads_dispatching_timeout();
+
+  /* dispatch: */
+  tme_sjlj_dispatch(1);
+
+  /* yield to GTK: */
+  tme_threads_gtk_yield();
+
+  /* if there are no runnable threads: */
+  if (tme_sjlj_threads_runnable == NULL) {
+
+    /* remove this idle: */
+    tme_sjlj_idle_set = FALSE;
+    return (FALSE);
+  }
+
+  /* preserve this idle: */
+  return (TRUE);
+
+  /* unused: */
+  callback_pointer = 0;
+}
+
+/* this yields to GTK: */
+void
+tme_sjlj_threads_gtk_yield(void)
+{
+  struct tme_sjlj_thread *thread_timeout;
+  struct timeval timeout;
+  unsigned long secs;
+  tme_uint32_t msecs;
+
+  /* if there are no runnable threads: */
+  if (tme_sjlj_threads_runnable == NULL) {
+
+    /* if there are no threads at all: */
+    if (__tme_predict_false(tme_sjlj_threads_all == NULL)) {
+
+      /* quit the GTK main loop: */
+      gtk_main_quit();
+      return;
+    }
+
+    /* if there is a GTK timeout, but the timeout list is empty or the
+       GTK timeout isn't for the earliest timeout: */
+    thread_timeout = tme_sjlj_threads_timeout;
+    if (_tme_sjlj_gtk_timeout_id != 0
+	&& (thread_timeout == NULL
+	    || _tme_sjlj_gtk_timeout.tv_sec != thread_timeout->tme_sjlj_thread_timeout.tv_sec
+	    || _tme_sjlj_gtk_timeout.tv_usec != thread_timeout->tme_sjlj_thread_timeout.tv_usec)) {
+
+      /* remove the GTK timeout: */
+      g_source_remove(_tme_sjlj_gtk_timeout_id);
+      _tme_sjlj_gtk_timeout_id = 0;
+    }
+
+    /* if the timeout list is not empty, but there is no GTK timeout: */
+    if (tme_sjlj_threads_timeout != NULL
+	&& _tme_sjlj_gtk_timeout_id == 0) {
+
+      /* get the timeout: */
+      _tme_sjlj_timeout_time(&timeout);
+
+      /* if there are still no runnable threads: */
+      /* NB: if the earliest timeout has already timed out,
+	 _tme_sjlj_timeout_time() has already made the thread
+	 runnable: */
+      if (tme_sjlj_threads_runnable == NULL) {
+
+	/* convert the timeout into milliseconds, and clip it at ten
+	   seconds: */
+	secs = timeout.tv_sec;
+	msecs = (timeout.tv_usec + 999) / 1000;
+	if (msecs == 1000) {
+	  secs++;
+	  msecs = 0;
+	}
+	msecs
+	  = (secs >= 10
+	     ? (10 * 1000)
+	     : ((secs * 1000) + msecs));
+
+	/* GTK timeouts can expire up to one millisecond early, so we
+	   always add one: */
+	msecs++;
+
+	/* add the timeout: */
+	/* XXX we have to call g_timeout_add_full here, because
+	   there are no gtk_timeout_add_ functions that allow you to
+	   specify the priority, and gtk_timeout_add() uses
+	   G_PRIORITY_DEFAULT, which means our (usually very
+	   frequent) timeouts always win over gtk's event handling,
+	   meaning the gtk windows never update: */
+	_tme_sjlj_gtk_timeout_id
+	  = g_timeout_add_full(G_PRIORITY_DEFAULT_IDLE,
+			       msecs,
+			       _tme_sjlj_gtk_callback_timeout,
+			       NULL,
+			       NULL);
+	assert (_tme_sjlj_gtk_timeout_id != 0);
+	_tme_sjlj_gtk_timeout = tme_sjlj_threads_timeout->tme_sjlj_thread_timeout;
+      }
+    }
+  }
+
+  /* if there are runnable threads: */
+  if (tme_sjlj_threads_runnable != NULL) {
+
+    /* if the idle callback isn't set */
+    if (!tme_sjlj_idle_set) {
+
+      /* set the idle callback: */
+      gtk_idle_add_priority(G_PRIORITY_DEFAULT_IDLE,
+			    _tme_sjlj_gtk_callback_idle,
+			    NULL);
+      tme_sjlj_idle_set = TRUE;
+    }
+  }
+}      
+
+#endif /* HAVE_GTK */
       
 /* this starts the threads dispatching: */
 void
 tme_sjlj_threads_run(void)
 {
-  struct tme_sjlj_thread *thread, *thread_other, **_prev;
   int fd;
   fd_set fdset_read_out;
   fd_set fdset_write_out;
   fd_set fdset_except_out;
   GdkInputCondition fd_conditions;
-  struct timeval now, *timeout, timeout_buffer;
+  struct timeval timeout_buffer;
+  struct timeval *timeout;
   int rc;
   
 #ifdef HAVE_GTK
-  /* if we're using the GTK main loop, add a single idle callback and
+  /* if we're using the GTK main loop, yield to GTK and
      call gtk_main(): */
   if (tme_sjlj_using_gtk) {
-    gtk_idle_add_priority(G_PRIORITY_DEFAULT_IDLE,
-			  tme_sjlj_dispatch_idle,
-			  NULL);
-    tme_sjlj_idle_set = TRUE;
+    tme_threads_gtk_yield();
     gtk_main();
     return;
   }
@@ -545,84 +742,6 @@ tme_sjlj_threads_run(void)
   
   /* loop while we have threads: */
   for (; tme_sjlj_threads_all != NULL; ) {
-
-    /* get the current time: */
-    gettimeofday(&now, NULL);
-
-    /* set the timeout time for any thread timeouts that are new or
-       just timed out, and insert-sort them into the timeouts list: */
-    for (; (thread = tme_sjlj_threads_timeout) != NULL; ) {
-
-      /* stop if we've run out of new timeouts to sort: */
-      if (thread->tme_sjlj_thread_timeout.tv_sec != 0
-	  || thread->tme_sjlj_thread_timeout.tv_usec != 0) {
-	break;
-      }
-
-      /* this thread must be on the timeouts list: */
-      assert(thread->timeout_prev == &tme_sjlj_threads_timeout);
-
-      /* remove this thread from the timeouts list: */
-      *thread->timeout_prev = thread->timeout_next;
-      if (thread->timeout_next != NULL) {
-	thread->timeout_next->timeout_prev = thread->timeout_prev;
-      }
-
-      /* set this thread's timeout: */
-      thread->tme_sjlj_thread_timeout = now;
-      thread->tme_sjlj_thread_timeout.tv_sec
-	+= thread->tme_sjlj_thread_sleep.tv_sec;
-      thread->tme_sjlj_thread_timeout.tv_usec
-	+= thread->tme_sjlj_thread_sleep.tv_usec;
-      for (; thread->tme_sjlj_thread_timeout.tv_usec >= 1000000; ) {
-	thread->tme_sjlj_thread_timeout.tv_sec++;
-	thread->tme_sjlj_thread_timeout.tv_usec -= 1000000;
-      }
-
-      /* find where to insert-sort this timeout back into the busy list: */
-      for (_prev = &tme_sjlj_threads_timeout;
-	   (thread_other = *_prev) != NULL;
-	   _prev = &thread_other->timeout_next) {
-
-	/* stop if this is the last timeout on the busy list,
-	   or if the next timeout happens at the same time as
-	   or later than the timeout we're inserting: */
-	if ((thread_other->tme_sjlj_thread_timeout.tv_sec
-	     > thread->tme_sjlj_thread_timeout.tv_sec)
-	    || ((thread_other->tme_sjlj_thread_timeout.tv_sec
-		 == thread->tme_sjlj_thread_timeout.tv_sec)
-		&& (thread_other->tme_sjlj_thread_timeout.tv_usec
-		    >= thread->tme_sjlj_thread_timeout.tv_usec))) {
-	  break;
-	}
-      }
-
-      /* put this thread back on the timeouts list: */
-      if ((thread->timeout_next = *_prev) != NULL) {
-	thread->timeout_next->timeout_prev = &thread->timeout_next;
-      }
-      thread->timeout_prev = _prev;
-      *_prev = thread;
-    }
-
-    /* if the top timeout has expired: */
-    thread = tme_sjlj_threads_timeout;
-    if (thread != NULL) {
-      if (thread->tme_sjlj_thread_timeout.tv_sec < now.tv_sec
-	  || (thread->tme_sjlj_thread_timeout.tv_sec == now.tv_sec
-	      && thread->tme_sjlj_thread_timeout.tv_usec <= now.tv_usec)) {
-
-	/* reset the timeout to zero: */
-	thread->tme_sjlj_thread_timeout.tv_sec = 0;
-	thread->tme_sjlj_thread_timeout.tv_usec = 0;
-
-	/* dispatch this timeout: */
-	tme_sjlj_dispatch_timeout(thread);
-
-	/* rerun the main loop: */
-	continue;
-      }
-    }
 
     /* if we have file descriptors to select on: */
     if (tme_sjlj_main_max_fd >= 0) {
@@ -635,30 +754,31 @@ tme_sjlj_threads_run(void)
 
     /* make the select timeout: */
 
+    /* if the timeout list is empty: */
+    if (tme_sjlj_threads_timeout == NULL) {
+
+      /* assume that we will block in select indefinitely.  there must
+	 either be runnable threads (in which case we will not block
+	 at all in select), or we must be selecting on file
+	 descriptors: */
+      timeout = NULL;
+      assert (tme_sjlj_threads_runnable != NULL
+	      || tme_sjlj_main_max_fd >= 0);
+    }
+
+    /* otherwise, the timeout list is not empty: */
+    else {
+
+      /* make the timeout: */
+      _tme_sjlj_timeout_time(&timeout_buffer);
+      timeout = &timeout_buffer;
+    }
+
     /* if there are runnable threads, make this a poll: */
     if (tme_sjlj_threads_runnable != NULL) {
       timeout_buffer.tv_sec = 0;
       timeout_buffer.tv_usec = 0;
       timeout = &timeout_buffer;
-    }
-
-    /* otherwise, if there are threads with timeouts, timeout when
-       the next thread's timeout will expire: */
-    else if (tme_sjlj_threads_timeout != NULL) {
-      timeout_buffer = tme_sjlj_threads_timeout->tme_sjlj_thread_timeout;
-      if (timeout_buffer.tv_usec < now.tv_usec) {
-	timeout_buffer.tv_sec--;
-	timeout_buffer.tv_usec += 1000000;
-      }
-      timeout_buffer.tv_sec -= now.tv_sec;
-      timeout_buffer.tv_usec -= now.tv_usec;
-      timeout = &timeout_buffer;
-    }
-
-    /* otherwise, block until a file descriptor is ready: */
-    else {
-      assert(tme_sjlj_main_max_fd >= 0);
-      timeout = NULL;
     }
 
     /* do the select: */
@@ -667,6 +787,15 @@ tme_sjlj_threads_run(void)
 		&fdset_write_out,
 		&fdset_except_out,
 		timeout);
+
+    /* we were in select() for an unknown amount of time: */
+    tme_thread_long();
+
+    /* move all runnable threads to the dispatching list: */
+    _tme_sjlj_threads_dispatching_runnable();
+
+    /* move all threads that have timed out to the dispatching list: */
+    _tme_sjlj_threads_dispatching_timeout();
 
     /* if some fds are ready, dispatch them: */
     if (rc > 0) {	
@@ -683,8 +812,9 @@ tme_sjlj_threads_run(void)
 	}
 	if (fd_conditions != 0) {
 
-	  /* dispatch this file descriptor: */
-	  tme_sjlj_dispatch_fd(NULL, fd, fd_conditions);
+	  /* move all threads that match the conditions on this file
+	     descriptor to the dispatching list: */
+	  _tme_sjlj_threads_dispatching_fd(fd, fd_conditions);
 
 	  /* stop if there are no more file descriptors left in the
 	     sets: */
@@ -695,8 +825,8 @@ tme_sjlj_threads_run(void)
       }
     }
     
-    /* dispatch an idle: */
-    tme_sjlj_dispatch_idle(NULL);
+    /* dispatch: */
+    tme_sjlj_dispatch(1);
   }
 
   /* all threads have exited: */
@@ -707,9 +837,6 @@ void
 tme_sjlj_thread_create(tme_thread_t func, void *func_private)
 {
   struct tme_sjlj_thread *thread;
-#ifdef HAVE_GTK
-  unsigned int i;
-#endif /* HAVE_GTK */
 
   /* allocate a new thread and put it on the all-threads list: */
   thread = tme_new(struct tme_sjlj_thread, 1);
@@ -728,18 +855,12 @@ tme_sjlj_thread_create(tme_thread_t func, void *func_private)
   thread->tme_sjlj_thread_sleep.tv_sec = 0;
   thread->tme_sjlj_thread_sleep.tv_usec = 0;
   thread->timeout_prev = NULL;
-#ifdef HAVE_GTK
-  thread->tme_sjlj_thread_timeout_handle = NULL;
-  i = TME_ARRAY_ELS(thread->tme_sjlj_thread_timeout_handles);
-  do {
-    thread->tme_sjlj_thread_timeout_handles[--i] = NULL;
-  } while (i > 0);
-#endif /* HAVE_GTK */
 
   /* make this thread runnable: */
   thread->tme_sjlj_thread_state = TME_SJLJ_THREAD_STATE_BLOCKED;
   thread->state_prev = NULL;
   thread->state_next = NULL;
+  thread->tme_sjlj_thread_dispatch_number = _tme_sjlj_thread_dispatch_number - 1;
   _tme_sjlj_change_state(thread,
 			 TME_SJLJ_THREAD_STATE_RUNNABLE);
 }
@@ -786,15 +907,9 @@ tme_sjlj_cond_notify(tme_cond_t *cond, int broadcast)
     if (thread->tme_sjlj_thread_state == TME_SJLJ_THREAD_STATE_BLOCKED
 	&& thread->tme_sjlj_thread_cond == cond) {
       
-      /* if threads are being dispatched, move this found thread to
-	 the dispatching state, else move it to the runnable state.
-	 (it's possible that this function could be called from
-	 outside the threads system, say, like from a GTK callback
-	 handler of some sort.) */
+      /* this thread is runnable: */
       _tme_sjlj_change_state(thread,
-			     (tme_sjlj_thread_active == NULL
-			      ? TME_SJLJ_THREAD_STATE_RUNNABLE
-			      : TME_SJLJ_THREAD_STATE_DISPATCHING));
+			     TME_SJLJ_THREAD_STATE_RUNNABLE);
 
       /* if we're not broadcasting this notification, stop now: */
       if (!broadcast) {
@@ -815,26 +930,17 @@ tme_sjlj_yield(void)
   int max_fd, fd;
   GdkInputCondition fd_condition_old;
   GdkInputCondition fd_condition_new;
-#ifdef HAVE_GTK
-  unsigned long usec_part;
-  struct tme_sjlj_thread **timeout_handle;
-  unsigned int timeout_handle_count;
-#endif /* HAVE_GTK */
-  int longjmp_value;
+  struct tme_sjlj_thread **_thread_prev;
+  struct tme_sjlj_thread *thread_other;
 
   /* get the active thread: */
   thread = tme_sjlj_thread_active;
 
-  /* the thread must be dispatching: */
-  assert(thread->tme_sjlj_thread_state
-	 == TME_SJLJ_THREAD_STATE_DISPATCHING);
+  /* the thread ran for an unknown amount of time: */
+  tme_thread_long();
 
   /* assume that this thread is not blocked: */
   blocked = FALSE;
-
-  /* assume that the dispatcher will return TRUE to keep the tag it
-     was called on alive: */
-  longjmp_value = TME_SJLJ_DISPATCHER_TRUE;
 
   /* see if this thread is blocked on a condition: */
   if (tme_sjlj_thread_blocked.tme_sjlj_thread_cond != NULL) {
@@ -901,7 +1007,7 @@ do {							\
 
 	  /* it should be safe to remove this fd, even if we're
 	     currently in a callback for it.  if we happen to get a
-	     callback for it later anyways, tme_sjlj_dispatch_fd()
+	     callback for it later anyways, _tme_sjlj_gtk_callback_fd()
 	     will ignore it: */
 	  gdk_input_remove(tme_sjlj_fd_tag[fd]);
 	}
@@ -959,7 +1065,7 @@ do {							\
 	  tme_sjlj_fd_tag[fd] = 
 	    gdk_input_add(fd,
 			  fd_condition_new,
-			  tme_sjlj_dispatch_fd,
+			  _tme_sjlj_gtk_callback_fd,
 			  NULL);
 	}
 	else
@@ -990,128 +1096,39 @@ do {							\
   if (tme_sjlj_thread_blocked.tme_sjlj_thread_sleep.tv_sec != 0
       || tme_sjlj_thread_blocked.tme_sjlj_thread_sleep.tv_usec != 0) {
 
-#ifdef HAVE_GTK
-    /* GTK timeouts only offer a resolution of one millisecond, and
-       can expire up to one millisecond early, so always round the
-       timeout up to a whole millisecond and add one: */
-    if (tme_sjlj_using_gtk) {
-      usec_part
-	= (tme_sjlj_thread_blocked.tme_sjlj_thread_sleep.tv_usec
-	   + 1999);
-      usec_part -= (usec_part % 1000);
-      if (usec_part >= 1000000) {
-	tme_sjlj_thread_blocked.tme_sjlj_thread_sleep.tv_sec++;
-	usec_part -= 1000000;
-      }
-      tme_sjlj_thread_blocked.tme_sjlj_thread_sleep.tv_usec = usec_part;
-    }
-#endif /* HAVE_GTK */
-
     assert(tme_sjlj_thread_blocked.tme_sjlj_thread_sleep.tv_usec < 1000000);
     blocked = TRUE;
-  }
 
-  /* if the sleep interval has changed, or if this thread
-     didn't run because its sleep interval expired: */
-  if ((tme_sjlj_thread_blocked.tme_sjlj_thread_sleep.tv_sec
-       != thread->tme_sjlj_thread_sleep.tv_sec)
-      || (tme_sjlj_thread_blocked.tme_sjlj_thread_sleep.tv_usec
-	  != thread->tme_sjlj_thread_sleep.tv_usec)
-      || ((thread->tme_sjlj_thread_sleep.tv_sec != 0
-	   || thread->tme_sjlj_thread_sleep.tv_usec != 0)
-	  && thread != tme_sjlj_thread_dispatched_timeout)) {
-
-    /* free any old timeout: */
-    if (thread->tme_sjlj_thread_sleep.tv_sec != 0
-	|| thread->tme_sjlj_thread_sleep.tv_usec != 0) {
-
-#ifdef HAVE_GTK
-      if (tme_sjlj_using_gtk) {
-
-	/* to be safe, if this timeout is why GTK is calling us back
-	   right now, don't risk confusing GTK's main loop by removing
-	   this timeout here.  instead, arrange for the dispatcher to
-	   return FALSE so the GTK main loop will remove the timeout
-	   automatically: */
-	if (thread == tme_sjlj_thread_dispatched_timeout) {
-	  longjmp_value = TME_SJLJ_DISPATCHER_FALSE;
-	}
-      }
-      else
-#endif /* HAVE_GTK */
-	{
-
-	  /* this thread must be on the timeout list: */
-	  assert(thread->timeout_prev != NULL);
-
-	  /* remove this thread from the timeout list: */
-	  *thread->timeout_prev = thread->timeout_next;
-	  if (thread->timeout_next != NULL) {
-	    thread->timeout_next->timeout_prev = thread->timeout_prev;
-	  }
-
-	  /* this thread is no longer on the timeout list: */
-	  thread->timeout_prev = NULL;
-	  thread->timeout_next = NULL;
-	}
+    /* set the timeout for this thread: */
+    tme_gettimeofday(&thread->tme_sjlj_thread_timeout);
+    thread->tme_sjlj_thread_timeout.tv_sec
+      += tme_sjlj_thread_blocked.tme_sjlj_thread_sleep.tv_sec;
+    thread->tme_sjlj_thread_timeout.tv_usec
+      += tme_sjlj_thread_blocked.tme_sjlj_thread_sleep.tv_usec;
+    if (thread->tme_sjlj_thread_timeout.tv_usec >= 1000000) {
+      thread->tme_sjlj_thread_timeout.tv_sec++;
+      thread->tme_sjlj_thread_timeout.tv_usec -= 1000000;
     }
 
-    /* add any new timeout: */
-    if (tme_sjlj_thread_blocked.tme_sjlj_thread_sleep.tv_sec != 0
-	|| tme_sjlj_thread_blocked.tme_sjlj_thread_sleep.tv_usec != 0) {
-#ifdef HAVE_GTK
-      if (tme_sjlj_using_gtk) {
-
-	/* find an unused GTK timeout handle, or allocate a new one: */
-	timeout_handle = &thread->tme_sjlj_thread_timeout_handles[0];
-	timeout_handle_count = TME_ARRAY_ELS(thread->tme_sjlj_thread_timeout_handles);
-	do {
-	  if (*timeout_handle == NULL) {
-	    break;
-	  }
-	  timeout_handle++;
-	} while (--timeout_handle_count > 0);
-	if (timeout_handle_count == 0) {
-	  timeout_handle = tme_new(struct tme_sjlj_thread *, 1);
-	}
-	*timeout_handle = thread;
-	thread->tme_sjlj_thread_timeout_handle = timeout_handle;
-
-	  /* XXX we have to call g_timeout_add_full here, because
-	     there are no gtk_timeout_add_ functions that allow you to
-	     specify the priority, and gtk_timeout_add() uses
-	     G_PRIORITY_DEFAULT, which means our (usually very
-	     frequent) timeouts always win over gtk's event handling,
-	     meaning the gtk windows never update: */
-	  g_timeout_add_full(G_PRIORITY_DEFAULT_IDLE,
-			     ((tme_sjlj_thread_blocked.tme_sjlj_thread_sleep.tv_sec
-			       * 1000)
-			      + (tme_sjlj_thread_blocked.tme_sjlj_thread_sleep.tv_usec
-				 / 1000)),
-			     tme_sjlj_dispatch_timeout,
-			     timeout_handle,
-			     NULL);
+    /* insert this thread into the timeout list: */
+    assert (thread->timeout_prev == NULL);
+    for (_thread_prev = &tme_sjlj_threads_timeout;
+	 (thread_other = *_thread_prev) != NULL;
+	 _thread_prev = &thread_other->timeout_next) {
+      if ((thread_other->tme_sjlj_thread_timeout.tv_sec
+	   > thread->tme_sjlj_thread_timeout.tv_sec)
+	  || ((thread_other->tme_sjlj_thread_timeout.tv_sec
+	       == thread->tme_sjlj_thread_timeout.tv_sec)
+	      && (thread_other->tme_sjlj_thread_timeout.tv_usec
+		  >= thread->tme_sjlj_thread_timeout.tv_usec))) {
+	break;
       }
-      else
-#endif /* HAVE_GTK */
-	{
-
-	  /* this thread must not be on the timeout list: */
-	  assert(thread->timeout_prev == NULL);
-
-	  /* put this thread at the front of the timeout list with
-	     zero wakeup time - the main loop will calculate the next
-	     wakeup time and insert-sort the thread into its correct
-	     spot: */
-	  thread->tme_sjlj_thread_timeout.tv_sec = 0;
-	  thread->tme_sjlj_thread_timeout.tv_usec = 0;
-	  thread->timeout_next = tme_sjlj_threads_timeout;
-	  thread->timeout_prev = &tme_sjlj_threads_timeout;
-	  tme_sjlj_threads_timeout = thread;
-	  if (thread->timeout_next != NULL) {
-	    thread->timeout_next->timeout_prev = &thread->timeout_next;
-	  }
-	}
+    }
+    *_thread_prev = thread;
+    thread->timeout_prev = _thread_prev;
+    thread->timeout_next = thread_other;
+    if (thread_other != NULL) {
+      thread_other->timeout_prev = &thread->timeout_next;
     }
   }
   thread->tme_sjlj_thread_sleep = tme_sjlj_thread_blocked.tme_sjlj_thread_sleep;
@@ -1152,7 +1169,7 @@ do {							\
   }
 
   /* jump back to the dispatcher: */
-  longjmp(tme_sjlj_dispatcher_jmp, longjmp_value);
+  longjmp(tme_sjlj_dispatcher_jmp, TRUE);
 }
 
 /* this sleeps: */
@@ -1162,8 +1179,11 @@ tme_sjlj_sleep(unsigned long sec, unsigned long usec)
   struct timeval then, now, timeout;
   int rc;
   
+  /* the thread ran for an unknown amount of time: */
+  tme_thread_long();
+
   /* get the wakeup time for the thread: */
-  gettimeofday(&then, NULL);
+  tme_gettimeofday(&then);
   for (; usec >= 1000000; sec++, usec -= 1000000);
   if ((then.tv_usec += usec) >= 1000000) {
     sec++;
@@ -1175,6 +1195,7 @@ tme_sjlj_sleep(unsigned long sec, unsigned long usec)
   for (;;) {
 
     /* calculate the current timeout: */
+    tme_gettimeofday(&now);
     if ((now.tv_sec > then.tv_sec)
 	|| (now.tv_sec == then.tv_sec
 	    && now.tv_usec >= then.tv_usec)) {
@@ -1191,12 +1212,12 @@ tme_sjlj_sleep(unsigned long sec, unsigned long usec)
     /* do the select.  select returns 0 iff the timeout expires, so we
        can skip another gettimeofday and loop: */
     rc = select(-1, NULL, NULL, NULL, &timeout);
+    tme_thread_long();
     if (rc == 0) {
       break;
     }
 
     /* loop to see if the timeout really expired: */
-    gettimeofday(&now, NULL);
   }
 }
 
@@ -1246,6 +1267,7 @@ tme_sjlj_select_yield(int nfds,
   /* do a polling select: */
   timeout_out.tv_sec = timeout_out.tv_usec = 0;
   rc = select(nfds, fdset_read_in, fdset_write_in, fdset_except_in, &timeout_out);
+  tme_thread_long();
   if (rc != 0
       || (timeout_in != NULL
 	  && timeout_in->tv_sec == 0

@@ -4,8 +4,6 @@ just the state of the signal on the last bus that happened to call it
 out.  this will cause interrupts to get lost (but because of cooperative
 threading, this probably isn't manifesting now).
 
-fix thread dispatch problems when not using gtk
-
 clean up posix-serial callouts to be like 3c400
 
 is the (brief) extension word handling correct for PC-relative 
@@ -31,9 +29,6 @@ group0 hook entirely, since while we guarantee that we won't fault on
 an instruction fetch, we still might fault on data in
 mid-instruction-fetch.  this optimization would however remove a 
 test and goto in the fast FETCH macros.
-
-probably the way ENA_NONBOOT works on the sun2 is that all FC_SP
-references go to the PROM
 
 /* version enforcement: */
 #if !defined(TME_BUS_DEVICE_VERSION) || TME_VERSION_CURRENT_X(TME_BUS_DEVICE_VERSION) != 0
@@ -104,8 +99,6 @@ pointers and bus boundary values, and scsi-bus.c needs to use
 tme_memory_bus_read_buffer(), tme_memory_bus_write_buffer() as
 appropriate.
 
-make sure all callers of *_tlb_allocate have tme_shared tlb set pointers
-
 need barriers in the m68k read/write/fetch, etc. functions
 
 remove the locks argument from the generic bus-device DMA functions, since
@@ -131,4 +124,129 @@ see the comments in _tme_gtk_keyboard_x11_new().
 
 sun4: FAILURE: SEVAR (60000004) Power-Up, Exp = 00000000, Obs = ffed9000
 
-sparc: is the test "x${sign}" = xs in sparc-insns-auto.sh right?
+add [] to all tr character classes, so they work for SysV
+
+sparc: convert tme_sparc_ls_tlb_map from a struct tme_bus_tlb to a new struct type,
+since it uses various fields that will disappear in the bus cycle transition.
+
+sparc64 recode: don't assist membar instructions
+sparc64 recode: don't redispatch return instructions; instead they
+should return a value for the TME_SPARC_IREG_PC_NEXT register, and we
+should set pc_advance and reg_guest_pc so PCs won't get updated by the
+TME_SPARC_RECODE_INSN_UPDATE_PCS code.  (but what about a return in a
+branch delay slot? - just add it to
+_tme_sparc_recode_insn_branch_delay_bad())
+
+sparc64 recode: make the %rcc flags thunk only do 64-bit flags (the
+32-bit flags shouldn't be needed)
+
+recode: we must document that tme_recode_insns_thunk() REQUIRES that
+guest read/write instructions THAT ARE READS have
+TME_RECODE_OPERAND_ZERO for tme_recode_insn_operand_src[1] (this frees
+tme_recode_insns_thunk() from having to skip _src[1] on a read).
+this should be an assert().
+
+tme_bus_tlb_map() - check that addr_offset can be a tme_bus_addr_t,
+no matter what tme_bus_addr_t's size.
+
+sparc64 recode: TME_SPARC_RECODE_SRC_HASH_SIZE_ELEMENT assumes
+that sizeof(tme_sparc_recode_src_key_t) >= sizeof(tme_recode_thunk_off_t)
+
+sparc64 FPU: the new operations (especially FMOVcc) are always
+present, no matter what the architecture.  this exposes us to guests.
+
+x86 recode: stack alignment correct for a read/write assist call on an
+x86_64 host?
+
+SUN-ULTRA-1: make the onboard esp0 revision 2, and the onboard
+ncr53c9x a variant esp200
+
+sparc64 recode: a redispatch should probably encourage thunk
+generation (otherwise, after a wrpsr we'll interpret instructions
+until the next branch), something similar to the encouragement
+at the end of the sparc-execute.c recode thunk running.
+
+sparc execute: note that the V8 execute_trap ISP description notes
+that if a trap is taken preinstruction when annul != 0, the PCs are
+just advanced past the annulled instruction when they are saved for
+the trap (i.e., in the trap case, the annulled instruction isn't
+fetched).  if we put the annulled bit into tme_sparc, we wouldn't have
+to force _tme_sparc_instruction_burst_remaining to be at least one
+after an annulling branch (if the burst was zero, we'll fetch the
+annulled instruction at the beginning of the next burst) and we'll get
+better emulation (because a real CPU doesn't fetch an annulled
+instruction when the previous instruction traps - but how could this
+happen, anyways?  how can you annul an instruction but take a trap
+before it's fetched?  maybe that's only possible by a trap for an
+interrupt?)
+
+sparc preemptive threading: an std must execute atomically; we must
+do one store instead of two.
+
+stp103x: there may be a race on setting TICK.INT_DIS, where you
+may still get a tick interrupt afterwards?
+
+make a version of tme_misc_cycles_spin_until() that doesn't
+do too many gettimeofday() calls?
+
+sparc64 recode: do we need to address-mask PC in
+_tme_sparc_recode_recode()?
+
+sparc64 recode: we should address-mask the PC_next_nexts made
+in the assist functions.
+
+sparc32 external: remove the interrupt acknowledge cycle
+
+make tme_sjlj_sleep_yield() and tme_sjlj_cond_sleep_yield() return
+immediately if the time to sleep is zero (because otherwise,
+tme_sjlj_yield() will think the thread is blocked).
+
+sparc64 recode assist: it's only necessary to set PC_next_next if
+the instruction handler might redispatch; are there any assist
+types where we know that the handler will not redispatch?
+
+replace some gettimeofday() calls with tme_gettimeofday(),
+also with tme_thread_long() as needed.
+
+sunfb bus transition: instead of initializing the completion error,
+tme_sunfb_bus_cycle_transition() should poison it and make sure that
+the cycle handler defines it *and* the fast cycle types.
+
+sparc execute: check for an external check at the beginning of
+tme_sparc_thread():TME_SPARC_MODE_EXECUTION, and truncate the
+execution burst if true?
+
+sparc optimization: in tme_sparc${arch}_ls(), push the poisoning of an
+unusable TLB entry before the address_map call, into the address_map
+functions (and only if they trap).
+
+sparc: in tme_sparc${arch}_ls(), should a TME_SPARC_LSINFO_OP_ATOMIC
+start out as TME_BUS_CYCLE_READ?  this would at least make a TLB miss
+report the access as a read.  the ultrasparc manual isn't clear if
+atomics are always reported in SFSR as writes.
+
+threading: any threading implementation must call tme_thread_long() as
+needed, including in its own tme_*_yield() functions as needed.
+
+NetBSD/sparc (>=5.x only?): on some hosts and some debugging setups,
+keys will unexpectedly repeat in the guest when large updates are
+happening on the text console:
+  1. original keypress, starts key repeat callout
+  2. user process writes a lot to the console kd device
+  3. kd.c:kd_putfb() does splsoftclock() and calls prom_putstr()
+  4. while prom_putstr() is running, the key release interrupt
+     happens.  since we're at splsoftclock(), the zs soft interrupt
+     for the key release is held pending.  (the key repeat callout is
+     only cancelled in the soft interrupt path.)
+  5. while prom_putstr() is running, the key repeat callout expires.
+     since we're at splsoftclock(), the callout is held pending.  it
+     is now too late to avoid the key repeating.
+  6. prom_putstr() finally finishes.  the key repeat callout is called
+     (either before or after the zs soft interrupt, it doesn't matter)
+     and repeats the key.
+in a non-debugging setup (-DNDEBUG, -DTME_NO_LOG, etc.) the emulator
+seems fast enough that prom_putstr() finishes before the key repeat
+callout expires, which is why this problem probably won't get fixed.
+(before recode, we may have avoided the problem because the emulator
+was actually too slow - the key release interrupt could have happened
+even before we got to the prom_putstr() point.)

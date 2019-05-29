@@ -1,4 +1,4 @@
-/* $Id: log.h,v 1.1 2003/05/16 21:48:14 fredette Exp $ */
+/* $Id: log.h,v 1.2 2009/08/30 13:23:39 fredette Exp $ */
 
 /* tme/log.h - public header file for logging: */
 
@@ -37,7 +37,7 @@
 #define _TME_LOG_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: log.h,v 1.1 2003/05/16 21:48:14 fredette Exp $");
+_TME_RCSID("$Id: log.h,v 1.2 2009/08/30 13:23:39 fredette Exp $");
 
 /* includes: */
 
@@ -58,6 +58,13 @@ _TME_RCSID("$Id: log.h,v 1.1 2003/05/16 21:48:14 fredette Exp $");
 #define __tme_printf_attribute
 #endif
 
+/* log modes: */
+#define TME_LOG_MODE_TEXT		(0)
+#define TME_LOG_MODE_BINARY		(1)
+
+/* maximum message sizes: */
+#define TME_LOG_MESSAGE_SIZE_MAX_BINARY	(1024)
+
 /* a logging handle: */
 struct tme_log_handle {
   
@@ -69,6 +76,7 @@ struct tme_log_handle {
 
   /* the log message: */
   char *tme_log_handle_message;
+  unsigned long tme_log_handle_message_size;
 
   /* any errno with this message: */
   int tme_log_handle_errno;
@@ -78,6 +86,12 @@ struct tme_log_handle {
 
   /* the interface's log output function: */
   void (*tme_log_handle_output) _TME_P((struct tme_log_handle *));
+
+  /* the mode of this handle: */
+  unsigned int tme_log_handle_mode;
+
+  /* a format hash: */
+  struct _tme_hash *tme_log_handle_hash_format;
 };
 
 /* prototypes and macros: */
@@ -96,7 +110,6 @@ do {							\
   if (_tme_log_start(handle, level)) {			\
     (handle)->tme_log_handle_level = (level);		\
     (handle)->tme_log_handle_errno = (rc);		\
-    (handle)->tme_log_handle_message = NULL;		\
     do
 
 /* this logs (part of) the body of a message: */

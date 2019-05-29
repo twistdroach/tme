@@ -1,4 +1,4 @@
-/* $Id: mouse.c,v 1.2 2006/09/30 12:34:16 fredette Exp $ */
+/* $Id: mouse.c,v 1.3 2010/02/07 14:29:53 fredette Exp $ */
 
 /* generic/mouse.c - generic mouse implementation support: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: mouse.c,v 1.2 2006/09/30 12:34:16 fredette Exp $");
+_TME_RCSID("$Id: mouse.c,v 1.3 2010/02/07 14:29:53 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/mouse.h>
@@ -88,15 +88,78 @@ tme_mouse_buffer_destroy(struct tme_mouse_buffer *buffer)
   tme_free(buffer);
 }
 
+/* this returns nonzero if both deltas are nonzero and have
+   different signs: */
+static inline int
+_tme_mouse_deltas_opposite(int delta, int delta_last)
+{
+  int opposite;
+
+  opposite = (delta_last ^ delta) < 0;
+  opposite -= (delta == 0);
+  opposite -= (delta_last == 0);
+  return (opposite > 0);
+}
+
 /* this copies an event into a mouse buffer: */
 int
 tme_mouse_buffer_copyin(struct tme_mouse_buffer *buffer,
 			_tme_const struct tme_mouse_event *event)
 {
   unsigned int buffer_head, buffer_size_mask;
+  struct tme_mouse_event *event_last;
+  unsigned int unmergeable_mash;
 
   buffer_head = buffer->tme_mouse_buffer_head;
   buffer_size_mask = buffer->tme_mouse_buffer_size - 1;
+
+  /* if the buffer is not empty: */
+  if (buffer_head != buffer->tme_mouse_buffer_tail) {
+
+    /* get the last event in the buffer: */
+    event_last = &buffer->tme_mouse_buffer_events[(buffer_head - 1) & buffer_size_mask];
+
+    /* the new event can't be merged if both delta Xs are nonzero and
+       have different signs: */
+    unmergeable_mash
+      = _tme_mouse_deltas_opposite(event->tme_mouse_event_delta_x,
+				   event_last->tme_mouse_event_delta_x);
+
+    /* the new event can't be merged if both delta Ys are nonzero and
+       have different signs: */
+    unmergeable_mash
+      |= _tme_mouse_deltas_opposite(event->tme_mouse_event_delta_y,
+				    event_last->tme_mouse_event_delta_y);
+
+    /* the new event can't be merged if its button mask is
+       different: */
+    unmergeable_mash
+      |= (event->tme_mouse_event_buttons
+	 ^ event_last->tme_mouse_event_buttons);
+
+    /* the new event can't be merged if its delta units are
+       different: */
+    unmergeable_mash
+      |= (event->tme_mouse_event_delta_units
+	  ^ event_last->tme_mouse_event_delta_units);
+
+    /* if the new event can't be merged: */
+    if (__tme_predict_false(unmergeable_mash)) {
+
+      /* nothing to do */
+    }
+
+    /* otherwise, the new event can be merged: */
+    else {
+
+      /* merge the event: */
+      /* XXX FIXME - we should check for integer overflow here: */
+      event_last->tme_mouse_event_delta_x += event->tme_mouse_event_delta_x;
+      event_last->tme_mouse_event_delta_y += event->tme_mouse_event_delta_y;
+      event_last->tme_mouse_event_time = event->tme_mouse_event_time;
+      return (TME_OK);
+    }
+  }
 
   /* if the buffer is full: */
   if (((buffer_head + 1) & buffer_size_mask)

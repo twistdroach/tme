@@ -1,4 +1,4 @@
-/* $Id: sun-mie.c,v 1.3 2006/09/30 12:43:31 fredette Exp $ */
+/* $Id: sun-mie.c,v 1.4 2010/06/05 13:57:27 fredette Exp $ */
 
 /* bus/multibus/sun_mie.c - implementation of the Sun Intel Ethernet Multibus emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun-mie.c,v 1.3 2006/09/30 12:43:31 fredette Exp $");
+_TME_RCSID("$Id: sun-mie.c,v 1.4 2010/06/05 13:57:27 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -168,7 +168,7 @@ struct tme_sun_mie {
   tme_uint8_t tme_sun_mie_memory[TME_SUN_MIE_MEMSIZE];
 
   /* the active TLB entries for each page map entry on the board: */
-  struct tme_bus_tlb *tme_sun_mie_tlbs[TME_SUN_MIE_PGMAP_COUNT * TME_SUN_MIE_PGMAP_TLBS];
+  struct tme_token *tme_sun_mie_tlb_tokens[TME_SUN_MIE_PGMAP_COUNT * TME_SUN_MIE_PGMAP_TLBS];
   unsigned int tme_sun_mie_tlb_head[TME_SUN_MIE_PGMAP_COUNT];
 
   /* the i825x6 image of the CSR: */
@@ -442,9 +442,9 @@ _tme_sun_mie_bus_cycle_regs(void *_sun_mie,
 
     /* invalidate the TLB entries: */
     for (; tlb_i < tlb_j; tlb_i++) {
-      if (sun_mie->tme_sun_mie_tlbs[tlb_i] != NULL) {
-	tme_bus_tlb_invalidate(sun_mie->tme_sun_mie_tlbs[tlb_i]);
-	sun_mie->tme_sun_mie_tlbs[tlb_i] = NULL;
+      if (sun_mie->tme_sun_mie_tlb_tokens[tlb_i] != NULL) {
+	tme_token_invalidate(sun_mie->tme_sun_mie_tlb_tokens[tlb_i]);
+	sun_mie->tme_sun_mie_tlb_tokens[tlb_i] = NULL;
       }
     }
   }
@@ -577,26 +577,20 @@ _tme_sun_mie_bus_signals_add(struct tme_bus_connection *conn_bus,
   return (TME_OK);
 }
 
-/* the sun_mie TLB allocator for the i825x6: */
+/* the sun_mie TLB adder for the i825x6: */
 static int
-_tme_sun_mie_tlb_set_allocate(struct tme_bus_connection *conn_bus,
-			      unsigned int count, unsigned int sizeof_one, 
-			      struct tme_bus_tlb * tme_shared *_tlbs,
-			      tme_rwlock_t *_tlbs_rwlock)
+_tme_sun_mie_tlb_set_add(struct tme_bus_connection *conn_bus,
+			 struct tme_bus_tlb_set_info *tlb_set_info)
 {
-  struct tme_bus_tlb *tlbs, *tlb;
-  unsigned int tlb_i;
 
-  /* allocate a singleton set: */
-  tlbs = (struct tme_bus_tlb *) tme_malloc(count * sizeof_one);
-  tlb = tlbs;
-  for (tlb_i = 0; tlb_i < count; tlb_i++) {
-    tme_bus_tlb_construct(tlb);
-    tlb = (struct tme_bus_tlb *) (((tme_uint8_t *) tlb) + sizeof_one);
+  /* if this TLB set provides a bus context register: */
+  if (tlb_set_info->tme_bus_tlb_set_info_bus_context != NULL) {
+
+    /* this bus only has one context: */
+    (*tlb_set_info->tme_bus_tlb_set_info_bus_context) = 0;
+    tlb_set_info->tme_bus_tlb_set_info_bus_context_max = 0;
   }
-  tme_memory_atomic_pointer_write(struct tme_bus_tlb *, *_tlbs, tlbs, _tlbs_rwlock);
-      
-  /* done: */
+
   return (TME_OK);
 }
 
@@ -604,16 +598,21 @@ _tme_sun_mie_tlb_set_allocate(struct tme_bus_connection *conn_bus,
 static int
 _tme_sun_mie_tlb_fill(struct tme_bus_connection *conn_bus,
 		      struct tme_bus_tlb *tlb, 
-		      tme_bus_addr_t address, 
+		      tme_bus_addr_t address_wider,
 		      unsigned int cycles)
 {
   struct tme_sun_mie *sun_mie;
+  tme_bus_addr32_t address;
   unsigned int pgmap_i;
   unsigned int tlb_i;
   tme_uint16_t pgmap;
 
   /* recover our data structures: */
   sun_mie = conn_bus->tme_bus_connection.tme_connection_element->tme_element_private;
+
+  /* get the normal-width address: */
+  address = address_wider;
+  assert (address == address_wider);
 
   /* the address must be within range: */
   assert(address <= 0xffffff);
@@ -639,9 +638,9 @@ _tme_sun_mie_tlb_fill(struct tme_bus_connection *conn_bus,
 
   /* if the new head pointer already has a TLB entry, and it doesn't
      happen to be the same one that we're filling now, invalidate it: */
-  if (sun_mie->tme_sun_mie_tlbs[tlb_i] != NULL
-      && sun_mie->tme_sun_mie_tlbs[tlb_i] != tlb->tme_bus_tlb_global) {
-    tme_bus_tlb_invalidate(sun_mie->tme_sun_mie_tlbs[tlb_i]);
+  if (sun_mie->tme_sun_mie_tlb_tokens[tlb_i] != NULL
+      && sun_mie->tme_sun_mie_tlb_tokens[tlb_i] != tlb->tme_bus_tlb_token) {
+    tme_token_invalidate(sun_mie->tme_sun_mie_tlb_tokens[tlb_i]);
   }
 
   /* initialize the TLB entry: */
@@ -667,8 +666,8 @@ _tme_sun_mie_tlb_fill(struct tme_bus_connection *conn_bus,
     tlb->tme_bus_tlb_emulator_off_write;
 
   /* add this TLB entry to the active list: */
-  sun_mie->tme_sun_mie_tlbs[tlb_i] =
-    tlb->tme_bus_tlb_global;
+  sun_mie->tme_sun_mie_tlb_tokens[tlb_i] =
+    tlb->tme_bus_tlb_token;
 
   /* unlock our mutex: */
   tme_mutex_unlock(&sun_mie->tme_sun_mie_mutex);
@@ -680,12 +679,18 @@ _tme_sun_mie_tlb_fill(struct tme_bus_connection *conn_bus,
 static int
 _tme_sun_mie_tlb_fill_regs(struct tme_bus_connection *conn_bus,
 			   struct tme_bus_tlb *tlb, 
-			   tme_bus_addr_t address, unsigned int cycles)
+			   tme_bus_addr_t address_wider,
+			   unsigned int cycles)
 {
   struct tme_sun_mie *sun_mie;
+  tme_bus_addr32_t address;
 
   /* recover our data structures: */
   sun_mie = conn_bus->tme_bus_connection.tme_connection_element->tme_element_private;
+
+  /* get the normal-width address: */
+  address = address_wider;
+  assert (address == address_wider);
 
   /* the address must be within range: */
   assert(address < TME_SUN_MIE_SIZ_REGS);
@@ -956,7 +961,7 @@ _tme_sun_mie_connections_new(struct tme_element *element,
     conn_bus->tme_bus_subregions.tme_bus_subregion_address_last = 0xffffff;
     conn_bus->tme_bus_signals_add = _tme_sun_mie_bus_signals_add;
     conn_bus->tme_bus_signal = _tme_sun_mie_bus_signal;
-    conn_bus->tme_bus_tlb_set_allocate = _tme_sun_mie_tlb_set_allocate;
+    conn_bus->tme_bus_tlb_set_add = _tme_sun_mie_tlb_set_add;
     conn_bus->tme_bus_tlb_fill = _tme_sun_mie_tlb_fill;
   }
   else if (regs) {

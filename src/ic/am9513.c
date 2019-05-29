@@ -1,4 +1,4 @@
-/* $Id: am9513.c,v 1.15 2006/09/30 12:43:36 fredette Exp $ */
+/* $Id: am9513.c,v 1.17 2010/06/05 14:36:59 fredette Exp $ */
 
 /* ic/am9513.c - implementation of Am9513 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: am9513.c,v 1.15 2006/09/30 12:43:36 fredette Exp $");
+_TME_RCSID("$Id: am9513.c,v 1.17 2010/06/05 14:36:59 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -487,7 +487,7 @@ _tme_am9513_th_timer(struct tme_am9513 *am9513)
 		   "timer %d interrupt rate: %ld/sec",
 		   counter_i,
 		   (counter->tme_am9513_counter_int_sample
-		    / counter->tme_am9513_counter_int_sample_time.tv_sec)));
+		    / (unsigned long) counter->tme_am9513_counter_int_sample_time.tv_sec)));
 	}
 
 	/* reset the sample: */
@@ -518,7 +518,7 @@ static int
 _tme_am9513_bus_cycle(void *_am9513, struct tme_bus_cycle *cycle_init)
 {
   struct tme_am9513 *am9513;
-  tme_bus_addr_t am9513_address_last;
+  tme_bus_addr32_t am9513_address_last;
   tme_uint8_t data_pointer, group_pointer, element_pointer, data_pointer_next;
   tme_uint16_t byte_pointer;
   int is_cmd;
@@ -952,7 +952,7 @@ _tme_am9513_tlb_fill(void *_am9513, struct tme_bus_tlb *tlb,
 		     tme_bus_addr_t address, unsigned int cycles)
 {
   struct tme_am9513 *am9513;
-  tme_bus_addr_t am9513_address_last;
+  tme_bus_addr32_t am9513_address_last;
 
   /* recover our data structure: */
   am9513 = (struct tme_am9513 *) _am9513;

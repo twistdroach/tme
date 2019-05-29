@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 
-dnl $Id: configure.in,v 1.17 2007/08/26 13:57:12 fredette Exp $
+dnl $Id: configure.in,v 1.20 2010/06/05 19:56:37 fredette Exp $
 
 dnl Copyright (c) 2001, 2003 Matt Fredette
 dnl All rights reserved.
@@ -34,7 +34,7 @@ dnl POSSIBILITY OF SUCH DAMAGE.
 dnl Checks that we are given a good source directory.
 AC_INIT(ic/m68k/m68k-impl.h)
 AC_CANONICAL_SYSTEM
-AM_INIT_AUTOMAKE(tme, 0.6)
+AM_INIT_AUTOMAKE(tme, 0.8)
 
 dnl Write configuration out to config.h through config.h.in.
 AM_CONFIG_HEADER(config.h)
@@ -76,6 +76,8 @@ if test $ac_cv_sizeof_int != 2 && test $ac_cv_sizeof_short != 2; then
 fi
 if test $ac_cv_sizeof_long = 8; then
   AC_CHECK_ALIGNOF(64)
+  AC_CHECK_SHIFTMAX(64)
+  AC_CHECK_SHIFTSIGNED(64)
 fi
 AC_CHECK_ALIGNOF(32)
 AC_CHECK_ALIGNOF(16)
@@ -117,6 +119,17 @@ AC_CHECK_FUNC_LONG(bswap32, [
 #include <sys/bswap.h>
 #endif
 ])
+if test $ac_cv_sizeof_long = 8; then
+  AC_CHECK_FUNC_LONG(bswap64, [
+  unsigned long x;
+
+  x = bswap64(0x11223344);
+], [ 
+#ifdef HAVE_SYS_BSWAP_H
+#include <sys/bswap.h>
+#endif
+  ])
+fi
 AC_CHECK_FUNC_LONG(isinff, 
 [
   float x;
@@ -170,7 +183,7 @@ dnl Checks for X11.
 AC_PATH_XTRA
 
 dnl Checks for GTK.
-AM_PATH_GTK([], have_gtk=true, have_gtk=false)
+AM_PATH_GTK_2_0([], have_gtk=true, have_gtk=false)
 if $have_gtk; then
   AC_DEFINE(HAVE_GTK, [], [Define if you are compiling with GTK.])
   TME_HOSTS="${TME_HOSTS} gtk"
@@ -354,6 +367,9 @@ dnl Configures for the system(s) to emulate.
 systems=all
 if echo " ${systems} " | grep ' all ' > /dev/null 2>&1; then
   systems="sun2 sun3 sun4"
+  if test $ac_cv_sizeof_long = 8 || test "x${GCC}" = "xyes"; then
+    systems="${systems} sunultra1"
+  fi
 fi
 TME_MACHINE_SUBDIRS=
 TME_IC_SUBDIRS=
@@ -362,6 +378,8 @@ TME_SERIAL_SUBDIRS=
 TME_SERIALS=
 TME_BUS_SUBDIRS=
 TME_FB_XLAT_SRC=
+bus_size_max=32
+recode_size_guest_max=0
 for system in $systems; do
 
     # dispatch on the machine type to get more machines, ICs, and
@@ -374,6 +392,8 @@ for system in $systems; do
 	ics="m68k am9513 mm58167 z8530 i825x6"
 	buses="multibus"
 	fb_xlats="1152x900d1b1s0p32om"
+	bus_size=32
+	recode_size_guest=0
 	;;
 
     # the sun3:
@@ -382,6 +402,8 @@ for system in $systems; do
 	ics="m68k isil7170 z8530 i825x6 ieee754 ncr5380"
 	buses="multibus"
 	fb_xlats="1152x900d1b1s0p32om 1152x900d8b8s0p32ommi8 1152x900d1b1s0p32omccmi8"
+	bus_size=32
+	recode_size_guest=0
 	;;
 
     # the sun4:
@@ -390,12 +412,34 @@ for system in $systems; do
 	ics="sparc isil7170 z8530 am7930 am7990 ieee754 ncr53c9x mk48txx lsi64854 nec765"
 	buses="sbus"
 	fb_xlats="1152x900d1b1s0p32om 1152x900d8b8s0p32ommi8 1152x900d1b1s0p32omccmi8"
+	bus_size=32
+	recode_size_guest=32
+	;;
+
+    # the sun Ultra-1:
+    sunultra1)
+	machines="sun sun4u"
+	ics="sparc stp22xx z8530 am7990 ieee754 ncr53c9x ncr89c105 mk48txx lsi64854 nec765 stp2024 ad184x"
+	buses="sbus"
+	fb_xlats="1152x900d1b1s0p32om 1152x900d8b8s0p32ommi8 1152x900d1b1s0p32omccmi8"
+	bus_size=64
+	recode_size_guest=64
 	;;
 
     *)
 	AC_MSG_ERROR([don't know how to emulate ${machine}])
 	;;
     esac
+
+    # update the maximum bus size:
+    if test `expr ${bus_size_max} \< ${bus_size}` = 1; then
+       bus_size_max=$bus_size
+    fi
+
+    # update the maximum recode guest size:
+    if test `expr ${recode_size_guest_max} \< ${recode_size_guest}` = 1; then
+       recode_size_guest_max=$recode_size_guest
+    fi
 
     # add in the new machines, ICs, serials, and buses to compile:
     for machine in $machines; do
@@ -404,7 +448,7 @@ for system in $systems; do
 	fi
     done
     for ic in $ics; do
-	if test -d ic/$ic; then
+	if test -d $srcdir/ic/$ic; then
 	    if echo " ${TME_IC_SUBDIRS} " | grep " ${ic} " > /dev/null 2>&1; then :; else
 		TME_IC_SUBDIRS="${TME_IC_SUBDIRS} ${ic}"
 	    fi
@@ -416,7 +460,7 @@ for system in $systems; do
 	fi
     done
     for serial in $serials; do
-	if test -d serial/$serial; then
+	if test -d $srcdir/serial/$serial; then
 	    if echo " ${TME_SERIAL_SUBDIRS} " | grep " ${serial} " > /dev/null 2>&1; then :; else
 		TME_SERIAL_SUBDIRS="${TME_SERIAL_SUBDIRS} ${serial}"
 	    fi
@@ -491,6 +535,73 @@ AC_SUBST(TME_FB_XLAT_SRC)
 
 dnl The list of host support is finished.
 AC_SUBST(TME_HOSTS)
+
+dnl Configure recode.
+AC_ARG_ENABLE(recode,
+[  --enable-recode         enable recode (dynamic binary translation) (default=if target supports)],
+[ ], [enable_recode=])
+if test "${recode_size_guest_max}" = 0; then
+    enable_recode=no
+    recode_size_guest_max=1
+fi
+if test "x${enable_recode}" = no; then
+    recode_hosts=
+else
+    AC_MSG_CHECKING([for target recode support])
+
+    dnl Make brackets safe to use.
+    changequote(<<, >>)dnl
+
+    # get the host maximum guest size:
+    case "${target_cpu}" in
+    i[3456789]86)
+	recode_size_guest_max_host=64
+	;;
+    x86_64)
+	recode_size_guest_max_host=128
+	;;
+    *) recode_size_guest_max_host= ;;
+    esac
+
+    # get the host recode parts:
+    case "${target}" in
+    i[3456789]86-*-netbsd* | x86_64-*-netbsd* | i[3456789]86-*-linux*)
+	recode_hosts="mmap x86"
+	;;
+    *) recode_hosts= ;;
+    esac
+
+    dnl Make brackets the quote characters again.
+    changequote([, ])dnl
+
+    if test "x${recode_hosts}" = x; then
+	AC_MSG_RESULT([no])
+	if test "x${enable_recode}" = xrequired; then
+	    AC_MSG_ERROR([recode required but not supported on ${target}])
+	fi
+    else
+	if test "x${recode_size_guest_max_host}" = x; then
+	    AC_MSG_ERROR([internal error - no maximum recode guest size for ${target_cpu}])
+	fi
+	if test `expr ${recode_size_guest_max} \> ${recode_size_guest_max_host}` = 1; then
+	    recode_size_guest_max=$recode_size_guest_max_host
+	fi
+	AC_MSG_RESULT([up to ${recode_size_guest_max}-bit guests using ${recode_hosts}])
+    fi
+fi
+
+dnl Configure miscellaneous target support.
+AC_MSG_CHECKING([for target miscellaneous support])
+changequote(<<, >>)dnl
+case "${target}" in
+i[3456789]86-* | x86_64-*) misc_hosts="x86" ;;
+*) misc_hosts=no ;;
+esac
+changequote([, ])dnl
+AC_MSG_RESULT([${misc_hosts}])
+if test "x${misc_hosts}" = no; then
+    misc_hosts=
+fi
 
 dnl Configure for libtool.
 AC_LIBLTDL_INSTALLABLE
@@ -577,6 +688,10 @@ TMEEOF
   done) | sort | uniq >> ${outfile}-tmp
   grep FLOAT_FORMAT config.h | \
     sed 's/#define[ 	]\{1,\}\([A-Za-z0-9_]\{1,\}\)[ 	]\{1,\}\([A-Za-z0-9_]\{1,\}\)/#define TME_\1 TME_FLOAT_FORMAT_\2/' >> ${outfile}-tmp
+  echo '#define TME_BUSMAX_LOG2 TME_BUS'${bus_size_max}'_LOG2' >> ${outfile}-tmp
+  echo '#define TME_HAVE_RECODE (' \
+    `if test "x${recode_hosts}" = x; then echo 0; else echo 1; fi` ')' >> ${outfile}-tmp
+  echo '#define TME_RECODE_SIZE_GUEST_MAX TME_RECODE_SIZE_'${recode_size_guest_max} >> ${outfile}-tmp
   echo '#define TME_RELEASE_MAJOR (' \
     `echo $VERSION | sed -e 's,^\([0-9][0-9]*\)\.[0-9][0-9]*$,\1,'` ')' >> ${outfile}-tmp
   echo '#define TME_RELEASE_MINOR (' \
@@ -584,13 +699,16 @@ TMEEOF
   echo '#define TME_BUILD_TARGET "'$target'"' >> ${outfile}-tmp
   if test $ac_cv_sizeof_long = 8; then
     echo '#define TME_HAVE_INT64_T' >> ${outfile}-tmp
+    echo '#define _TME_PRI64 "l"' >> ${outfile}-tmp
     echo 'typedef signed long tme_int64_t;' >> ${outfile}-tmp
     echo 'typedef unsigned long tme_uint64_t;' >> ${outfile}-tmp
   fi
   if test $ac_cv_sizeof_int = 4; then
+    echo '#define _TME_PRI32 ""' >> ${outfile}-tmp
     echo 'typedef signed int tme_int32_t;' >> ${outfile}-tmp
     echo 'typedef unsigned int tme_uint32_t;' >> ${outfile}-tmp
   elif test $ac_cv_sizeof_long = 4; then
+    echo '#define _TME_PRI32 "l"' >> ${outfile}-tmp
     echo 'typedef signed long tme_int32_t;' >> ${outfile}-tmp
     echo 'typedef unsigned long tme_uint32_t;' >> ${outfile}-tmp
   fi
@@ -616,14 +734,93 @@ TMEEOF
   else
     mv ${outfile}-tmp ${outfile}
   fi
+
+  outfile=tme/recode-host.h
+  echo "$as_me: creating $outfile"
+  cat <<TMEEOF > ${outfile}-tmp
+/* recode-host.h
+ * 
+ * This is an automatically generated file - please modify 'configure.in'.
+ */
+
+TMEEOF
+  for host in ${recode_hosts}; do
+    echo '#include <tme/host/recode-'${host}'.h>' >> ${outfile}-tmp
+  done
+  delim='#define TME_RECODE_HOST_IC \'
+  for host in ${recode_hosts}; do
+    echo ${delim} >> ${outfile}-tmp
+    echo -n '  TME_RECODE_'`echo ${host} | tr '[a-z]' '[A-Z]'`'_IC' >> ${outfile}-tmp
+    delim='; \'
+  done
+  echo '' >> ${outfile}-tmp
+  if cmp -s ${outfile}-tmp $outfile; then
+    echo "$as_me: $outfile is unchanged"
+    rm -f ${outfile}-tmp
+  else
+    mv ${outfile}-tmp ${outfile}
+  fi
+
+  outfile=libtme/recode-host.c
+  echo "$as_me: creating $outfile"
+  cat <<TMEEOF > ${outfile}-tmp
+/* recode-host.c
+ * 
+ * This is an automatically generated file - please modify 'configure.in'.
+ */
+
+TMEEOF
+  for host in ${recode_hosts}; do
+    if test -d ${srcdir}/libtme/host/${host}; then
+      echo '#include "libtme/host/'${host}'/recode-'${host}'.c"' >> ${outfile}-tmp
+    else
+      echo '#include "libtme/host/recode-'${host}'.c"' >> ${outfile}-tmp
+    fi
+  done
+  if cmp -s ${outfile}-tmp $outfile; then
+    echo "$as_me: $outfile is unchanged"
+    rm -f ${outfile}-tmp
+  else
+    mv ${outfile}-tmp ${outfile}
+  fi
+
+  outfile=libtme/misc-host.c
+  echo "$as_me: creating $outfile"
+  cat <<TMEEOF > ${outfile}-tmp
+/* misc-host.c
+ * 
+ * This is an automatically generated file - please modify 'configure.in'.
+ */
+
+TMEEOF
+  for host in ${misc_hosts}; do
+    if test -d ${srcdir}/libtme/host/${host}; then
+      echo '#include "libtme/host/'${host}'/misc-'${host}'.c"' >> ${outfile}-tmp
+    else
+      echo '#include "libtme/host/misc-'${host}'.c"' >> ${outfile}-tmp
+    fi
+  done
+  echo '#include "libtme/misc.c"' >> ${outfile}-tmp
+  if cmp -s ${outfile}-tmp $outfile; then
+    echo "$as_me: $outfile is unchanged"
+    rm -f ${outfile}-tmp
+  else
+    mv ${outfile}-tmp ${outfile}
+  fi
+
 fi
 ], [
+recode_hosts="$recode_hosts"
+recode_size_guest_max="$recode_size_guest_max"
+misc_hosts="$misc_hosts"
+srcdir="$srcdir"
 PACKAGE="$PACKAGE"
 VERSION="$VERSION"
 target="$target"
 ac_cv_sizeof_int="$ac_cv_sizeof_int"
 ac_cv_sizeof_long="$ac_cv_sizeof_long"
 ac_cv_sizeof_short="$ac_cv_sizeof_short"
+bus_size_max="$bus_size_max"
 ])
 
 dnl Writes files.
@@ -633,16 +830,22 @@ AC_OUTPUT(Makefile
 	  tme/machine/Makefile
 	  tme/generic/Makefile
 	  tme/scsi/Makefile
+	  tme/host/Makefile
+	  tme/bus/Makefile
 	  libtme/Makefile
+	  libtme/host/Makefile
+	  libtme/host/x86/Makefile
 	  ic/Makefile
 	  ic/m68k/Makefile
 	  ic/ieee754/Makefile
 	  ic/sparc/Makefile
+	  ic/stp22xx/Makefile
 	  machine/Makefile
 	  machine/sun/Makefile
 	  machine/sun2/Makefile
 	  machine/sun3/Makefile
 	  machine/sun4/Makefile
+	  machine/sun4u/Makefile
           host/Makefile
           host/posix/Makefile
           host/bsd/Makefile

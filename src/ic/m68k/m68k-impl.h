@@ -1,4 +1,4 @@
-/* $Id: m68k-impl.h,v 1.18 2007/03/29 01:36:10 fredette Exp $ */
+/* $Id: m68k-impl.h,v 1.19 2009/08/29 19:28:08 fredette Exp $ */
 
 /* ic/m68k/m68k-impl.h - implementation header file for Motorola 68k emulation: */
 
@@ -37,7 +37,7 @@
 #define _IC_M68K_IMPL_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: m68k-impl.h,v 1.18 2007/03/29 01:36:10 fredette Exp $");
+_TME_RCSID("$Id: m68k-impl.h,v 1.19 2009/08/29 19:28:08 fredette Exp $");
 
 /* includes: */
 #include <tme/ic/m68k.h>
@@ -256,17 +256,13 @@ _TME_RCSID("$Id: m68k-impl.h,v 1.18 2007/03/29 01:36:10 fredette Exp $");
 /* given a linear address, this hashes it into a TLB entry: */
 #define _TME_M68K_TLB_HASH_SIZE (1024)
 #define TME_M68K_TLB_ADDRESS_BIAS(n)	((n) << 10)
-#define TME_M68K_TLB_ENTRY_SET(set, function_code, linear_address)	\
-  (((set)								\
-    + (((linear_address)						\
-	/ TME_M68K_TLB_ADDRESS_BIAS(1))					\
-       % _TME_M68K_TLB_HASH_SIZE))					\
+#define TME_M68K_DTLB_ENTRY(ic, context, function_code, linear_address)	\
+  (((ic)->_tme_m68k_tlb_array					\
+    + ((((context) * 16)			\
+	+ ((linear_address)			\
+	   / TME_M68K_TLB_ADDRESS_BIAS(1)))	\
+       % _TME_M68K_TLB_HASH_SIZE))		\
    + (0 && (function_code)))
-#define TME_M68K_TLB_ENTRY(ic, function_code, linear_address) \
-  TME_M68K_TLB_ENTRY_SET(tme_memory_atomic_pointer_read(struct tme_m68k_tlb *,\
-							(ic)->_tme_m68k_tlb_array,\
-							&(ic)->_tme_m68k_tlbs_rwlock),\
-			 function_code, linear_address)
 
 /* macros for sequence control: */
 #define TME_M68K_SEQUENCE_START						\
@@ -479,21 +475,12 @@ struct tme_m68k {
   unsigned int _tme_m68k_insn_fetch_slow_count_fast;
   unsigned int _tme_m68k_insn_fetch_slow_count_total;
 
-  /* the TLB entry set, and a separate instruction TLB entry set
-     reserved for the executors: */
-  union {
-    struct tme_m68k_tlb * tme_shared _tme_m68k_tlb_array_u_m68k;
-    struct tme_bus_tlb * tme_shared _tme_m68k_tlb_array_u_bus;
-  } _tme_m68k_tlb_array_u;
-#define _tme_m68k_tlb_array _tme_m68k_tlb_array_u._tme_m68k_tlb_array_u_m68k
-#define _tme_m68k_tlb_array_bus _tme_m68k_tlb_array_u._tme_m68k_tlb_array_u_bus
-  union {
-    struct tme_m68k_tlb * tme_shared _tme_m68k_itlb_u_m68k;
-    struct tme_bus_tlb * tme_shared _tme_m68k_itlb_u_bus;
-  } _tme_m68k_itlb_u;
-#define _tme_m68k_itlb _tme_m68k_itlb_u._tme_m68k_itlb_u_m68k
-#define _tme_m68k_itlb_bus _tme_m68k_itlb_u._tme_m68k_itlb_u_bus
-  tme_rwlock_t _tme_m68k_tlbs_rwlock;
+  /* the TLB set: */
+  struct tme_m68k_tlb _tme_m68k_tlb_array[_TME_M68K_TLB_HASH_SIZE + 1];
+#define _tme_m68k_itlb _tme_m68k_tlb_array[_TME_M68K_TLB_HASH_SIZE]
+
+  /* the bus context: */
+  tme_bus_context_t _tme_m68k_bus_context;
 
   /* exception handling information: */
   tme_uint32_t _tme_m68k_exceptions;

@@ -1,4 +1,4 @@
-/* $Id: posix-disk.c,v 1.4 2005/02/17 12:42:20 fredette Exp $ */
+/* $Id: posix-disk.c,v 1.6 2010/06/05 14:28:57 fredette Exp $ */
 
 /* host/posix/posix-disk.c - implementation of disks on a POSIX system: */
 
@@ -33,8 +33,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* this might enable large-file support: */
+#define _FILE_OFFSET_BITS 64
+
 #include <tme/common.h>
-_TME_RCSID("$Id: posix-disk.c,v 1.4 2005/02/17 12:42:20 fredette Exp $");
+_TME_RCSID("$Id: posix-disk.c,v 1.6 2010/06/05 14:28:57 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/disk.h>
@@ -133,6 +136,56 @@ struct tme_posix_disk {
 #define tme_posix_disk_buffer_agg_pre _tme_posix_disk_stat0.st_size
 #define tme_posix_disk_buffer_agg_post _tme_posix_disk_stat1.st_size
 };
+
+/* this frees a buffer: */
+static void
+_tme_posix_disk_buffer_free(struct tme_posix_disk *posix_disk,
+			    struct tme_posix_disk_buffer *buffer)
+{
+  int rc;
+  struct iovec iovecs[1];
+#define ssize iovecs[0].iov_len
+
+  /* if this buffer is mmapped: */
+  if (buffer->tme_posix_disk_buffer_flags 
+      & TME_POSIX_DISK_BUFFER_MMAPPED) {
+#ifdef HAVE_MMAP
+	
+    /* munmap the buffer: */
+    rc = munmap(buffer->tme_posix_disk_buffer_data,
+		buffer->tme_posix_disk_buffer_size);
+    assert (rc == 0);
+	
+    /* free this buffer: */
+    buffer->tme_posix_disk_buffer_size = 0;
+#endif /* HAVE_MMAP */
+  }
+
+  /* otherwise, this buffer is not mmapped: */
+  else {
+
+    /* if this buffer is dirty, we need to write it out: */
+    if (buffer->tme_posix_disk_buffer_flags 
+	& TME_POSIX_DISK_BUFFER_DIRTY) {
+	    
+      /* seek to the buffer's position: */
+      rc = (lseek(posix_disk->tme_posix_disk_fd,
+		  buffer->tme_posix_disk_buffer_pos,
+		  SEEK_SET) < 0);
+      assert (rc == 0);
+	    
+      /* write out the buffer: */
+      ssize = write(posix_disk->tme_posix_disk_fd,
+		    buffer->tme_posix_disk_buffer_data,
+		    buffer->tme_posix_disk_buffer_size);
+      assert (ssize == buffer->tme_posix_disk_buffer_size);
+    }
+
+    /* free this buffer: */
+    buffer->tme_posix_disk_buffer_flags = 0;
+  }
+#undef ssize
+}
 
 /* this gets a buffer: */
 static int
@@ -268,44 +321,9 @@ _tme_posix_disk_buffer_get(struct tme_posix_disk *posix_disk,
 		 && buffer_free_nosize == NULL
 		 && buffer_free_sized == NULL)) {
 
-#ifdef HAVE_MMAP
-      /* if this buffer is mmapped: */
-      if (buffer->tme_posix_disk_buffer_flags 
-	  & TME_POSIX_DISK_BUFFER_MMAPPED) {
-	
-	/* munmap the buffer: */
-	rc = munmap(buffer->tme_posix_disk_buffer_data,
-		    buffer->tme_posix_disk_buffer_size);
-	assert (rc == 0);
-	
-	/* free this buffer: */
-	buffer->tme_posix_disk_buffer_size = 0;
-      }
-      
-      else
-#endif /* HAVE_MMAP */
-	{
-
-	  /* if this buffer is dirty, we need to write it out: */
-	  if (buffer->tme_posix_disk_buffer_flags 
-	      & TME_POSIX_DISK_BUFFER_DIRTY) {
-	    
-	    /* seek to the buffer's position: */
-	    rc = (lseek(posix_disk->tme_posix_disk_fd,
-			buffer->tme_posix_disk_buffer_pos,
-			SEEK_SET) < 0);
-	    assert (rc == 0);
-	    
-	    /* write out the buffer: */
-	    ssize = write(posix_disk->tme_posix_disk_fd,
-			  buffer->tme_posix_disk_buffer_data,
-			  buffer->tme_posix_disk_buffer_size);
-	    assert (ssize == buffer->tme_posix_disk_buffer_size);
-	  }
-
-	  /* free this buffer: */
-	  buffer->tme_posix_disk_buffer_flags = 0;
-	}
+      /* free this buffer: */
+      _tme_posix_disk_buffer_free(posix_disk,
+				  buffer);
       
       /* continue without updating buffer, so that this now-free
 	 buffer is revisited, to possibly become a best free buffer: */
@@ -577,6 +595,270 @@ static int _tme_posix_disk_control(conn_disk, control, va_alist)
   return (TME_OK);
 }
 
+/* this opens a disk: */
+static int
+_tme_posix_disk_open(struct tme_posix_disk *posix_disk,
+		     const char *filename,
+		     int flags,
+		     char **_output)
+{
+  int fd;
+  struct stat statbuf;
+  tme_uint8_t *block;
+#ifdef HAVE_MMAP
+  int page_size;
+#endif /* HAVE_MMAP */
+
+  /* open the file: */
+  fd = open(filename,
+	    ((flags
+	      & TME_POSIX_DISK_FLAG_RO)
+	     ? O_RDONLY
+	     : O_RDWR));
+  if (fd < 0) {
+    tme_output_append_error(_output,
+			    "%s",
+			    filename);
+    return (errno);
+  }
+
+  /* stat the file: */
+  if (fstat(fd, &statbuf) < 0) {
+    tme_output_append_error(_output,
+			    "%s",
+			    filename);
+    close(fd);
+    return (errno);
+  }
+
+  /* we will handle a character device, but not a block device: */
+  if (S_ISBLK(statbuf.st_mode)) {
+    tme_output_append_error(_output,
+			    "%s",
+			    filename);
+    close(fd);
+    return (EINVAL);
+  }
+
+  /* if this is a character device, determine its block size: */
+  if (S_ISCHR(statbuf.st_mode)) {
+
+    /* the block size must be at least one: */
+    statbuf.st_blksize = 1;
+
+    /* allocate space for the block: */
+    block = tme_new(tme_uint8_t, statbuf.st_blksize);
+
+    /* loop trying to read a block at offset zero, doubling the block
+       size until we succeed: */
+    for (; statbuf.st_blksize <= TME_POSIX_DISK_BLOCK_SIZE_MAX; ) {
+
+      /* do the read: */
+      if (read(fd, block, statbuf.st_blksize) >= 0) {
+	break;
+      }
+
+      /* seek back to the beginning: */
+      if (lseek(fd, 0, SEEK_SET) < 0) {
+	tme_free(block);
+	tme_output_append_error(_output,
+				"%s",
+				filename);
+	close(fd);
+	return (errno);
+      }
+
+      /* resize the block: */
+      statbuf.st_blksize <<= 1;
+      block = tme_renew(tme_uint8_t, block, statbuf.st_blksize);
+    }
+
+    /* free the block: */
+    tme_free(block);
+
+    /* if we failed: */
+    if (statbuf.st_blksize > TME_POSIX_DISK_BLOCK_SIZE_MAX) {
+      tme_output_append_error(_output,
+			      "%s",
+			      filename);
+      close(fd);
+      return (EINVAL);
+    }
+  }
+
+#ifdef HAVE_MMAP
+  /* if we're mmapping, the block size must be at least the page size: */
+  for (page_size = getpagesize();
+       page_size < statbuf.st_blksize;
+       page_size <<= 1);
+  statbuf.st_blksize = page_size;
+#endif /* HAVE_MMAP */
+
+  /* update the disk structure: */
+  posix_disk->tme_posix_disk_flags = flags;
+  posix_disk->tme_posix_disk_fd = fd;
+  posix_disk->tme_posix_disk_stat = statbuf;
+  return (TME_OK);
+}
+
+/* this closes a disk: */
+static void
+_tme_posix_disk_close(struct tme_posix_disk *posix_disk)
+{
+  struct tme_posix_disk_buffer *buffer;
+
+  /* free all of the buffers: */
+  for (buffer = posix_disk->tme_posix_disk_buffers;
+       buffer != NULL;
+       buffer = buffer->tme_posix_disk_buffer_next) {
+    _tme_posix_disk_buffer_free(posix_disk,
+				buffer);
+  }
+
+  /* close the disk: */
+  close(posix_disk->tme_posix_disk_fd);
+  posix_disk->tme_posix_disk_fd = -1;
+}
+
+/* our internal command function: */
+static int
+__tme_posix_disk_command(struct tme_posix_disk *posix_disk,
+			 const char * const * args, 
+			 char **_output)
+{
+  int usage;
+  int arg_i;
+  const char *filename;
+  int flags;
+  int rc;
+
+  /* check the command: */
+  usage = FALSE;
+  arg_i = 1;
+
+  /* the "load" command: */
+  if (TME_ARG_IS(args[arg_i], "load")) {
+    arg_i++;
+
+    /* if a disk is currently loaded, it must be unloaded first: */
+    if (posix_disk->tme_posix_disk_fd >= 0) {
+      tme_output_append_error(_output,
+			      _("%s: disk already loaded; must unload first"),
+			      args[0]);
+      return (EBUSY);
+    }
+
+    /* the first argument is the filename: */
+    filename = args[arg_i];
+    arg_i += (filename != NULL);
+
+    /* any remaining arguments are flags: */
+    flags = 0;
+    for (;;) {
+      
+      /* the "read-only" flag: */
+      if (TME_ARG_IS(args[arg_i], "read-only")) {
+	flags |= TME_POSIX_DISK_FLAG_RO;
+	arg_i++;
+      }
+
+      else {
+	break;
+      }
+    }
+
+    /* if we don't have a filename, or if there are more arguments: */
+    if (filename == NULL
+	|| args[arg_i] != NULL) {
+
+      tme_output_append_error(_output,
+			      "%s %s load { %s | %s } [read-only]",
+			      _("usage:"),
+			      args[0],
+			      _("DEVICE"),
+			      _("FILENAME"));
+      rc = EINVAL;
+    }
+
+    /* otherwise, if we can open the disk: */
+    else if ((rc = _tme_posix_disk_open(posix_disk,
+					filename,
+					flags,
+					_output)) == TME_OK) {
+
+      /* nothing to do */
+    }
+  }
+
+  /* the "unload" command: */
+  else if (TME_ARG_IS(args[arg_i], "unload")) {
+
+    /* if no disk is currently loaded: */
+    if (posix_disk->tme_posix_disk_fd < 0) {
+      tme_output_append_error(_output,
+			      _("%s: no disk loaded"),
+			      args[0]);
+      return (ENXIO);
+    }
+
+    /* we must have no arguments: */
+    if (args[arg_i + 1] != NULL) {
+      tme_output_append_error(_output,
+			      "%s %s unload",
+			      _("usage:"),
+			      args[0]);
+      return (EINVAL);
+    }
+
+    /* close the disk: */
+    _tme_posix_disk_close(posix_disk);
+    rc = TME_OK;
+  }
+
+  /* any other command: */
+  else {
+    if (args[arg_i] != NULL) {
+      tme_output_append_error(_output,
+			      "%s '%s', ",
+			      _("unknown command"),
+			      args[1]);
+    }
+    tme_output_append_error(_output,
+			    _("available %s commands: %s"),
+			    args[0],
+			    "load unload");
+    return (EINVAL);
+  }
+
+  return (rc);
+}
+
+/* our command function: */
+static int
+_tme_posix_disk_command(struct tme_element *element,
+			const char * const * args, 
+			char **_output)
+{
+  struct tme_posix_disk *posix_disk;
+  int rc;
+
+  /* recover our data structure: */
+  posix_disk = (struct tme_posix_disk *) element->tme_element_private;
+
+  /* lock the mutex: */
+  tme_mutex_lock(&posix_disk->tme_posix_disk_mutex);
+
+  /* call the internal command function: */
+  rc = __tme_posix_disk_command(posix_disk,
+				args, 
+				_output);
+
+  /* unlock the mutex: */
+  tme_mutex_unlock(&posix_disk->tme_posix_disk_mutex);
+
+  return (rc);
+}
+
 /* this breaks a posix disk connection: */
 static int
 _tme_posix_disk_connection_break(struct tme_connection *conn,
@@ -673,16 +955,11 @@ _tme_posix_disk_connections_new(struct tme_element *element,
 TME_ELEMENT_SUB_NEW_DECL(tme_host_posix,disk) {
   const char *filename;
   int flags;
-  int fd;
   unsigned long agg_pre;
   unsigned long agg_post;
   int buffers;
-  struct stat statbuf;
-  tme_uint8_t *block;
-#ifdef HAVE_MMAP
-  int page_size;
-#endif /* HAVE_MMAP */
   struct tme_posix_disk *posix_disk;
+  int rc;
   struct tme_posix_disk_buffer *buffer, **_prev;
   int arg_i;
   int usage;
@@ -771,99 +1048,22 @@ TME_ELEMENT_SUB_NEW_DECL(tme_host_posix,disk) {
     return (EINVAL);
   }
 
-  /* open the file: */
-  fd = open(filename, ((flags
-			& TME_POSIX_DISK_FLAG_RO)
-		       ? O_RDONLY
-		       : O_RDWR));
-  if (fd < 0) {
-    tme_output_append_error(_output,
-			    "%s",
-			    filename);
-    return (errno);
-  }
-
-  /* stat the file: */
-  if (fstat(fd, &statbuf) < 0) {
-    tme_output_append_error(_output,
-			    "%s",
-			    filename);
-    close(fd);
-    return (errno);
-  }
-
-  /* we will handle a character device, but not a block device: */
-  if (S_ISBLK(statbuf.st_mode)) {
-    tme_output_append_error(_output,
-			    "%s",
-			    filename);
-    close(fd);
-    return (EINVAL);
-  }
-
-  /* if this is a character device, determine its block size: */
-  if (S_ISCHR(statbuf.st_mode)) {
-
-    /* the block size must be at least one: */
-    statbuf.st_blksize = TME_MAX(statbuf.st_blksize, 1);
-
-    /* allocate space for the block: */
-    block = tme_new(tme_uint8_t, statbuf.st_blksize);
-
-    /* loop trying to read a block at offset zero, doubling the block
-       size until we succeed: */
-    for (; statbuf.st_blksize <= TME_POSIX_DISK_BLOCK_SIZE_MAX; ) {
-
-      /* do the read: */
-      if (read(fd, block, statbuf.st_blksize) >= 0) {
-	break;
-      }
-
-      /* seek back to the beginning: */
-      if (lseek(fd, 0, SEEK_SET) < 0) {
-	tme_free(block);
-	tme_output_append_error(_output,
-				"%s",
-				filename);
-	close(fd);
-	return (errno);
-      }
-
-      /* resize the block: */
-      statbuf.st_blksize <<= 1;
-      block = tme_renew(tme_uint8_t, block, statbuf.st_blksize);
-    }
-
-    /* free the block: */
-    tme_free(block);
-
-    /* if we failed: */
-    if (statbuf.st_blksize > TME_POSIX_DISK_BLOCK_SIZE_MAX) {
-      tme_output_append_error(_output,
-			      "%s",
-			      filename);
-      close(fd);
-      return (EINVAL);
-    }
-  }
-
-#ifdef HAVE_MMAP
-  /* if we're mmapping, the block size must be at least the page size: */
-  for (page_size = getpagesize();
-       page_size < statbuf.st_blksize;
-       page_size <<= 1);
-  statbuf.st_blksize = page_size;
-#endif /* HAVE_MMAP */
-
   /* start the disk structure: */
   posix_disk = tme_new0(struct tme_posix_disk, 1);
   posix_disk->tme_posix_disk_element = element;
   tme_mutex_init(&posix_disk->tme_posix_disk_mutex);
-  posix_disk->tme_posix_disk_flags = flags;
-  posix_disk->tme_posix_disk_fd = fd;
-  posix_disk->tme_posix_disk_stat = statbuf;
   posix_disk->tme_posix_disk_buffer_agg_pre = agg_pre;
   posix_disk->tme_posix_disk_buffer_agg_post = agg_post;
+
+  /* open the disk: */
+  rc = _tme_posix_disk_open(posix_disk,
+			    filename,
+			    flags,
+			    _output);
+  if (rc != TME_OK) {
+    tme_free(posix_disk);
+    return (rc);
+  }
 
   /* allocate the buffers: */
   for (_prev = &posix_disk->tme_posix_disk_buffers;
@@ -878,6 +1078,7 @@ TME_ELEMENT_SUB_NEW_DECL(tme_host_posix,disk) {
   /* fill the element: */
   element->tme_element_private = posix_disk;
   element->tme_element_connections_new = _tme_posix_disk_connections_new;
+  element->tme_element_command = _tme_posix_disk_command;
 
   return (TME_OK);
 }

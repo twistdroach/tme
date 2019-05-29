@@ -1,4 +1,4 @@
-/* $Id: sun-si.c,v 1.6 2007/02/21 01:34:02 fredette Exp $ */
+/* $Id: sun-si.c,v 1.7 2010/06/05 19:25:16 fredette Exp $ */
 
 /* machine/sun/sun-si.c - Sun ncr5380-based SCSI implementation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun-si.c,v 1.6 2007/02/21 01:34:02 fredette Exp $");
+_TME_RCSID("$Id: sun-si.c,v 1.7 2010/06/05 19:25:16 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -189,7 +189,7 @@ struct tme_sun_si {
   tme_uint8_t tme_sun_si_regs[TME_SUN_SI_SIZ_REGS];
 
   /* any outstanding NCR 5380 TLB entry: */
-  struct tme_bus_tlb *tme_sun_si_ncr5380_tlb;
+  struct tme_token *tme_sun_si_ncr5380_tlb_token;
 
   /* the 3/E DMA buffer: */
   tme_uint8_t *tme_sun_si_3e_dma;
@@ -473,7 +473,7 @@ _tme_sun_si_bus_cycle_regs(void *_sun_si,
 {
   struct tme_sun_si *sun_si;
   tme_uint32_t csr_old, csr_new, csr_diff, csr_mask;
-  tme_bus_addr_t address;
+  tme_bus_addr32_t address;
   tme_uint8_t cycle_size;
   tme_uint32_t dma_count;
   int new_callouts;
@@ -600,16 +600,22 @@ _tme_sun_si_bus_cycle_regs(void *_sun_si,
 static int
 _tme_sun_si_tlb_fill_regs(struct tme_bus_connection *conn_bus,
 			  struct tme_bus_tlb *tlb, 
-			  tme_bus_addr_t address, unsigned int cycles)
+			  tme_bus_addr_t address_bus,
+			  unsigned int cycles)
 {
   struct tme_sun_si *sun_si;
+  tme_bus_addr32_t address;
   struct tme_bus_connection *conn_ncr5380;
-  tme_bus_addr_t address_regs;
+  tme_bus_addr32_t address_regs;
   struct tme_bus_tlb tlb_mapping;
   int rc;
 
   /* recover our data structures: */
   sun_si = conn_bus->tme_bus_connection.tme_connection_element->tme_element_private;
+
+  /* get the internal address: */
+  address = address_bus;
+  assert (address == address_bus);
 
   /* assume that the registers start at address zero: */
   address_regs = 0;
@@ -806,12 +812,13 @@ _tme_sun_si_bus_fault_handler(void *_sun_si,
 static int
 _tme_sun_si_tlb_fill(struct tme_bus_connection *conn_bus,
 		     struct tme_bus_tlb *tlb, 
-		     tme_bus_addr_t ncr5380_address, 
+		     tme_bus_addr_t ncr5380_address_wider,
 		     unsigned int cycles)
 {
   struct tme_sun_si *sun_si;
+  tme_bus_addr32_t ncr5380_address;
   tme_uint32_t csr;
-  tme_bus_addr_t dma_address;
+  tme_bus_addr32_t dma_address;
   tme_uint32_t dma_count;
   tme_uint32_t bpr;
   unsigned int bpr_count;
@@ -824,6 +831,10 @@ _tme_sun_si_tlb_fill(struct tme_bus_connection *conn_bus,
   /* recover our data structures: */
   sun_si = conn_bus->tme_bus_connection.tme_connection_element->tme_element_private;
 
+  /* get the normal-width NCR 5380 DMA address: */
+  ncr5380_address = ncr5380_address_wider;
+  assert (ncr5380_address == ncr5380_address_wider);
+
   /* assume that this call will succeed: */
   rc = TME_OK;
 
@@ -832,14 +843,14 @@ _tme_sun_si_tlb_fill(struct tme_bus_connection *conn_bus,
 
   /* if the NCR 5380 already has an outstanding TLB entry, and it
      doesn't happen to be this TLB entry, invalidate it: */
-  if (sun_si->tme_sun_si_ncr5380_tlb != NULL
+  if (sun_si->tme_sun_si_ncr5380_tlb_token != NULL
       && (tlb == NULL
-	  || (sun_si->tme_sun_si_ncr5380_tlb 
-	      != tlb->tme_bus_tlb_global))) {
-    tme_bus_tlb_invalidate(sun_si->tme_sun_si_ncr5380_tlb);
+	  || (sun_si->tme_sun_si_ncr5380_tlb_token
+	      != tlb->tme_bus_tlb_token))) {
+    tme_token_invalidate(sun_si->tme_sun_si_ncr5380_tlb_token);
 
     /* the NCR 5380 doesn't have any outstanding TLB entry: */
-    sun_si->tme_sun_si_ncr5380_tlb = NULL;
+    sun_si->tme_sun_si_ncr5380_tlb_token = NULL;
   }
 
   /* get the CSR value: */
@@ -1056,8 +1067,8 @@ _tme_sun_si_tlb_fill(struct tme_bus_connection *conn_bus,
   if (cycles != TME_BUS_CYCLE_UNDEF) {
 
     /* the NCR 5380 now has this outstanding TLB entry: */
-    sun_si->tme_sun_si_ncr5380_tlb
-      = tlb->tme_bus_tlb_global;
+    sun_si->tme_sun_si_ncr5380_tlb_token
+      = tlb->tme_bus_tlb_token;
   }
 
   /* unlock our mutex: */
@@ -1112,12 +1123,10 @@ _tme_sun_si_tlb_fill(struct tme_bus_connection *conn_bus,
   return (rc);
 }
 
-/* the sun_si TLB allocator for the NCR 5380: */
+/* the sun_si TLB adder for the NCR 5380: */
 static int
-_tme_sun_si_tlb_set_allocate(struct tme_bus_connection *conn_bus,
-			     unsigned int count, unsigned int sizeof_one, 
-			     struct tme_bus_tlb * tme_shared *_tlbs,
-			     tme_rwlock_t *_tlbs_rwlock)
+_tme_sun_si_tlb_set_add(struct tme_bus_connection *conn_bus,
+			struct tme_bus_tlb_set_info *tlb_set_info)
 {
   struct tme_sun_si *sun_si;
 
@@ -1127,9 +1136,8 @@ _tme_sun_si_tlb_set_allocate(struct tme_bus_connection *conn_bus,
   /* pass the sun_si's request through to the memory bus: */
   conn_bus = sun_si->tme_sun_si_conn_memory;
   return (conn_bus != NULL
-	  ? (*conn_bus->tme_bus_tlb_set_allocate)(conn_bus, 
-						  count, sizeof_one,
-						  _tlbs, _tlbs_rwlock)
+	  ? (*conn_bus->tme_bus_tlb_set_add)(conn_bus, 
+					     tlb_set_info)
 	  : ENXIO);
 }
 
@@ -1322,7 +1330,7 @@ _tme_sun_si_connections_new(struct tme_element *element,
     conn_bus->tme_bus_subregions.tme_bus_subregion_address_last = ((tme_bus_addr_t) 0) - 1;
     conn_bus->tme_bus_signals_add = NULL;
     conn_bus->tme_bus_signal = _tme_sun_si_bus_signal;
-    conn_bus->tme_bus_tlb_set_allocate = _tme_sun_si_tlb_set_allocate;
+    conn_bus->tme_bus_tlb_set_add = _tme_sun_si_tlb_set_add;
     conn_bus->tme_bus_tlb_fill = _tme_sun_si_tlb_fill;
   }
   else if (regs) {

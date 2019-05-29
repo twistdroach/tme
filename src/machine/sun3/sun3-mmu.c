@@ -1,4 +1,4 @@
-/* $Id: sun3-mmu.c,v 1.5 2006/09/30 12:43:39 fredette Exp $ */
+/* $Id: sun3-mmu.c,v 1.6 2009/08/30 14:25:21 fredette Exp $ */
 
 /* machine/sun3/sun3-mmu.c - implementation of Sun 3 MMU emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun3-mmu.c,v 1.5 2006/09/30 12:43:39 fredette Exp $");
+_TME_RCSID("$Id: sun3-mmu.c,v 1.6 2009/08/30 14:25:21 fredette Exp $");
 
 /* includes: */
 #include "sun3-impl.h"
@@ -67,16 +67,19 @@ _TME_RCSID("$Id: sun3-mmu.c,v 1.5 2006/09/30 12:43:39 fredette Exp $");
 #define TME_SUN3_BUSERR_PROTERR		TME_BIT(6)	/* MMU protection error */
 #define TME_SUN3_BUSERR_INVALID		TME_BIT(7)	/* MMU page invalid error */
 
+/* real context count: */
+#define TME_SUN3_CONTEXT_COUNT		(8)
+
 /* this logs a bus error: */
 #ifndef TME_NO_LOG
 static void
 _tme_sun3_bus_fault_log(struct tme_sun3 *sun3, struct tme_bus_tlb *tlb, struct tme_bus_cycle *cycle)
 {
-  tme_bus_addr_t virtual_address;
+  tme_bus_addr32_t virtual_address;
   struct tme_sun_mmu_pte pte;
   tme_uint32_t pte_sun3;
   const char *bus_name;
-  tme_bus_addr_t physical_address;
+  tme_bus_addr32_t physical_address;
   int rc;
 
   /* this silences gcc -Wuninitialized: */
@@ -254,7 +257,6 @@ _tme_sun3_tlb_fill(struct tme_sun3 *sun3, struct tme_bus_tlb *tlb, tme_uint8_t c
   unsigned int function_code_sp;
   unsigned short access;
   struct tme_bus_tlb tlb_bus;
-  unsigned int tlb_i;
   unsigned short tlb_flags;
 
   /* recover the function code: */
@@ -284,7 +286,7 @@ _tme_sun3_tlb_fill(struct tme_sun3 *sun3, struct tme_bus_tlb *tlb, tme_uint8_t c
 	 cycles);
 	
       /* create the mapping TLB entry: */
-      tlb_bus.tme_bus_tlb_addr_first = address & (((tme_bus_addr_t) 0) - TME_SUN3_PROM_SIZE);
+      tlb_bus.tme_bus_tlb_addr_first = address & (((tme_bus_addr32_t) 0) - TME_SUN3_PROM_SIZE);
       tlb_bus.tme_bus_tlb_addr_last = address | (TME_SUN3_PROM_SIZE - 1);
       tlb_bus.tme_bus_tlb_cycles_ok
 	= TME_BUS_CYCLE_READ;
@@ -298,25 +300,6 @@ _tme_sun3_tlb_fill(struct tme_sun3 *sun3, struct tme_bus_tlb *tlb, tme_uint8_t c
       /* done: */
       return(TME_OK);
     }
-
-    /* update the head pointer for the active boot state TLB entry
-       list: */
-    tlb_i = sun3->tme_sun3_boot_state_tlb_next
-      = ((sun3->tme_sun3_boot_state_tlb_next
-	  + 1)
-	 & (TME_SUN3_BOOT_STATE_TLBS - 1));
-
-    /* if the new head pointer already has a TLB entry, and it doesn't
-       happen to be the same as this TLB entry, invalidate it: */
-    if (sun3->tme_sun3_boot_state_tlbs[tlb_i] != NULL
-	&& (sun3->tme_sun3_boot_state_tlbs[tlb_i]
-	    != tlb->tme_bus_tlb_global)) {
-      tme_bus_tlb_invalidate(sun3->tme_sun3_boot_state_tlbs[tlb_i]);
-    }
-
-    /* add this TLB entry to the active list: */
-    sun3->tme_sun3_boot_state_tlbs[tlb_i] =
-      tlb->tme_bus_tlb_global;
 
     /* if this TLB entry ends up good for the supervisor, it's not
        good for the supervisor program function code: */
@@ -370,7 +353,10 @@ _tme_sun3_tlb_fill(struct tme_sun3 *sun3, struct tme_bus_tlb *tlb, tme_uint8_t c
 
       /* remember this TLB entry pointer, and its original bus cycle
 	 handler: */
-      sun3->tme_sun3_memerr_tlb = tlb->tme_bus_tlb_global;
+      /* XXX FIXME - this assumes that the TLB entry being filled is a
+	 real m68k TLB entry, not on the stack: */
+      assert (tlb->tme_bus_tlb_token == &((struct tme_m68k_tlb *) tlb)->tme_m68k_tlb_token);
+      sun3->tme_sun3_memerr_tlb = tlb;
       assert (sun3->tme_sun3_memerr_tlb != NULL);
       sun3->tme_sun3_memerr_cycle_private = tlb->tme_bus_tlb_cycle_private;
       sun3->tme_sun3_memerr_cycle = tlb->tme_bus_tlb_cycle;
@@ -466,8 +452,9 @@ _tme_sun3_m68k_tlb_fill(struct tme_m68k_bus_connection *conn_m68k, struct tme_m6
 /* our bus TLB filler: */
 int
 _tme_sun3_bus_tlb_fill(struct tme_bus_connection *conn_bus, struct tme_bus_tlb *tlb,
-		       tme_uint32_t address, unsigned int cycles)
+		       tme_bus_addr_t address_wider, unsigned int cycles)
 {
+  tme_bus_addr32_t address;
   struct tme_sun3 *sun3;
   struct tme_sun3_bus_connection *conn_sun3;
   tme_uint32_t base, size;
@@ -475,6 +462,10 @@ _tme_sun3_bus_tlb_fill(struct tme_bus_connection *conn_bus, struct tme_bus_tlb *
   tme_uint8_t context;
   unsigned int function_code_or_codes;
   unsigned int tlb_i;
+
+  /* get the normal-width address: */
+  address = address_wider;
+  assert (address == address_wider);
 
   /* recover our sun3: */
   sun3 = (struct tme_sun3 *) conn_bus->tme_bus_connection.tme_connection_element->tme_element_private;
@@ -540,15 +531,15 @@ _tme_sun3_bus_tlb_fill(struct tme_bus_connection *conn_bus, struct tme_bus_tlb *
 
   /* if the new head pointer already has a TLB entry, and it doesn't
      happen to be the same as this TLB entry, invalidate it: */
-  if (sun3->tme_sun3_sdvma_tlbs[tlb_i] != NULL
-      && (sun3->tme_sun3_sdvma_tlbs[tlb_i]
-	  != tlb->tme_bus_tlb_global)) {
-    tme_bus_tlb_invalidate(sun3->tme_sun3_sdvma_tlbs[tlb_i]);
+  if (sun3->tme_sun3_sdvma_tlb_tokens[tlb_i] != NULL
+      && (sun3->tme_sun3_sdvma_tlb_tokens[tlb_i]
+	  != tlb->tme_bus_tlb_token)) {
+    tme_token_invalidate(sun3->tme_sun3_sdvma_tlb_tokens[tlb_i]);
   }
 
   /* add this TLB entry to the active list: */
-  sun3->tme_sun3_sdvma_tlbs[tlb_i] =
-    tlb->tme_bus_tlb_global;
+  sun3->tme_sun3_sdvma_tlb_tokens[tlb_i]
+    = tlb->tme_bus_tlb_token;
 
   /* if system DVMA is disabled: */
   if (__tme_predict_false(!(sun3->tme_sun3_enable & TME_SUN3_ENA_SDVMA))) {
@@ -571,6 +562,9 @@ _tme_sun3_bus_tlb_fill(struct tme_bus_connection *conn_bus, struct tme_bus_tlb *
   _tme_sun3_tlb_fill(sun3, tlb, context,
 		     &function_code_or_codes,
 		     address | base, cycles);
+
+  /* this bus TLB entry depends on the current context: */
+  tme_sun_mmu_context_add(sun3->tme_sun3_mmu, tlb);
 
   /* create the mapping TLB entry.  we do this even if base == 0,
      because the TLB entry as currently filled may cover more address
@@ -730,7 +724,7 @@ _tme_sun3_mmu_pte_set(struct tme_sun3 *sun3, tme_uint32_t address, tme_uint32_t 
   unsigned int pte_flags;
 #ifndef TME_NO_LOG
   const char *bus_name;
-  tme_bus_addr_t physical_address;
+  tme_bus_addr32_t physical_address;
       
   /* this silences gcc -Wuninitialized: */
   bus_name = NULL;
@@ -788,9 +782,9 @@ _tme_sun3_mmu_sdvma_change(struct tme_sun3 *sun3)
   /* whenever the SDVMA bit changes, we have to invalidate all SDVMA
      TLB entries: */
   for (tlb_i = 0; tlb_i < TME_SUN3_SDVMA_TLBS; tlb_i++) {
-    if (sun3->tme_sun3_sdvma_tlbs[tlb_i] != NULL) {
-      tme_bus_tlb_invalidate(sun3->tme_sun3_sdvma_tlbs[tlb_i]);
-      sun3->tme_sun3_sdvma_tlbs[tlb_i] = NULL;
+    if (sun3->tme_sun3_sdvma_tlb_tokens[tlb_i] != NULL) {
+      tme_token_invalidate(sun3->tme_sun3_sdvma_tlb_tokens[tlb_i]);
+      sun3->tme_sun3_sdvma_tlb_tokens[tlb_i] = NULL;
     }
   }
 }
@@ -799,26 +793,15 @@ _tme_sun3_mmu_sdvma_change(struct tme_sun3 *sun3)
 void
 _tme_sun3_mmu_context_set(struct tme_sun3 *sun3)
 {
-  unsigned int tlb_i;
+  tme_bus_context_t context_base;
 
-  /* every TLB set has nine contexts' worth of TLB entries.  context
-     zero is used for the "boot state", and the remaining contexts
-     correspond to the eight possible MMU contexts.  
-
-     context zero is used for the boot state because at TLB set
-     allocation time, TLB sets are initialized pointing to the context
-     zero TLBs (by tme_sun_mmu_tlb_set_allocate), and TLBs must be
-     initialized to the boot state TLBs.
+  /* there are sixteen total contexts.  contexts zero through seven
+     are the not-boot (normal) contexts.  contexts eight through
+     fifteen are the same contexts, but in the boot state.
 
      in the boot state, TLB fills for supervisor program references
      bypass the MMU and are filled to reference the PROM, and data
-     fills are filled as normal using the current context.  since context
-     register changes can happen while in the boot state, but we only
-     have one boot state context in the TLB sets, we have to track 
-     the data TLBs we fill in the boot state.
-
-     we don't bother to track the supervisor program TLB fills, since
-     they never change.  */
+     fills are filled as normal using the current context:  */
 
   /* in the not-boot (i.e., normal, state): */
   if (__tme_predict_true(sun3->tme_sun3_enable & TME_SUN3_ENA_NOTBOOT)) {
@@ -828,8 +811,8 @@ _tme_sun3_mmu_context_set(struct tme_sun3 *sun3)
 	     _("context now #%d"),
 	     sun3->tme_sun3_context));
 
-    /* update all TLB sets to reflect the context change: */
-    tme_sun_mmu_tlbs_context_set(sun3->tme_sun3_mmu, sun3->tme_sun3_context + 1);
+    /* the normal state contexts are numbered from zero: */
+    context_base = 0;
   }
 
   /* in the boot state: */
@@ -840,25 +823,23 @@ _tme_sun3_mmu_context_set(struct tme_sun3 *sun3)
 	     _("context now #%d (boot state)"),
 	     sun3->tme_sun3_context));
 
-    /* update all TLB sets to reflect the pseudo-context change: */
-    tme_sun_mmu_tlbs_context_set(sun3->tme_sun3_mmu, 0);
-
-    /* invalidate all of the boot-state data TLBs: */
-    for (tlb_i = 0; tlb_i < TME_SUN3_BOOT_STATE_TLBS; tlb_i++) {
-      if (sun3->tme_sun3_boot_state_tlbs[tlb_i] != NULL) {
-	tme_bus_tlb_invalidate(sun3->tme_sun3_boot_state_tlbs[tlb_i]);
-	sun3->tme_sun3_boot_state_tlbs[tlb_i] = NULL;
-      }
-    }
+    /* the boot state contexts are numbered from eight: */
+    context_base = TME_SUN3_CONTEXT_COUNT;
   }
+
+  /* update the m68k bus context register: */
+  *sun3->tme_sun3_m68k_bus_context
+    = (context_base
+       + sun3->tme_sun3_context);
+
+  /* invalidate all DVMA TLBs that depended on the previous context: */
+  tme_sun_mmu_context_switched(sun3->tme_sun3_mmu);
 }
 
-/* this allocates a new TLB set: */
+/* this adds a new TLB set: */
 int
-_tme_sun3_mmu_tlb_set_allocate(struct tme_bus_connection *conn_bus_asker,
-			       unsigned int count, unsigned int sizeof_one, 
-			       struct tme_bus_tlb * tme_shared *_tlbs,
-			       tme_rwlock_t *_tlbs_rwlock)
+_tme_sun3_mmu_tlb_set_add(struct tme_bus_connection *conn_bus_asker,
+			  struct tme_bus_tlb_set_info *tlb_set_info)
 {
   struct tme_sun3 *sun3;
   int rc;
@@ -866,8 +847,31 @@ _tme_sun3_mmu_tlb_set_allocate(struct tme_bus_connection *conn_bus_asker,
   /* recover our sun3: */
   sun3 = (struct tme_sun3 *) conn_bus_asker->tme_bus_connection.tme_connection_element->tme_element_private;
 
-  /* get the MMU to allocate the TLB set: */
-  rc = tme_sun_mmu_tlb_set_allocate(sun3->tme_sun3_mmu, count, sizeof_one, _tlbs, _tlbs_rwlock);
+  /* add the TLB set to the MMU: */
+  rc = tme_sun_mmu_tlb_set_add(sun3->tme_sun3_mmu,
+			       tlb_set_info);
+  assert (rc == TME_OK);
+
+  /* if this is the TLB set from the m68k: */
+  if (conn_bus_asker->tme_bus_connection.tme_connection_type == TME_CONNECTION_BUS_M68K) {
+
+    /* the m68k must expose a bus context register: */
+    assert (tlb_set_info->tme_bus_tlb_set_info_bus_context != NULL);
+
+    /* save the pointer to the m68k bus context register, and
+       initialize it: */
+    sun3->tme_sun3_m68k_bus_context
+      = tlb_set_info->tme_bus_tlb_set_info_bus_context;
+    _tme_sun3_mmu_context_set(sun3);
+
+    /* return the maximum context number.  there are eight
+       contexts in the not-boot (normal) state, and each of
+       them has a boot state counterpart: */
+    tlb_set_info->tme_bus_tlb_set_info_bus_context_max
+      = (TME_SUN3_CONTEXT_COUNT
+	 + TME_SUN3_CONTEXT_COUNT
+	 - 1);
+  }
 
   return (rc);
 }
@@ -883,7 +887,7 @@ _tme_sun3_mmu_new(struct tme_sun3 *sun3)
   mmu_info.tme_sun_mmu_info_address_bits = 28;
   mmu_info.tme_sun_mmu_info_pgoffset_bits = TME_SUN3_PAGE_SIZE_LOG2;
   mmu_info.tme_sun_mmu_info_pteindex_bits = 4;
-  mmu_info.tme_sun_mmu_info_contexts = 1 + 8; /* internal context zero is for the boot state */
+  mmu_info.tme_sun_mmu_info_contexts = TME_SUN3_CONTEXT_COUNT;
   mmu_info.tme_sun_mmu_info_pmegs = TME_SUN3_PMEGS;
   mmu_info.tme_sun_mmu_info_tlb_fill_private = sun3;
   mmu_info.tme_sun_mmu_info_tlb_fill = _tme_sun3_tlb_fill_mmu;

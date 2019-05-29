@@ -1,4 +1,4 @@
-/* $Id: sun-obie.c,v 1.4 2007/08/25 20:44:11 fredette Exp $ */
+/* $Id: sun-obie.c,v 1.5 2010/06/05 19:20:30 fredette Exp $ */
 
 /* machine/sun/sun-obie.c - classic Sun onboard Intel Ethernet implementation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun-obie.c,v 1.4 2007/08/25 20:44:11 fredette Exp $");
+_TME_RCSID("$Id: sun-obie.c,v 1.5 2010/06/05 19:20:30 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -69,9 +69,13 @@ _TME_RCSID("$Id: sun-obie.c,v 1.4 2007/08/25 20:44:11 fredette Exp $");
 
 /* these get and put the CSR: */
 #define TME_SUN_OBIE_CSR_GET(sun_obie)	\
-  tme_betoh_u16(*((tme_uint16_t *) &(sun_obie)->tme_sun_obie_regs[TME_SUN_OBIE_REG_CSR]))
+  ((((tme_uint16_t) (sun_obie)->tme_sun_obie_regs[TME_SUN_OBIE_REG_CSR + 0]) << 8)	\
+   + (sun_obie)->tme_sun_obie_regs[TME_SUN_OBIE_REG_CSR + 1])
 #define TME_SUN_OBIE_CSR_PUT(sun_obie, csr)	\
-  (*((tme_uint16_t *) &(sun_obie)->tme_sun_obie_regs[TME_SUN_OBIE_REG_CSR]) = tme_htobe_u16(csr))
+  do {											\
+    (sun_obie)->tme_sun_obie_regs[TME_SUN_OBIE_REG_CSR + 0] = (csr) >> 8;		\
+    (sun_obie)->tme_sun_obie_regs[TME_SUN_OBIE_REG_CSR + 1] = (tme_uint8_t) (csr);	\
+  } while (/* CONSTCOND */ 0)
 
 /* the callout flags: */
 #define TME_SUN_OBIE_CALLOUT_CHECK	(0)
@@ -488,12 +492,10 @@ _tme_sun_obie_bus_signals_add(struct tme_bus_connection *conn_bus,
   return (TME_OK);
 }
 
-/* the sun_obie TLB allocator for the i825x6: */
+/* the sun_obie TLB adder for the i825x6: */
 static int
-_tme_sun_obie_tlb_set_allocate(struct tme_bus_connection *conn_bus,
-			      unsigned int count, unsigned int sizeof_one, 
-			       struct tme_bus_tlb * tme_shared *_tlbs,
-			       tme_rwlock_t *_tlbs_rwlock)
+_tme_sun_obie_tlb_set_add(struct tme_bus_connection *conn_bus,
+			  struct tme_bus_tlb_set_info *tlb_set_info)
 {
   struct tme_sun_obie *sun_obie;
 
@@ -503,9 +505,8 @@ _tme_sun_obie_tlb_set_allocate(struct tme_bus_connection *conn_bus,
   /* pass the i825x6's request through to the mainbus: */
   conn_bus = sun_obie->tme_sun_obie_conn_memory;
   return (conn_bus != NULL
-	  ? (*conn_bus->tme_bus_tlb_set_allocate)(conn_bus, 
-						  count, sizeof_one,
-						  _tlbs, _tlbs_rwlock)
+	  ? (*conn_bus->tme_bus_tlb_set_add)(conn_bus, 
+					     tlb_set_info)
 	  : ENXIO);
 }
 
@@ -750,7 +751,7 @@ _tme_sun_obie_connections_new(struct tme_element *element,
     conn_bus->tme_bus_subregions.tme_bus_subregion_address_last = 0xffffff;
     conn_bus->tme_bus_signals_add = _tme_sun_obie_bus_signals_add;
     conn_bus->tme_bus_signal = _tme_sun_obie_bus_signal;
-    conn_bus->tme_bus_tlb_set_allocate = _tme_sun_obie_tlb_set_allocate;
+    conn_bus->tme_bus_tlb_set_add = _tme_sun_obie_tlb_set_add;
     conn_bus->tme_bus_tlb_fill = _tme_sun_obie_tlb_fill;
   }
   else if (regs) {

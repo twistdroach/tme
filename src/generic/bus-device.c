@@ -1,4 +1,4 @@
-/* $Id: bus-device.c,v 1.9 2006/09/30 12:43:35 fredette Exp $ */
+/* $Id: bus-device.c,v 1.10 2009/08/28 01:23:44 fredette Exp $ */
 
 /* generic/bus-device.c - implementation of a generic bus device support: */
 
@@ -34,13 +34,56 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: bus-device.c,v 1.9 2006/09/30 12:43:35 fredette Exp $");
+_TME_RCSID("$Id: bus-device.c,v 1.10 2009/08/28 01:23:44 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
 
 /* include the automatically-generated bus-device functions: */
 #include "bus-device-auto.c"
+
+/* this adds a generic bus TLB set: */
+int
+tme_bus_device_tlb_set_add(struct tme_bus_device *bus_device,
+			   unsigned long tlb_count,
+			   struct tme_bus_tlb *tlb)
+{
+  struct tme_bus_tlb_set_info tlb_set_info;
+  struct tme_token *token;
+  struct tme_bus_connection *conn_bus;
+  int rc;
+
+  /* make the TLB set information, and allocate a token for each TLB
+     entry: */
+  assert (tlb_count > 0);
+  memset(&tlb_set_info, 0, sizeof(tlb_set_info));
+  tlb_set_info.tme_bus_tlb_set_info_token0 = tme_new(struct tme_token, tlb_count);
+  tlb_set_info.tme_bus_tlb_set_info_token_stride = sizeof(struct tme_token);
+  tlb_set_info.tme_bus_tlb_set_info_token_count = tlb_count;
+  tlb_set_info.tme_bus_tlb_set_info_bus_context = NULL;
+
+  /* connect each TLB entry with its token: */
+  token = tlb_set_info.tme_bus_tlb_set_info_token0;
+  do {
+    tme_token_init(token);
+    tlb->tme_bus_tlb_token = token;
+    tlb++;
+    token++;
+  } while (--tlb_count);
+
+  /* get our bus connection: */
+  conn_bus
+    = tme_memory_atomic_pointer_read(struct tme_bus_connection *,
+				     bus_device->tme_bus_device_connection,
+				     &bus_device->tme_bus_device_connection_rwlock);
+
+  /* add the TLB set: */
+  rc
+    = ((*conn_bus->tme_bus_tlb_set_add)
+       (conn_bus,
+	&tlb_set_info));
+  return (rc);
+}
 
 /* this scores a connection: */
 int

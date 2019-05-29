@@ -1,4 +1,4 @@
-/* $Id: fb.h,v 1.3 2007/08/25 22:45:51 fredette Exp $ */
+/* $Id: fb.h,v 1.4 2008/09/24 22:45:55 fredette Exp $ */
 
 /* tme/generic/fb.h - header file for generic framebuffer support: */
 
@@ -37,7 +37,7 @@
 #define _TME_GENERIC_FB_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: fb.h,v 1.3 2007/08/25 22:45:51 fredette Exp $");
+_TME_RCSID("$Id: fb.h,v 1.4 2008/09/24 22:45:55 fredette Exp $");
 
 /* includes: */
 #include <tme/element.h>
@@ -136,6 +136,12 @@ struct tme_fb_connection {
 
   /* the real framebuffer memory: */
   tme_uint8_t *tme_fb_connection_buffer;
+
+  /* the offsets of the first and last bytes updated in the real
+     framebuffer memory.  if the first offset is greater than the last
+     offset, none of the framebuffer memory was updated: */
+  tme_uint32_t tme_fb_connection_offset_updated_first;
+  tme_uint32_t tme_fb_connection_offset_updated_last;
 
   /* the class of the framebuffer: */
   unsigned int tme_fb_connection_class;

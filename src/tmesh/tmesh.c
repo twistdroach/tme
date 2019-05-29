@@ -1,4 +1,4 @@
-/* $Id: tmesh.c,v 1.3 2003/10/16 02:48:27 fredette Exp $ */
+/* $Id: tmesh.c,v 1.4 2009/08/30 17:06:38 fredette Exp $ */
 
 /* tmesh/tmesh.c - the tme shell: */
 
@@ -34,13 +34,29 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: tmesh.c,v 1.3 2003/10/16 02:48:27 fredette Exp $");
+_TME_RCSID("$Id: tmesh.c,v 1.4 2009/08/30 17:06:38 fredette Exp $");
 
 /* includes: */
 #include <tme/tme.h>
 #include <tme/tmesh.h>
+#include <tme/hash.h>
 #include <stdio.h>
 #include <string.h>
+
+/* macros: */
+
+/* the binary log message buffer size: */
+#define _TMESH_LOG_MESSAGE_BINARY_BUFFER_SIZE	(5 * TME_LOG_MESSAGE_SIZE_MAX_BINARY)
+
+/* the binary log message handle, size, and errno: */
+#define _TMESH_LOG_MESSAGE_BINARY_ERRNO		(0xff)
+#if TME_LOG_MESSAGE_SIZE_MAX_BINARY & (TME_LOG_MESSAGE_SIZE_MAX_BINARY - 1)
+#error "TME_LOG_MESSAGE_SIZE_MAX_BINARY must be a power of two"
+#endif
+#define _TMESH_LOG_MESSAGE_BINARY_SIZE \
+  ((TME_LOG_MESSAGE_SIZE_MAX_BINARY - 1) * (_TMESH_LOG_MESSAGE_BINARY_ERRNO + 1))
+#define _TMESH_LOG_MESSAGE_BINARY_HANDLE \
+  (~ (tme_uint32_t) (_TMESH_LOG_MESSAGE_BINARY_SIZE + _TMESH_LOG_MESSAGE_BINARY_ERRNO))
 
 /* types: */
 
@@ -51,6 +67,12 @@ struct _tmesh_input {
   unsigned int _tmesh_input_buffer_head;
   unsigned int _tmesh_input_buffer_tail;
   int _tmesh_input_buffer_eof;
+};
+
+/* a binary log message: */
+struct _tmesh_log_message_binary {
+  tme_uint32_t _tmesh_log_message_binary_handle_size_errno;
+  tme_uint32_t _tmesh_log_message_binary_level;
 };
 
 /* globals: */
@@ -68,6 +90,15 @@ static int _tmesh_doing_pre_threads;
 /* our log and its mutex: */
 static FILE *_tmesh_log;
 static tme_mutex_t _tmesh_log_mutex;
+
+/* the log mode: */
+static unsigned int _tmesh_log_mode = TME_LOG_MODE_TEXT;
+
+/* the next log handle number: */
+static tme_uint32_t _tmesh_log_handle_next;
+
+/* a format hash: */
+static tme_hash_t _tmesh_log_hash_format;
 
 /* this removes all consumed characters from a buffer, and shifts
    everything else down: */
@@ -212,6 +243,78 @@ _tmesh_log_output(struct tme_log_handle *handle)
   tme_mutex_unlock(&_tmesh_log_mutex);
 }
 
+/* our binary log output function: */
+static void
+_tmesh_log_output_binary(struct tme_log_handle *handle)
+{
+  struct _tmesh_log_message_binary *binary_message;
+  tme_uint32_t handle_size_errno;
+  struct _tmesh_log_message_binary binary_message_buffer;
+  tme_uint32_t buffer_size;
+  
+  /* lock the log mutex: */
+  tme_mutex_lock(&_tmesh_log_mutex);
+
+  /* make values for the binary message header: */
+  binary_message = (struct _tmesh_log_message_binary *) handle->tme_log_handle_private;
+  handle_size_errno = binary_message->_tmesh_log_message_binary_handle_size_errno;
+  TME_FIELD_MASK_DEPOSITU(handle_size_errno,
+			  _TMESH_LOG_MESSAGE_BINARY_SIZE,
+			  (handle->tme_log_handle_message_size
+			   - sizeof(*binary_message)));
+  TME_FIELD_MASK_DEPOSITU(handle_size_errno,
+			  _TMESH_LOG_MESSAGE_BINARY_ERRNO,
+			  handle->tme_log_handle_errno);
+
+  /* write the binary message header: */
+  binary_message = (struct _tmesh_log_message_binary *) handle->tme_log_handle_message;
+  if (_TME_ALIGNOF_INT32_T == 1) {
+    binary_message->_tmesh_log_message_binary_handle_size_errno = handle_size_errno;
+    binary_message->_tmesh_log_message_binary_level = handle->tme_log_handle_level;
+  }
+  else {
+    binary_message_buffer._tmesh_log_message_binary_handle_size_errno = handle_size_errno;
+    binary_message_buffer._tmesh_log_message_binary_level = handle->tme_log_handle_level;
+    memcpy(binary_message,
+	   &binary_message_buffer,
+	   sizeof(binary_message_buffer));
+  }
+
+  /* if there isn't enough room in the buffer for a maximum-sized
+     message: */
+  buffer_size
+    = ((((char *) binary_message)
+	+ handle->tme_log_handle_message_size)
+       - (char *) handle->tme_log_handle_private);
+  if (buffer_size
+      > (_TMESH_LOG_MESSAGE_BINARY_BUFFER_SIZE
+	 - TME_LOG_MESSAGE_SIZE_MAX_BINARY)) {
+
+    /* write out the buffer: */
+    fwrite(handle->tme_log_handle_private,
+	   1,
+	   buffer_size,
+	   _tmesh_log);
+
+    /* reset the buffer: */
+    handle->tme_log_handle_message = handle->tme_log_handle_private;
+  }
+
+  /* otherwise, there is enough room in the buffer for a maximum-sized
+     message: */
+  else {
+
+    /* advance the buffer: */
+    handle->tme_log_handle_message += handle->tme_log_handle_message_size;
+  }
+
+  /* reset for the next message: */
+  handle->tme_log_handle_message_size = sizeof(*binary_message);
+
+  /* unlock the log mutex: */
+  tme_mutex_unlock(&_tmesh_log_mutex);
+}
+
 /* our log open function: */
 static void 
 _tmesh_log_open(struct tmesh_support *support, 
@@ -219,9 +322,64 @@ _tmesh_log_open(struct tmesh_support *support,
 		const char *pathname, 
 		const char *module)
 {
+  struct _tmesh_log_message_binary *binary_message;
+  
+  /* lock the log mutex: */
+  tme_mutex_lock(&_tmesh_log_mutex);
+
   handle->tme_log_handle_level_max = 0;
-  handle->tme_log_handle_private = tme_strdup(pathname);
-  handle->tme_log_handle_output = _tmesh_log_output;
+  handle->tme_log_handle_mode = _tmesh_log_mode;
+
+  /* if the log is binary: */
+  if (handle->tme_log_handle_mode == TME_LOG_MODE_BINARY) {
+
+    /* allocate the binary buffer: */
+    handle->tme_log_handle_private = tme_malloc(_TMESH_LOG_MESSAGE_BINARY_BUFFER_SIZE);
+
+    /* allocate the handle number and make the first message
+       structure: */
+    binary_message = (struct _tmesh_log_message_binary *) handle->tme_log_handle_private;
+    memset (binary_message, 0, sizeof(*binary_message));
+    TME_FIELD_MASK_DEPOSITU(binary_message->_tmesh_log_message_binary_handle_size_errno,
+			    _TMESH_LOG_MESSAGE_BINARY_HANDLE,
+			    _tmesh_log_handle_next);
+    _tmesh_log_handle_next++;
+    handle->tme_log_handle_message = (char *) binary_message;
+    handle->tme_log_handle_message_size = sizeof(*binary_message);
+    assert (handle->tme_log_handle_message_size < TME_LOG_MESSAGE_SIZE_MAX_BINARY);
+    
+    /* write a dummy first message for the handle that is only the
+       pathname: */
+    TME_FIELD_MASK_DEPOSITU(binary_message->_tmesh_log_message_binary_handle_size_errno,
+			    _TMESH_LOG_MESSAGE_BINARY_SIZE,
+			    strlen(pathname) + 1);
+    fwrite(binary_message,
+	   sizeof(*binary_message),
+	   1,
+	   _tmesh_log);
+    fwrite(pathname,
+	   1,
+	   (strlen(pathname) + 1),
+	   _tmesh_log);
+
+    /* set the output function: */
+    handle->tme_log_handle_output = _tmesh_log_output_binary;
+    
+    /* set the format hash: */
+    handle->tme_log_handle_hash_format = _tmesh_log_hash_format;
+  }
+
+  /* otherwise, the log is text: */
+  else {
+
+    /* set the output function: */
+    handle->tme_log_handle_message = NULL;
+    handle->tme_log_handle_output = _tmesh_log_output;
+    handle->tme_log_handle_private = tme_strdup(pathname);
+  }
+
+  /* unlock the log mutex: */
+  tme_mutex_unlock(&_tmesh_log_mutex);
 }
 
 /* our log close function: */
@@ -368,6 +526,18 @@ main(int argc, char **argv)
       else {
 	usage = TRUE;
 	break;
+      }
+    }
+    else if (!strcmp(opt, "--log-mode")) {
+      ++arg_i;
+      if (arg_i >= argc
+	  || strcmp(argv[arg_i], "binary")) {
+	usage = TRUE;
+	break;
+      }
+      _tmesh_log_mode = TME_LOG_MODE_BINARY;
+      if (_tmesh_log_hash_format == NULL) {
+	_tmesh_log_hash_format = tme_hash_new(tme_direct_hash, tme_direct_compare, TME_HASH_DATA_NULL);
       }
     }
     else if (!strcmp(opt, "-c")

@@ -1,4 +1,4 @@
-/* $Id: keyboard.c,v 1.8 2007/02/15 02:12:44 fredette Exp $ */
+/* $Id: keyboard.c,v 1.9 2010/06/05 14:14:08 fredette Exp $ */
 
 /* generic/keyboard.c - generic keyboard implementation support: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: keyboard.c,v 1.8 2007/02/15 02:12:44 fredette Exp $");
+_TME_RCSID("$Id: keyboard.c,v 1.9 2010/06/05 14:14:08 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/keyboard.h>
@@ -1831,6 +1831,7 @@ _tme_keyboard_buffer_out1_bottom(struct tme_keyboard_buffer_int *buffer,
        : TME_KEYBOARD_EVENT_RELEASE);
   event_buffer.tme_keyboard_event_keyval
     = keycode->tme_keycode_state_keycode;
+  event_buffer.tme_keyboard_event_keycode = 0;
   event_buffer.tme_keyboard_event_time
     = event_time;
   event_buffer.tme_keyboard_event_modifiers
@@ -1916,6 +1917,7 @@ _tme_keyboard_buffer_out0(struct tme_keyboard_buffer_int *buffer,
 	 : TME_KEYBOARD_EVENT_RELEASE);
     event_buffer.tme_keyboard_event_keyval
       = keysym->tme_keysym_state_keysym;
+    event_buffer.tme_keyboard_event_keycode = 0;
     event_buffer.tme_keyboard_event_time
       = event_time;
     event_buffer.tme_keyboard_event_modifiers

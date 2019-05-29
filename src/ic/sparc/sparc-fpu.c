@@ -1,4 +1,4 @@
-/* $Id: sparc-fpu.c,v 1.3 2007/01/14 16:32:16 fredette Exp $ */
+/* $Id: sparc-fpu.c,v 1.5 2010/06/05 16:08:44 fredette Exp $ */
 
 /* ic/sparc/sparc-fpu.c - SPARC floating-point unit implementation */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sparc-fpu.c,v 1.3 2007/01/14 16:32:16 fredette Exp $");
+_TME_RCSID("$Id: sparc-fpu.c,v 1.5 2010/06/05 16:08:44 fredette Exp $");
 
 /* includes: */
 #include "sparc-impl.h"
@@ -134,7 +134,7 @@ tme_sparc_fpu_strict(struct tme_sparc_bus_connection *conn_sparc, unsigned int s
 }
 
 /* this handles a sparc FPU exception: */
-void
+static void
 tme_sparc_fpu_exception(struct tme_sparc *ic, tme_uint32_t ftt)
 {
 
@@ -172,7 +172,11 @@ tme_sparc_fpu_exception_check(struct tme_sparc *ic)
     
     /* enter exception mode and start IU trap processing: */
     ic->tme_sparc_fpu_mode = TME_SPARC_FPU_MODE_EXCEPTION;
-    TME_SPARC_INSN_TRAP(TME_SPARC_TRAP_fp_exception);
+    TME_SPARC_INSN_TRAP(TME_SPARC_VERSION(ic) < 9
+			? TME_SPARC32_TRAP_fp_exception
+			: (ic->tme_sparc_fpu_fsr & TME_SPARC_FSR_FTT) != TME_SPARC_FSR_FTT_IEEE754_exception
+			? TME_SPARC64_TRAP_fp_exception_other
+			: TME_SPARC64_TRAP_fp_exception_ieee_754);
   }
 
   /* otherwise, the FPU must be in exception mode: */
@@ -241,7 +245,7 @@ _tme_sparc_fpu_exception_ieee754(struct tme_ieee754_ctl *ctl, tme_int8_t excepti
 TME_SPARC_FORMAT3(tme_sparc32_stdfq, tme_uint32_t)
 {
   TME_SPARC_INSN_PRIV;
-  TME_SPARC_INSN_FPU_STORE(sizeof(tme_uint32_t) * 2);
+  TME_SPARC_INSN_FPU_ENABLED;
 
   /* "An attempt to execute STDFQ on an implementation without a
      floating-point queue causes an fp_exception trap with FSR.ftt set
@@ -269,25 +273,65 @@ TME_SPARC_FORMAT3(tme_sparc32_stdfq, tme_uint32_t)
   TME_SPARC_INSN_OK;
 }
 
-/* this checks that the given floating point register number is aligned
-   for a certain format: */
-int
-tme_sparc_fpu_fpreg_aligned(struct tme_sparc *ic,
-			    unsigned int fpreg_number,
-			    unsigned int fpreg_format)
+/* this decodes a floating point register number and checks that it is
+   aligned for a certain format: */
+unsigned int
+tme_sparc_fpu_fpreg_decode(struct tme_sparc *ic,
+			   unsigned int fpreg_number_encoded,
+			   unsigned int fpreg_format)
 {
+  unsigned int fpreg_number;
+
+  /* assume that the register number and its encoding are the same: */
+  fpreg_number = fpreg_number_encoded;
+ 
+  /* if this is a double or quad-precision register number encoding: */
+#if (TME_IEEE754_FPREG_FORMAT_SINGLE != 1 || TME_IEEE754_FPREG_FORMAT_DOUBLE != 2 || TME_IEEE754_FPREG_FORMAT_QUAD != 4)
+#error "bad TME_IEEE754_FPREG_FORMAT_ macros"
+#endif
+  if (fpreg_format
+      & (TME_IEEE754_FPREG_FORMAT_DOUBLE
+	 | TME_IEEE754_FPREG_FORMAT_QUAD)) {
+
+    /* on a v9 CPU, bit zero of a double- or quad-precision register
+       number encoding is bit five of the register number: */
+    if (TME_SPARC_VERSION(ic) >= 9) {
+      fpreg_number
+	= ((fpreg_number_encoded
+	    + (fpreg_number_encoded * 32))
+	   & (64 - 2));
+    }
+  }
 
   /* if the register number is misaligned for the format: */
 #if (TME_IEEE754_FPREG_FORMAT_SINGLE != 1 || TME_IEEE754_FPREG_FORMAT_DOUBLE != 2 || TME_IEEE754_FPREG_FORMAT_QUAD != 4)
 #error "bad TME_IEEE754_FPREG_FORMAT_ macros"
 #endif
-  if (fpreg_number & ((fpreg_format & ~TME_IEEE754_FPREG_FORMAT_BUILTIN) - 1)) {
-    if (!(ic->tme_sparc_fpu_flags & TME_SPARC_FPU_FLAG_OK_REG_MISALIGNED)) {
+  if (__tme_predict_false(fpreg_number
+			  & ((fpreg_format
+			      & (TME_IEEE754_FPREG_FORMAT_SINGLE
+				 | TME_IEEE754_FPREG_FORMAT_DOUBLE
+				 | TME_IEEE754_FPREG_FORMAT_QUAD))
+			     - 1))) {
+
+    /* if this CPU allows misaligned register numbers: */
+    if (ic->tme_sparc_fpu_flags & TME_SPARC_FPU_FLAG_OK_REG_MISALIGNED) {
+
+      /* force the register number to be aligned: */
+      fpreg_number
+	&= (0 - (fpreg_format
+		 & (TME_IEEE754_FPREG_FORMAT_SINGLE
+		    | TME_IEEE754_FPREG_FORMAT_DOUBLE
+		    | TME_IEEE754_FPREG_FORMAT_QUAD)));
+    }
+
+    /* otherwise, this CPU does not allow misaligned register numbers: */
+    else {
       tme_sparc_fpu_exception(ic, TME_SPARC_FSR_FTT_invalid_fp_register);
     }
-    return (FALSE);
   }
-  return (TRUE);
+
+  return (fpreg_number);
 }
 
 /* this forces the given floating point register to assume the given
@@ -297,11 +341,6 @@ tme_sparc_fpu_fpreg_format(struct tme_sparc *ic,
 			   unsigned int fpreg_number,
 			   unsigned int fpreg_format)
 {
-
-  /* make sure the register is aligned: */
-  if (!tme_sparc_fpu_fpreg_aligned(ic, fpreg_number, fpreg_format)) {
-    abort();
-  }
 
   /* make sure the register is in the given format: */
   tme_ieee754_fpreg_format(ic->tme_sparc_fpu_fpregs,
@@ -319,10 +358,28 @@ tme_sparc_fpu_fpreg_read(struct tme_sparc *ic,
 			 tme_uint32_t fpreg_number_mask,
 			 unsigned int fpreg_format)
 {
+  tme_uint32_t fpreg_number_encoded;
   unsigned int fpreg_number;
 
-  /* extract the register number: */
-  fpreg_number = TME_FIELD_MASK_EXTRACTU(TME_SPARC_INSN, fpreg_number_mask);
+  /* extract and decode the register number: */
+  fpreg_number_encoded = TME_SPARC_INSN;
+#if TME_SPARC_FORMAT3_MASK_RD < TME_SPARC_FORMAT3_MASK_RS1 || TME_SPARC_FORMAT3_MASK_RS1 < TME_SPARC_FORMAT3_MASK_RS2
+#error "TME_SPARC_FORMAT3_MASK_RS values changed"
+#endif
+  assert (fpreg_number_mask == TME_SPARC_FORMAT3_MASK_RD
+	  || fpreg_number_mask == TME_SPARC_FORMAT3_MASK_RS1
+	  || fpreg_number_mask == TME_SPARC_FORMAT3_MASK_RS2);
+  if (fpreg_number_mask == TME_SPARC_FORMAT3_MASK_RD) {
+    fpreg_number_encoded /= (TME_SPARC_FORMAT3_MASK_RD / TME_SPARC_FORMAT3_MASK_RS2);
+  }    
+  if (fpreg_number_mask == TME_SPARC_FORMAT3_MASK_RS1) {
+    fpreg_number_encoded /= (TME_SPARC_FORMAT3_MASK_RS1 / TME_SPARC_FORMAT3_MASK_RS2);
+  }
+  fpreg_number_encoded = TME_FIELD_MASK_EXTRACTU(fpreg_number_encoded, TME_SPARC_FORMAT3_MASK_RS2);
+  fpreg_number
+    = tme_sparc_fpu_fpreg_decode(ic,
+				 fpreg_number_encoded,
+				 fpreg_format);
 
   /* make sure the register is in the given format: */
   tme_sparc_fpu_fpreg_format(ic, fpreg_number, fpreg_format);
@@ -333,6 +390,9 @@ tme_sparc_fpu_fpreg_read(struct tme_sparc *ic,
 
 /* include the automatically generated code: */
 #include "sparc-fpu-auto.c"
+#ifdef TME_HAVE_INT64_T
+#include "sparc-vis-auto.c"
+#endif /* TME_HAVE_INT64_T */
 
 /* this checks for an FPU argument: */
 int

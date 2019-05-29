@@ -1,4 +1,4 @@
-/* $Id: isil7170.c,v 1.4 2006/09/30 12:43:36 fredette Exp $ */
+/* $Id: isil7170.c,v 1.6 2010/06/05 14:37:27 fredette Exp $ */
 
 /* ic/isil7170.c - implementation of Intersil 7170 emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: isil7170.c,v 1.4 2006/09/30 12:43:36 fredette Exp $");
+_TME_RCSID("$Id: isil7170.c,v 1.6 2010/06/05 14:37:27 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -340,8 +340,8 @@ _tme_isil7170_th_timer(struct tme_isil7170 *isil7170)
 		   "timer interrupt rate: %ld/sec",
 		   (isil7170->tme_isil7170_int_sample
 		    / (TME_ISIL7170_TRACK_INT_RATE
-		       + now.tv_sec
-		       - isil7170->tme_isil7170_int_sample_time.tv_sec))));
+		       + (unsigned long) (now.tv_sec
+					  - isil7170->tme_isil7170_int_sample_time.tv_sec)))));
 	}
 
 	/* reset the sample: */
@@ -402,7 +402,7 @@ static int
 _tme_isil7170_bus_cycle(void *_isil7170, struct tme_bus_cycle *cycle_init)
 {
   struct tme_isil7170 *isil7170;
-  tme_bus_addr_t address, isil7170_address_last;
+  tme_bus_addr32_t address, isil7170_address_last;
   tme_uint8_t buffer, value, value_old;
   struct tme_bus_cycle cycle_resp;
   unsigned int reg;
@@ -643,7 +643,7 @@ _tme_isil7170_tlb_fill(void *_isil7170, struct tme_bus_tlb *tlb,
 		     tme_bus_addr_t address, unsigned int cycles)
 {
   struct tme_isil7170 *isil7170;
-  tme_bus_addr_t isil7170_address_last;
+  tme_bus_addr32_t isil7170_address_last;
 
   /* recover our data structure: */
   isil7170 = (struct tme_isil7170 *) _isil7170;

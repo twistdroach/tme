@@ -1,4 +1,4 @@
-/* $Id: sun44c-memerr.c,v 1.1 2006/09/30 12:56:00 fredette Exp $ */
+/* $Id: sun44c-memerr.c,v 1.3 2010/06/05 19:29:11 fredette Exp $ */
 
 /* machine/sun4/sun44c-memerr.c - implementation of Sun 4/4c memory error emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun44c-memerr.c,v 1.1 2006/09/30 12:56:00 fredette Exp $");
+_TME_RCSID("$Id: sun44c-memerr.c,v 1.3 2010/06/05 19:29:11 fredette Exp $");
 
 /* includes: */
 #include "sun4-impl.h"
@@ -250,7 +250,7 @@ int
 _tme_sun44c_memerr_cycle_control(void *_sun4, struct tme_bus_cycle *cycle_init)
 {
   struct tme_sun4 *sun4;
-  tme_uint8_t memerr_reg[TME_SUN44C_MEMERR_SIZ_REG * 2];
+  tme_uint32_t memerr_reg[2][TME_SUN44C_MEMERR_SIZ_REG / sizeof(tme_uint32_t)];
   int write_csr, unlatch;
   int write_parctl;
   tme_uint32_t csr_old;
@@ -262,7 +262,7 @@ _tme_sun44c_memerr_cycle_control(void *_sun4, struct tme_bus_cycle *cycle_init)
   sun4 = (struct tme_sun4 *) _sun4;
 
   /* start filling the memory error register(s): */
-  *((tme_uint32_t *) &memerr_reg[TME_SUN44C_MEMERR_SIZ_REG * 0 + TME_SUN44C_MEMERR_REG_CSR])
+  memerr_reg[0][TME_SUN44C_MEMERR_REG_CSR / sizeof(tme_uint32_t)]
     = tme_htobe_u32(sun4->tme_sun44c_memerr_csr[0]);
 
   /* assume this cycle won't write or unlatch a memory error register: */
@@ -280,11 +280,11 @@ _tme_sun44c_memerr_cycle_control(void *_sun4, struct tme_bus_cycle *cycle_init)
   if (TME_SUN4_IS_SUN4C(sun4)) {
 
     /* finish filling the memory error registers: */
-    *((tme_uint32_t *) &memerr_reg[TME_SUN44C_MEMERR_SIZ_REG * 0 + TME_SUN4C_MEMERR_REG_PARCTL])
+    memerr_reg[0][TME_SUN4C_MEMERR_REG_PARCTL / sizeof(tme_uint32_t)]
       = tme_htobe_u32(sun4->tme_sun4c_memerr_parctl[0]);
-    *((tme_uint32_t *) &memerr_reg[TME_SUN44C_MEMERR_SIZ_REG * 1 + TME_SUN44C_MEMERR_REG_CSR])
+    memerr_reg[1][TME_SUN44C_MEMERR_REG_CSR / sizeof(tme_uint32_t)]
       = tme_htobe_u32(sun4->tme_sun44c_memerr_csr[1]);
-    *((tme_uint32_t *) &memerr_reg[TME_SUN44C_MEMERR_SIZ_REG * 1 + TME_SUN4C_MEMERR_REG_PARCTL])
+    memerr_reg[1][TME_SUN4C_MEMERR_REG_PARCTL / sizeof(tme_uint32_t)]
       = tme_htobe_u32(sun4->tme_sun4c_memerr_parctl[1]);
 
     assert ((cycle_init->tme_bus_cycle_address 
@@ -321,7 +321,7 @@ _tme_sun44c_memerr_cycle_control(void *_sun4, struct tme_bus_cycle *cycle_init)
   else {
 
     /* finish filling the memory error register: */
-    *((tme_uint32_t *) &memerr_reg[TME_SUN44C_MEMERR_SIZ_REG * 0 + TME_SUN4_MEMERR_REG_VADDR])
+    memerr_reg[0][TME_SUN4_MEMERR_REG_VADDR / sizeof(tme_uint32_t)]
       = tme_htobe_u32(sun4->tme_sun4_memerr_vaddr);
 
     assert ((cycle_init->tme_bus_cycle_address 
@@ -348,7 +348,7 @@ _tme_sun44c_memerr_cycle_control(void *_sun4, struct tme_bus_cycle *cycle_init)
 
   /* do the transfer: */
   tme_bus_cycle_xfer_memory(cycle_init, 
-			    memerr_reg,
+			    (tme_uint8_t *) memerr_reg,
 			    sizeof(memerr_reg) - 1);
 
   /* if this is a write: */
@@ -357,14 +357,14 @@ _tme_sun44c_memerr_cycle_control(void *_sun4, struct tme_bus_cycle *cycle_init)
     /* if the sun4c parity control register has been written: */
     if (write_parctl >= 0) {
       sun4->tme_sun4c_memerr_parctl[write_parctl]
-	= tme_betoh_u32(*((tme_uint32_t *) &memerr_reg[TME_SUN44C_MEMERR_SIZ_REG * write_parctl + TME_SUN4C_MEMERR_REG_PARCTL]));
+	= tme_betoh_u32(memerr_reg[write_parctl][TME_SUN4C_MEMERR_REG_PARCTL / sizeof(tme_uint32_t)]);
     }
 
     /* if the sun4 vaddr register has been written: */
     if (TME_SUN4_IS_SUN4(sun4)
 	&& unlatch) {
       sun4->tme_sun4c_memerr_parctl[0]
-	= tme_betoh_u32(*((tme_uint32_t *) &memerr_reg[TME_SUN44C_MEMERR_SIZ_REG * 0 + TME_SUN4_MEMERR_REG_VADDR]));
+	= tme_betoh_u32(memerr_reg[0][TME_SUN4_MEMERR_REG_VADDR / sizeof(tme_uint32_t)]);
     }
   }
 
@@ -381,7 +381,7 @@ _tme_sun44c_memerr_cycle_control(void *_sun4, struct tme_bus_cycle *cycle_init)
 
     /* get the new and old CSR values, preserving the read-only bits: */
     csr_old = sun4->tme_sun44c_memerr_csr[write_csr];
-    csr_new = tme_betoh_u32(*((tme_uint32_t *) &memerr_reg[TME_SUN44C_MEMERR_SIZ_REG * write_csr + TME_SUN44C_MEMERR_REG_CSR]));
+    csr_new = tme_betoh_u32(memerr_reg[write_csr][TME_SUN44C_MEMERR_REG_CSR / sizeof(tme_uint32_t)]);
     csr_new = ((csr_old & csr_ro)
 	       | (csr_new & ~csr_ro));
   }
@@ -461,7 +461,11 @@ _tme_sun44c_memerr_cycle_bus(void *_conn_bus_init,
   struct tme_bus_tlb *tlb;
   tme_uint32_t address;
   unsigned int cycle_size;
-  tme_uint8_t memory_buffer[sizeof(tme_uint32_t)];
+  union {
+    tme_uint8_t memory_buffer_8s[sizeof(tme_uint32_t) / sizeof(tme_uint8_t)];
+    tme_uint16_t memory_buffer_16s[sizeof(tme_uint32_t) / sizeof(tme_uint16_t)];
+    tme_uint32_t memory_buffer_32s[sizeof(tme_uint32_t) / sizeof(tme_uint32_t)];
+  } memory_buffer;
   struct tme_sun_mmu_pte pte_mmu;
   const tme_shared tme_uint8_t *memory_data_read;
   tme_shared tme_uint8_t *memory_data_write;
@@ -512,34 +516,31 @@ _tme_sun44c_memerr_cycle_bus(void *_conn_bus_init,
       assert (FALSE);
       /* FALLTHROUGH */
     case sizeof(tme_uint8_t):
-      tme_memory_write8(&memory_buffer[0],
-			tme_memory_bus_read8(memory_data_read,
-					     tlb->tme_bus_tlb_rwlock,
-					     sizeof(tme_uint8_t),
-					     sizeof(tme_uint32_t)),
-			sizeof(tme_uint32_t));
+      memory_buffer.memory_buffer_8s[0]
+	= tme_memory_bus_read8(memory_data_read,
+			       tlb->tme_bus_tlb_rwlock,
+			       sizeof(tme_uint8_t),
+			       sizeof(tme_uint32_t));
       break;
     case sizeof(tme_uint16_t):
-      tme_memory_write16((tme_uint16_t *) &memory_buffer[0],
-			 tme_memory_bus_read16((const tme_shared tme_uint16_t *) memory_data_read,
-					       tlb->tme_bus_tlb_rwlock,
-					       sizeof(tme_uint16_t),
-					       sizeof(tme_uint32_t)),
-			 sizeof(tme_uint32_t));
+      memory_buffer.memory_buffer_16s[0]
+	= tme_memory_bus_read16((const tme_shared tme_uint16_t *) memory_data_read,
+				tlb->tme_bus_tlb_rwlock,
+				sizeof(tme_uint16_t),
+				sizeof(tme_uint32_t));
       break;
     case sizeof(tme_uint32_t):
-      tme_memory_write32((tme_uint32_t *) &memory_buffer[0],
-			 tme_memory_bus_read32((const tme_shared tme_uint32_t *) memory_data_read,
-					       tlb->tme_bus_tlb_rwlock,
-					       sizeof(tme_uint32_t),
-					       sizeof(tme_uint32_t)),
-			 sizeof(tme_uint32_t));
+      memory_buffer.memory_buffer_32s[0]
+	= tme_memory_bus_read32((const tme_shared tme_uint32_t *) memory_data_read,
+				tlb->tme_bus_tlb_rwlock,
+				sizeof(tme_uint32_t),
+				sizeof(tme_uint32_t));
       break;
     }
 
     /* run the bus cycle against the memory buffer: */
     tme_bus_cycle_xfer_memory(cycle_init,
-			      &memory_buffer[0] - address, 
+			      &memory_buffer.memory_buffer_8s[0] - address, 
 			      address + cycle_size - 1);
     assert (cycle_init->tme_bus_cycle_size == cycle_size);
 
@@ -559,7 +560,7 @@ _tme_sun44c_memerr_cycle_bus(void *_conn_bus_init,
 
     /* run the bus cycle against the memory buffer: */
     tme_bus_cycle_xfer_memory(cycle_init,
-			      &memory_buffer[0] - address, 
+			      &memory_buffer.memory_buffer_8s[0] - address, 
 			      address + cycle_size - 1);
     assert (cycle_init->tme_bus_cycle_size == cycle_size);
 
@@ -576,24 +577,21 @@ _tme_sun44c_memerr_cycle_bus(void *_conn_bus_init,
       /* FALLTHROUGH */
     case sizeof(tme_uint8_t):
       tme_memory_bus_write8(memory_data_write,
-			    tme_memory_read8(&memory_buffer[0],
-					     sizeof(tme_uint8_t)),
+			    memory_buffer.memory_buffer_8s[0],
 			    tlb->tme_bus_tlb_rwlock,
 			    sizeof(tme_uint8_t),
 			    sizeof(tme_uint32_t));
       break;
     case sizeof(tme_uint16_t):
       tme_memory_bus_write16((tme_shared tme_uint16_t *) memory_data_write,
-			     tme_memory_read16((tme_uint16_t *) &memory_buffer[0],
-					       sizeof(tme_uint16_t)),
+			     memory_buffer.memory_buffer_16s[0],
 			     tlb->tme_bus_tlb_rwlock,
 			     sizeof(tme_uint16_t),
 			     sizeof(tme_uint32_t));
       break;
     case sizeof(tme_uint32_t):
       tme_memory_bus_write32((tme_shared tme_uint32_t *) memory_data_write,
-			     tme_memory_read32((tme_uint32_t *) &memory_buffer[0],
-					       sizeof(tme_uint32_t)),
+			     memory_buffer.memory_buffer_32s[0],
 			     tlb->tme_bus_tlb_rwlock,
 			     sizeof(tme_uint32_t),
 			     sizeof(tme_uint32_t));
@@ -614,7 +612,7 @@ _tme_sun44c_memerr_cycle_bus(void *_conn_bus_init,
      in the presence of virtual address aliases (addresses that have
      never been written to can suddenly have read errors): */
   tme_bus_tlb_unbusy(tlb);
-  tme_bus_tlb_invalidate(tlb);
+  tme_token_invalidate(tlb->tme_bus_tlb_token);
   sun4->tme_sun4_memtest_tlb = NULL;
 
   return (rc);
@@ -649,7 +647,7 @@ _tme_sun44c_tlb_fill_memerr(const struct tme_bus_connection *conn_bus_init,
   /* invalidate any other memory test TLB entry: */
   if (sun4->tme_sun4_memtest_tlb != NULL
       && sun4->tme_sun4_memtest_tlb != tlb) {
-    tme_bus_tlb_invalidate(sun4->tme_sun4_memtest_tlb);
+    tme_token_invalidate(sun4->tme_sun4_memtest_tlb->tme_bus_tlb_token);
   }
   sun4->tme_sun4_memtest_tlb = NULL;
 #ifndef NDEBUG

@@ -1,4 +1,4 @@
-/* $Id: sun2-mmu.c,v 1.13 2007/02/15 01:34:34 fredette Exp $ */
+/* $Id: sun2-mmu.c,v 1.14 2009/08/30 14:39:47 fredette Exp $ */
 
 /* machine/sun2/sun2-mmu.c - implementation of Sun 2 MMU emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun2-mmu.c,v 1.13 2007/02/15 01:34:34 fredette Exp $");
+_TME_RCSID("$Id: sun2-mmu.c,v 1.14 2009/08/30 14:39:47 fredette Exp $");
 
 /* includes: */
 #include "sun2-impl.h"
@@ -67,16 +67,19 @@ _TME_RCSID("$Id: sun2-mmu.c,v 1.13 2007/02/15 01:34:34 fredette Exp $");
 #define TME_SUN2_BUSERR_VMEBUSERR	TME_BIT(6)	/* bus error signaled on VMEbus */
 #define TME_SUN2_BUSERR_VALID		TME_BIT(7)	/* page map was valid */
 
+/* real context count: */
+#define TME_SUN2_CONTEXT_COUNT		(8)
+
 /* this logs a bus error: */
 #ifndef TME_NO_LOG
 static void
 _tme_sun2_bus_fault_log(struct tme_sun2 *sun2, struct tme_bus_tlb *tlb, struct tme_bus_cycle *cycle)
 {
-  tme_bus_addr_t virtual_address;
+  tme_bus_addr32_t virtual_address;
   struct tme_sun_mmu_pte pte;
   tme_uint32_t pte_sun2;
   const char *bus_name;
-  tme_bus_addr_t physical_address;
+  tme_bus_addr32_t physical_address;
   int rc;
 
   /* this silences gcc -Wuninitialized: */
@@ -277,6 +280,10 @@ _tme_sun2_m68k_tlb_fill(struct tme_m68k_bus_connection *conn_m68k, struct tme_m6
 {
   struct tme_sun2 *sun2;
   struct tme_bus_tlb *tlb;
+  unsigned int function_codes_mask;
+  struct tme_bus_tlb tlb_mapping;
+  tme_uint32_t context;
+  tme_uint32_t access;
   unsigned short tlb_flags;
 
   /* recover our sun2: */
@@ -293,7 +300,7 @@ _tme_sun2_m68k_tlb_fill(struct tme_m68k_bus_connection *conn_m68k, struct tme_m6
 
     /* we cover the entire address space: */
     tlb->tme_bus_tlb_addr_first = 0;
-    tlb->tme_bus_tlb_addr_last = ((tme_bus_addr_t) 0) - 1;
+    tlb->tme_bus_tlb_addr_last = 0 - (tme_bus_addr32_t) 1;
 
     /* we allow reading and writing: */
     tlb->tme_bus_tlb_cycles_ok = TME_BUS_CYCLE_READ | TME_BUS_CYCLE_WRITE;
@@ -304,59 +311,90 @@ _tme_sun2_m68k_tlb_fill(struct tme_m68k_bus_connection *conn_m68k, struct tme_m6
 
     /* this is good for function code three only: */
     tlb_m68k->tme_m68k_tlb_function_codes_mask = TME_BIT(TME_M68K_FC_3);
+
+    /* done: */
+    return (TME_OK);
   }
 
-  /* if this is a supervisor function code and we're in the PROM
-     address range, we handle this ourselves: */
-  else if ((function_code == TME_M68K_FC_SD
-	    || function_code == TME_M68K_FC_SP)
-	   && address >= TME_SUN2_PROM_BASE
-	   && address < (TME_SUN2_PROM_BASE + TME_SUN2_PROM_SIZE)) {
+  /* this must be or a user or supervisor program or data function
+     code: */
+  assert(function_code == TME_M68K_FC_UD
+	 || function_code == TME_M68K_FC_UP
+	 || function_code == TME_M68K_FC_SD
+	 || function_code == TME_M68K_FC_SP);
 
-    /* fill this TLB entry directly from the obmem bus: */
-    (*sun2->tme_sun2_obmem->tme_bus_tlb_fill)
-      (sun2->tme_sun2_obmem,
-       tlb,
-       address,
-       cycles);
+  /* assume that if this TLB entry ends up good for the supervisor,
+     it's good for the supervisor program function code: */
+  function_codes_mask = TME_BIT(TME_M68K_FC_SP);
 
-    /* this is good for supervisor data and supervisor program function codes: */
-    tlb_m68k->tme_m68k_tlb_function_codes_mask = (TME_BIT(TME_M68K_FC_SD)
-						  | TME_BIT(TME_M68K_FC_SP));
+  /* if we're in the boot state: */
+  if (__tme_predict_false((sun2->tme_sun2_enable & TME_SUN2_ENA_NOTBOOT) == 0)) {
+
+    /* if this is the supervisor program function code: */
+    if (function_code == TME_M68K_FC_SP) {
+
+      /* fill this TLB entry directly from the obmem bus: */
+      (*sun2->tme_sun2_obmem->tme_bus_tlb_fill)
+	(sun2->tme_sun2_obmem,
+	 tlb,
+	 TME_SUN2_PROM_BASE | (address & (TME_SUN2_PROM_SIZE - 1)),
+	 cycles);
+	
+      /* create the mapping TLB entry: */
+      tlb_mapping.tme_bus_tlb_addr_first = address & (((tme_bus_addr32_t) 0) - TME_SUN2_PROM_SIZE);
+      tlb_mapping.tme_bus_tlb_addr_last = address | (TME_SUN2_PROM_SIZE - 1);
+      tlb_mapping.tme_bus_tlb_cycles_ok
+	= TME_BUS_CYCLE_READ;
+  
+      /* map the filled TLB entry: */
+      tme_bus_tlb_map(tlb, TME_SUN2_PROM_BASE | (address & (TME_SUN2_PROM_SIZE - 1)), &tlb_mapping, address);
+	
+      /* this is good for the supervisor program function code only: */
+      tlb_m68k->tme_m68k_tlb_function_codes_mask
+	= TME_BIT(TME_M68K_FC_SP);
+
+      /* done: */
+      return(TME_OK);
+    }
+
+    /* if this TLB entry ends up good for the supervisor, it's not
+       good for the supervisor program function code: */
+    function_codes_mask = 0;
   }
 
-  /* this is a normal function code: */
+  /* start the access: */
+  access
+    = ((cycles & TME_BUS_CYCLE_WRITE)
+       ? TME_SUN_MMU_PTE_PROT_RW
+       : TME_SUN_MMU_PTE_PROT_RO);
+
+  /* if this is a user program or data function code: */
+  if (function_code == TME_M68K_FC_UD
+      || function_code == TME_M68K_FC_UP) {
+    context = sun2->tme_sun2_context_user;
+    access = TME_SUN_MMU_PTE_PROT_USER(access);
+    function_codes_mask = (TME_BIT(TME_M68K_FC_UD) + TME_BIT(TME_M68K_FC_UP));
+  }
+
+  /* otherwise, this is a supervisor program or data function code: */
   else {
-
-    /* fill this TLB entry from the MMU: */
-    tlb_flags = ((function_code == TME_M68K_FC_UD
-		  || function_code == TME_M68K_FC_UP)
-		 ? tme_sun_mmu_tlb_fill(sun2->tme_sun2_mmu,
-					tlb,
-					sun2->tme_sun2_context_user,
-					address,
-					((cycles & TME_BUS_CYCLE_WRITE)
-					 ? TME_SUN_MMU_PTE_PROT_USER(TME_SUN_MMU_PTE_PROT_RW)
-					 : TME_SUN_MMU_PTE_PROT_USER(TME_SUN_MMU_PTE_PROT_RO)))
-		 : tme_sun_mmu_tlb_fill(sun2->tme_sun2_mmu,
-					tlb,
-					sun2->tme_sun2_context_system,
-					address,
-					((cycles & TME_BUS_CYCLE_WRITE)
-					 ? TME_SUN_MMU_PTE_PROT_SYSTEM(TME_SUN_MMU_PTE_PROT_RW)
-					 : TME_SUN_MMU_PTE_PROT_SYSTEM(TME_SUN_MMU_PTE_PROT_RO))));
-    
-    /* TLB entries are good only for the program and data function
-       codes for the user or supervisor, but never both, because
-       the two types of accesses go through different contexts: */
-    tlb_m68k->tme_m68k_tlb_function_codes_mask =
-      ((function_code == TME_M68K_FC_UD
-	|| function_code == TME_M68K_FC_UP)
-       ? (TME_BIT(TME_M68K_FC_UD)
-	  | TME_BIT(TME_M68K_FC_UP))
-       : (TME_BIT(TME_M68K_FC_SD)
-	  | TME_BIT(TME_M68K_FC_SP)));
+    context = sun2->tme_sun2_context_system;
+    access = TME_SUN_MMU_PTE_PROT_SYSTEM(access);
+    function_codes_mask += TME_BIT(TME_M68K_FC_SD);
   }
+
+  /* fill this TLB entry from the MMU: */
+  tlb_flags
+    = tme_sun_mmu_tlb_fill(sun2->tme_sun2_mmu,
+			   tlb,
+			   context,
+			   address,
+			   access);
+
+  /* TLB entries are good only for the program and data function
+     codes for the user or supervisor, but never both, because
+     the two types of accesses go through different contexts: */
+  tlb_m68k->tme_m68k_tlb_function_codes_mask = function_codes_mask;
 
   return (TME_OK);
 }
@@ -364,15 +402,20 @@ _tme_sun2_m68k_tlb_fill(struct tme_m68k_bus_connection *conn_m68k, struct tme_m6
 /* our bus TLB filler: */
 int
 _tme_sun2_bus_tlb_fill(struct tme_bus_connection *conn_bus, struct tme_bus_tlb *tlb,
-		       tme_uint32_t address, unsigned int cycles)
+		       tme_bus_addr_t address_wider, unsigned int cycles)
 {
   struct tme_sun2 *sun2;
+  tme_bus_addr32_t address;
   struct tme_sun2_bus_connection *conn_sun2;
   tme_uint32_t base, size;
   struct tme_bus_tlb tlb_bus;
 
   /* recover our sun2: */
   sun2 = (struct tme_sun2 *) conn_bus->tme_bus_connection.tme_connection_element->tme_element_private;
+
+  /* get the normal-width address: */
+  address = address_wider;
+  assert (address == address_wider);
 
   /* recover the sun2 internal mainbus connection: */
   conn_sun2 = (struct tme_sun2_bus_connection *) conn_bus;
@@ -558,7 +601,7 @@ _tme_sun2_mmu_pte_set(struct tme_sun2 *sun2, tme_uint32_t address, tme_uint32_t 
   unsigned int pte_flags;
 #ifndef TME_NO_LOG
   const char *bus_name;
-  tme_bus_addr_t physical_address;
+  tme_bus_addr32_t physical_address;
       
   /* this silences gcc -Wuninitialized: */
   bus_name = NULL;
@@ -722,19 +765,62 @@ _tme_sun2_mmu_context_system_set(struct tme_sun2 *sun2)
 void
 _tme_sun2_mmu_context_user_set(struct tme_sun2 *sun2)
 {
-  tme_log(TME_SUN2_LOG_HANDLE(sun2), 1000, TME_OK,
-	  (TME_SUN2_LOG_HANDLE(sun2),
-	   _("user context now #%d"),
-	   sun2->tme_sun2_context_user));
-  tme_sun_mmu_tlbs_context_set(sun2->tme_sun2_mmu, sun2->tme_sun2_context_user);
+  tme_bus_context_t context_base;
+
+  /* NB that even though user and supervisor references use the two
+     different context registers simultaneously, TLB entries for one
+     are never usable by the other.  because of this, and because we
+     assume that the system context register rarely changes, we choose
+     not to factor the system context into the context seen by the
+     m68k: */
+
+  /* there are sixteen total contexts.  contexts zero through seven
+     are the not-boot (normal) contexts.  contexts eight through
+     fifteen are the same contexts, but in the boot state.
+
+     in the boot state, TLB fills for supervisor program references
+     bypass the MMU and are filled to reference the PROM, and data
+     fills are filled as normal using the current context:  */
+
+  /* in the not-boot (i.e., normal, state): */
+  if (__tme_predict_true(sun2->tme_sun2_enable & TME_SUN2_ENA_NOTBOOT)) {
+
+    tme_log(TME_SUN2_LOG_HANDLE(sun2), 1000, TME_OK,
+	    (TME_SUN2_LOG_HANDLE(sun2),
+	     _("user context now #%d"),
+	     sun2->tme_sun2_context_user));
+
+    /* the normal state contexts are numbered from zero: */
+    context_base = 0;
+  }
+
+  /* in the boot state: */
+  else {
+
+    tme_log(TME_SUN2_LOG_HANDLE(sun2), 1000, TME_OK,
+	    (TME_SUN2_LOG_HANDLE(sun2),
+	     _("user context now #%d (boot state)"),
+	     sun2->tme_sun2_context_user));
+
+    /* the boot state contexts are numbered from eight: */
+    context_base = TME_SUN2_CONTEXT_COUNT;
+  }
+
+  /* update the m68k bus context register: */
+  *sun2->tme_sun2_m68k_bus_context
+    = (context_base
+       + sun2->tme_sun2_context_user);
+
+  /* NB: unlike the sun3, sun2 DVMA TLBS are always filled using the
+     system context, meaning they don't need to be invalidated when
+     the user context changes, so we don't need to call
+     tme_sun_mmu_context_switched() here: */
 }
 
-/* this allocates a new TLB set: */
+/* this adds a new TLB set: */
 int
-_tme_sun2_mmu_tlb_set_allocate(struct tme_bus_connection *conn_bus_asker,
-			       unsigned int count, unsigned int sizeof_one, 
-			       struct tme_bus_tlb * tme_shared * _tlbs,
-			       tme_rwlock_t *_tlbs_rwlock)
+_tme_sun2_mmu_tlb_set_add(struct tme_bus_connection *conn_bus_asker,
+			  struct tme_bus_tlb_set_info *tlb_set_info)
 {
   struct tme_sun2 *sun2;
   int rc;
@@ -742,135 +828,33 @@ _tme_sun2_mmu_tlb_set_allocate(struct tme_bus_connection *conn_bus_asker,
   /* recover our sun2: */
   sun2 = (struct tme_sun2 *) conn_bus_asker->tme_bus_connection.tme_connection_element->tme_element_private;
 
-  /* get the MMU to allocate the TLB set: */
-  rc = tme_sun_mmu_tlb_set_allocate(sun2->tme_sun2_mmu, count, sizeof_one, _tlbs, _tlbs_rwlock);
+  /* add the TLB set to the MMU: */
+  rc = tme_sun_mmu_tlb_set_add(sun2->tme_sun2_mmu,
+			       tlb_set_info);
+  assert (rc == TME_OK);
 
-  /* if this is the TLB set for our CPU, remember where the context
-     zero TLBs are, and try to reset the MMU now: */
-  /* FIXME - this assumes that the *first* TLB set allocated by
-     the CPU is for its data: */
-  if (rc == TME_OK
-      && conn_bus_asker->tme_bus_connection.tme_connection_type == TME_CONNECTION_BUS_M68K
-      && sun2->tme_sun2_reset_tlbs == NULL) {
-    assert(sizeof_one == sizeof(struct tme_m68k_tlb));
-    sun2->tme_sun2_reset_tlbs = (struct tme_m68k_tlb *) tme_memory_atomic_pointer_read(struct tme_bus_tlb *, *_tlbs, _tlbs_rwlock);
-    sun2->tme_sun2_reset_tlb_count = count;
-    _tme_sun2_mmu_reset(sun2);
+  /* if this is the TLB set from the m68k: */
+  if (conn_bus_asker->tme_bus_connection.tme_connection_type == TME_CONNECTION_BUS_M68K) {
+
+    /* the m68k must expose a bus context register: */
+    assert (tlb_set_info->tme_bus_tlb_set_info_bus_context != NULL);
+
+    /* save the pointer to the m68k bus context register, and
+       initialize it: */
+    sun2->tme_sun2_m68k_bus_context
+      = tlb_set_info->tme_bus_tlb_set_info_bus_context;
+    _tme_sun2_mmu_context_user_set(sun2);
+
+    /* return the maximum context number.  there are eight
+       contexts in the not-boot (normal) state, and each of
+       them has a boot state counterpart: */
+    tlb_set_info->tme_bus_tlb_set_info_bus_context_max
+      = (TME_SUN2_CONTEXT_COUNT
+	 + TME_SUN2_CONTEXT_COUNT
+	 - 1);
   }
 
   return (rc);
-}
-
-/* the first four 16-bit read cycles that the m68010 does after it comes
-   out of reset are to fetch the reset vector (one 32-bit word for the
-   initial SSP, one 32-bit word for the initial PC).
-
-   apparently the Sun-2 reset circuitry has some special logic that
-   is able to direct these read cycles to the PROM, where the reset
-   vector is located.  we simulate this logic by forcing the CPU's
-   context zero TLB entries to all point to ROM for addresses 0-7,
-   but only for the first four cycles, after which we invalidate 
-   all of the CPU TLB entries. */
-
-/* this is a special bus cycle handling function used at reset time.
-   it is used only for the first four m68010 read cycles: */
-static int
-_tme_sun2_reset_cycle(void *_sun2, struct tme_bus_cycle *cycle)
-{
-  struct tme_sun2 *sun2;
-  int rc;
-
-  /* recover our sun2: */
-  sun2 = (struct tme_sun2 *) _sun2;
-
-  /* this must be a 16-bit read: */
-  assert(cycle->tme_bus_cycle_size == sizeof(tme_uint16_t));
-  tme_log(TME_SUN2_LOG_HANDLE(sun2), 1000, TME_OK,
-	  (TME_SUN2_LOG_HANDLE(sun2),
-	   _("reset cycle #%d"),
-	   sun2->tme_sun2_reset_cycles));
-
-  /* run the real cycle: */
-  rc = ((*sun2->tme_sun2_reset_cycle)
-	(sun2->tme_sun2_reset_cycle_private,
-	 cycle));
-
-  /* after the fourth read cycle, invalidate all of the TLBs
-     that the CPU holds, ending these abnormal reset reads: */
-  if (rc == TME_OK) {
-    sun2->tme_sun2_reset_cycles++;
-    if (sun2->tme_sun2_reset_cycles == 4) {
-      tme_sun_mmu_tlbs_invalidate(sun2->tme_sun2_mmu);
-    }
-  }
-
-  return (rc);
-}
-
-/* this initializes the context zero part of the CPU's TLB set to
-   support four slow 16-bit reads from ROM at addresses 0, 2, 4, 6,
-   respectively.  this emulates how the Sun-2 behaves as it comes out
-   of reset: */
-int
-_tme_sun2_mmu_reset(struct tme_sun2 *sun2)
-{
-  struct tme_m68k_tlb *tlb_m68k;
-  struct tme_bus_tlb *tlb, tlb_virtual;
-  unsigned long tlb_i;
-
-  /* we can only do this initialization once we have both
-     the obmem bus and the CPU's TLBs: */
-  tlb_m68k = sun2->tme_sun2_reset_tlbs;
-  if (tlb_m68k == NULL
-      || sun2->tme_sun2_obmem == NULL) {
-    return (TME_OK);
-  }
-  sun2->tme_sun2_reset_tlbs = NULL;
-  /* XXX FIXME - this is not thread-safe: */
-  tlb = &tlb_m68k->tme_m68k_tlb_bus_tlb;
-  tme_bus_tlb_busy(tlb);
-  tme_bus_tlb_unbusy_fill(tlb);
-  
-  /* fill the TLB entry: */
-  (*sun2->tme_sun2_obmem->tme_bus_tlb_fill)
-    (sun2->tme_sun2_obmem,
-     tlb,
-     TME_SUN2_PROM_BASE,
-     TME_BUS_CYCLE_READ);
-
-  /* map the TLB entry: */
-  tlb_virtual.tme_bus_tlb_addr_first = 0;
-  tlb_virtual.tme_bus_tlb_addr_last = 7;
-  tlb_virtual.tme_bus_tlb_cycles_ok = TME_BUS_CYCLE_READ;
-  tme_bus_tlb_map(tlb, TME_SUN2_PROM_BASE, &tlb_virtual, 0);
-  
-  /* this TLB entry must allow slow reads from exactly the reset
-     range: */
-  if (!(tlb->tme_bus_tlb_cycles_ok & TME_BUS_CYCLE_READ)
-      || tlb->tme_bus_tlb_addr_first != 0
-      || tlb->tme_bus_tlb_addr_last != 7) {
-    abort();
-  }
-  
-  /* take over this TLB entry: */
-  sun2->tme_sun2_reset_cycles = 0;
-  sun2->tme_sun2_reset_cycle_private = tlb->tme_bus_tlb_cycle_private;
-  sun2->tme_sun2_reset_cycle = tlb->tme_bus_tlb_cycle;
-  tlb->tme_bus_tlb_emulator_off_read = TME_EMULATOR_OFF_UNDEF;
-  tlb->tme_bus_tlb_cycle_private = sun2;
-  tlb->tme_bus_tlb_cycle = _tme_sun2_reset_cycle;
-  
-  /* this TLB entry is usable by the supervisor: */
-  tlb_m68k->tme_m68k_tlb_function_codes_mask = (TME_BIT(TME_M68K_FC_SD)
-						| TME_BIT(TME_M68K_FC_SP));
-  
-  /* now copy this TLB entry into all of the others: */
-  for (tlb_i = sun2->tme_sun2_reset_tlb_count - 1; tlb_i-- > 0; ) {
-    tlb_m68k[1] = tlb_m68k[0];
-    tlb_m68k++;
-  }
-
-  return (TME_OK);
 }
 
 /* this creates a Sun-2 MMU: */
@@ -884,7 +868,7 @@ _tme_sun2_mmu_new(struct tme_sun2 *sun2)
   mmu_info.tme_sun_mmu_info_address_bits = 24;
   mmu_info.tme_sun_mmu_info_pgoffset_bits = TME_SUN2_PAGE_SIZE_LOG2;
   mmu_info.tme_sun_mmu_info_pteindex_bits = 4;
-  mmu_info.tme_sun_mmu_info_contexts = 8;
+  mmu_info.tme_sun_mmu_info_contexts = TME_SUN2_CONTEXT_COUNT;
   mmu_info.tme_sun_mmu_info_pmegs = 256;
   mmu_info.tme_sun_mmu_info_tlb_fill_private = sun2;
   mmu_info.tme_sun_mmu_info_tlb_fill = _tme_sun2_tlb_fill_mmu;

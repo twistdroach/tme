@@ -1,4 +1,4 @@
-/* $Id: sun4-impl.h,v 1.2 2007/02/15 01:31:14 fredette Exp $ */
+/* $Id: sun4-impl.h,v 1.3 2009/08/30 14:01:55 fredette Exp $ */
 
 /* machine/sun4/sun4-impl.h - implementation header file for Sun 4 emulation: */
 
@@ -37,7 +37,7 @@
 #define _MACHINE_SUN4_IMPL_H
 
 #include <tme/common.h>
-_TME_RCSID("$Id: sun4-impl.h,v 1.2 2007/02/15 01:31:14 fredette Exp $");
+_TME_RCSID("$Id: sun4-impl.h,v 1.3 2009/08/30 14:01:55 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus.h>
@@ -313,6 +313,7 @@ struct tme_sun4 {
   tme_rwlock_t tme_sun4_cache_rwlock;
   tme_uint32_t tme_sun4_cache_visible;
   struct tme_bus_tlb tme_sun4_cache_tlb_internal;
+  struct tme_token tme_sun4_cache_tlb_internal_token;
 
   /* memory error support: */
   unsigned int tme_sun4_memerr_int_asserted;
@@ -372,15 +373,13 @@ struct tme_sun4 {
   /* the last ipl we gave to the CPU: */
   unsigned int tme_sun4_int_ipl_last;
 
-  /* the set of active sun4/4c boot state TLB entries: */
-  unsigned int tme_sun44c_boot_state_tlb_next;
-#define TME_SUN44C_BOOT_STATE_TLBS	(8)
-  struct tme_bus_tlb *tme_sun44c_boot_state_tlbs[TME_SUN44C_BOOT_STATE_TLBS];
-
   /* the set of active sun4/4c SDVMA TLB entries: */
   unsigned int tme_sun44c_sdvma_tlb_next;
 #define TME_SUN44C_SDVMA_TLBS		(16)
-  struct tme_bus_tlb *tme_sun44c_sdvma_tlbs[TME_SUN44C_SDVMA_TLBS];
+  struct tme_token *tme_sun44c_sdvma_tlb_tokens[TME_SUN44C_SDVMA_TLBS];
+
+  /* the sun4/4c sparc v7 bus context register: */
+  tme_bus_context_t *tme_sun44c_sparc_bus_context;
 };
 
 /* sun4/4c cache prototypes: */
@@ -402,10 +401,8 @@ int _tme_sun44c_tlb_fill_memerr _TME_P((const struct tme_bus_connection *,
 
 /* sun4/4c MMU prototypes: */
 void _tme_sun44c_mmu_new _TME_P((struct tme_sun4 *));
-int _tme_sun44c_mmu_tlb_set_allocate _TME_P((struct tme_bus_connection *,
-					     unsigned int, unsigned int, 
-					     struct tme_bus_tlb * tme_shared *,
-					     tme_rwlock_t *));
+int _tme_sun44c_mmu_tlb_set_add _TME_P((struct tme_bus_connection *,
+					struct tme_bus_tlb_set_info *));
 void _tme_sun44c_mmu_sdvma_change _TME_P((struct tme_sun4 *));
 void _tme_sun44c_mmu_context_set _TME_P((struct tme_sun4 *));
 int _tme_sun44c_mmu_pte_get _TME_P((struct tme_sun4 *, tme_uint32_t, tme_uint32_t *));
@@ -418,7 +415,7 @@ int _tme_sun44c_tlb_fill_sparc _TME_P((struct tme_sparc_bus_connection *,
 				       unsigned int cycles));
 int _tme_sun44c_tlb_fill_bus _TME_P((struct tme_bus_connection *,
 				     struct tme_bus_tlb *,
-				     tme_uint32_t,
+				     tme_bus_addr_t,
 				     unsigned int));
 int _tme_sun44c_tlb_fill_mmu _TME_P((const struct tme_bus_connection *,
 				     struct tme_bus_tlb *,

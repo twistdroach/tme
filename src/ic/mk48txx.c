@@ -1,4 +1,4 @@
-/* $Id: mk48txx.c,v 1.2 2006/11/26 16:01:49 fredette Exp $ */
+/* $Id: mk48txx.c,v 1.4 2010/06/05 14:54:10 fredette Exp $ */
 
 /* ic/mk48txx.c - implementation of Mostek 48Txx emulation: */
 
@@ -34,7 +34,7 @@
  */
 
 #include <tme/common.h>
-_TME_RCSID("$Id: mk48txx.c,v 1.2 2006/11/26 16:01:49 fredette Exp $");
+_TME_RCSID("$Id: mk48txx.c,v 1.4 2010/06/05 14:54:10 fredette Exp $");
 
 /* includes: */
 #include <tme/generic/bus-device.h>
@@ -47,9 +47,10 @@ _TME_RCSID("$Id: mk48txx.c,v 1.2 2006/11/26 16:01:49 fredette Exp $");
 
 /* the different parts: */
 #define TME_MK48TXX_PART_02	(02)
+#define TME_MK48TXX_PART_59	(59)
 
 /* register addresses: */
-#define TME_MK48TXX_REGS_COUNT	(8)		/* maximum number of registers */
+#define TME_MK48TXX_REGS_COUNT	(16)		/* maximum number of registers */
 #define TME_MK48TXX_REG_YEAR	(TME_MK48TXX_REGS_COUNT - 1)	/* BCD year */
 #define TME_MK48TXX_REG_MON	(TME_MK48TXX_REGS_COUNT - 2)	/* BCD month */
 #define TME_MK48TXX_REG_DAY	(TME_MK48TXX_REGS_COUNT - 3)	/* BCD day in month */
@@ -58,9 +59,20 @@ _TME_RCSID("$Id: mk48txx.c,v 1.2 2006/11/26 16:01:49 fredette Exp $");
 #define TME_MK48TXX_REG_MIN	(TME_MK48TXX_REGS_COUNT - 6)	/* BCD minutes */
 #define TME_MK48TXX_REG_SEC	(TME_MK48TXX_REGS_COUNT - 7)	/* BCD seconds */
 #define TME_MK48TXX_REG_CSR	(TME_MK48TXX_REGS_COUNT - 8)	/* control register */
+#define TME_MK48TXX_REG_WDOG	(TME_MK48TXX_REGS_COUNT - 9)	/* watchdog */
+#define TME_MK48TXX_REG_INTR	(TME_MK48TXX_REGS_COUNT - 10)	/* interrupts */
+#define TME_MK48TXX_REG_ADAY	(TME_MK48TXX_REGS_COUNT - 11)	/* BCD alarm day */
+#define TME_MK48TXX_REG_AHOUR	(TME_MK48TXX_REGS_COUNT - 12)	/* BCD alarm hour */
+#define TME_MK48TXX_REG_AMIN	(TME_MK48TXX_REGS_COUNT - 13)	/* BCD alarm minutes */
+#define TME_MK48TXX_REG_ASEC	(TME_MK48TXX_REGS_COUNT - 14)	/* BCD alarm seconds */
+			     /* (TME_MK48TXX_REGS_COUNT - 15)	   unused */
+#define TME_MK48TXX_REG_FLAGS	(TME_MK48TXX_REGS_COUNT - 16)	/* flags */
 
 /* the first register implemented by a part: */
-#define TME_MK48TXX_REG_FIRST(part)	(TME_MK48TXX_REG_CSR)
+#define TME_MK48TXX_REG_FIRST(part)	\
+  ((part) == TME_MK48TXX_PART_59	\
+   ? TME_MK48TXX_REG_FLAGS		\
+   : TME_MK48TXX_REG_CSR)
 
 /* bits in the CSR: */
 #define TME_MK48TXX_CSR_WRITE	TME_BIT(7)	/* start writing */
@@ -135,7 +147,7 @@ _tme_mk48txx_reset(struct tme_mk48txx *mk48txx)
 
   /* start the clock running normally: */
   mk48txx->tme_mk48txx_regs[TME_MK48TXX_REG_WDAY] = 0;
-  mk48txx->tme_mk48txx_regs[TME_MK48TXX_SEC_STOP] = 0;
+  mk48txx->tme_mk48txx_regs[TME_MK48TXX_REG_SEC] = !TME_MK48TXX_SEC_STOP;
 }
 
 /* the mk48txx bus cycle handler: */
@@ -143,7 +155,7 @@ static int
 _tme_mk48txx_bus_cycle(void *_mk48txx, struct tme_bus_cycle *cycle_init)
 {
   struct tme_mk48txx *mk48txx;
-  tme_bus_addr_t address, mk48txx_address_last;
+  tme_bus_addr32_t address, mk48txx_address_last;
   tme_uint8_t buffer, value;
   struct tme_bus_cycle cycle_resp;
   unsigned int reg;
@@ -242,6 +254,18 @@ _tme_mk48txx_bus_cycle(void *_mk48txx, struct tme_bus_cycle *cycle_init)
 
       break;
 
+    case TME_MK48TXX_REG_ADAY:
+    case TME_MK48TXX_REG_AHOUR:
+    case TME_MK48TXX_REG_AMIN:
+    case TME_MK48TXX_REG_ASEC:
+    case TME_MK48TXX_REG_WDOG:
+    case TME_MK48TXX_REG_INTR:
+    case TME_MK48TXX_REG_FLAGS:
+
+      /* update the register: */
+      mk48txx->tme_mk48txx_regs[reg] = value;
+      break;
+
     default:
       /* ignore */
       break;
@@ -262,6 +286,13 @@ _tme_mk48txx_bus_cycle(void *_mk48txx, struct tme_bus_cycle *cycle_init)
     case TME_MK48TXX_REG_DAY:
     case TME_MK48TXX_REG_YEAR:
     case TME_MK48TXX_REG_WDAY:
+    case TME_MK48TXX_REG_ADAY:
+    case TME_MK48TXX_REG_AHOUR:
+    case TME_MK48TXX_REG_AMIN:
+    case TME_MK48TXX_REG_ASEC:
+    case TME_MK48TXX_REG_WDOG:
+    case TME_MK48TXX_REG_INTR:
+    case TME_MK48TXX_REG_FLAGS:
 
       /* read the register: */
       value = mk48txx->tme_mk48txx_regs[reg];
@@ -323,7 +354,7 @@ _tme_mk48txx_tlb_fill(void *_mk48txx, struct tme_bus_tlb *tlb,
 		     tme_bus_addr_t address, unsigned int cycles)
 {
   struct tme_mk48txx *mk48txx;
-  tme_bus_addr_t mk48txx_address_last;
+  tme_bus_addr32_t mk48txx_address_last;
 
   /* recover our data structure: */
   mk48txx = (struct tme_mk48txx *) _mk48txx;
@@ -441,4 +472,8 @@ _tme_mk48txx_new(struct tme_element *element,
 
 TME_ELEMENT_X_NEW_DECL(tme_ic_,mk48txx,mk48t02) {
   return (_tme_mk48txx_new(element, args, extra, _output, TME_MK48TXX_PART_02));
+}
+
+TME_ELEMENT_X_NEW_DECL(tme_ic_,mk48txx,mk48t59) {
+  return (_tme_mk48txx_new(element, args, extra, _output, TME_MK48TXX_PART_59));
 }
