@@ -1,0 +1,846 @@
+Sun May 18 00:07:59 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* Release 0.0 out.
+
+	* configure.in: Changed the version number to 0.0; this is very alpha.
+	There are now fewer include directories under tme/; many
+	unnecessary headers that belonged to modules were removed.
+
+	* bus/multibus/3c400.c: No longer include <tme/bus/multibus/3c400.h>.
+	* bus/multibus/Makefile.am: Added library and module versioning.
+	* generic/Makefile.am: Added library and module versioning.
+	* host/bsd/Makefile.am: Added library and module versioning.
+	* host/bsd/bsd-bpf.c: Now include "bsd-impl.h" instead of <tme/host/bsd.h>.
+	* host/bsd/bsd-if.c: Now include "bsd-impl.h" instead of <tme/host/bsd.h>.
+	* host/bsd/bsd-impl.h: Added.
+	* host/posix/Makefile.am: Added library and module versioning.
+	* ic/Makefile.am: Added library and module versioning.
+	* ic/m68k/Makefile.am: Added library and module versioning.
+	* libtme/Makefile.am: Added library and module versioning.
+	* machine/sun/Makefile.am: Added library and module versioning.
+	* machine/sun/tme-sun-idprom.pl: Added.
+	* machine/sun2/Makefile.am: Added library and module versioning.
+	* machine/sun2/SUN2-MULTIBUS: Changed the extension on the PROM and IDPROM
+	files from .dat to .bin.
+
+	* machine/sun2/SUN2-MULTIBUS: Changed the name of the PROM filename to match the documentation.
+	* tme/Makefile.am: Removed the host and bus include directories; they don't exist anymore.
+	* tmesh/Makefile.am: Added library and module versioning.
+
+Sat May 17 20:16:06 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* acinclude.m4: Added an RCS Id and a short comment.
+	* configure.in: Added an RCS Id, the copyright, and license.
+	Do a real path search for perl.
+
+	* libtme/log-prf.c: Changes to silence gcc -Wuninitialized.
+	* libtme/module.c: Changes to silence gcc -Wuninitialized.
+	* machine/sun2/sun2-mainbus.c: Changes to silence gcc -Wuninitialized.
+
+Fri May 16 21:48:16 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* By far, this is the worst bulk commit I've ever done.
+	Many changes to simplify the element interface as much
+	as possible, to do modules better, and to do logging
+	better.  Fixed a small number of actual bugs.  Also
+	converted to modern autoconf and automake, because
+	the module support requires modern libtool.
+	Also added the main libtme, libtmesh, and tmesh itself.
+
+Fri May 16 17:50:17 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* acinclude.m4 (AC_CHECK_ALIGNOF): Now takes only a size, in bits, to check the
+	alignment for.  Before, it used to take a string of the form intN_t,
+	which wouldn't work on systems that don't define an intN_t type.
+	When cross-compiling, assume the target requires alignment equal
+	to the size.  Now use AC_DEFINE_UNQUOTED's third argument to
+	specify the config.h.in comment.
+	(AC_CHECK_SHIFTMAX): Added.
+	(AC_SYS_SOCKADDR_SA_LEN): Now use AC_DEFINE_UNQUOTED's third
+	argument to specify the config.h.in comment.
+
+Thu May 15 15:52:08 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* ic/m68k/m68k-insns-auto.sh: Fixed bugs in the shift and rotate insns, where we might try to
+	shift by an amount greater than the maximum meaningful shift for
+	a given size.
+
+Sat May 10 13:46:02 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* acinclude.m4 (AC_CHECK_ALIGNOF): Fixed a bug where this would stop on
+	the first misalignment, instead of continuing to find the
+	true minimum alignment.  For example, this would have
+	found the minimum 32-bit alignment to be 4 instead of 2
+	on a 68000 or 68010, stopping on the misaligned address 3.
+
+	* configure.in: Some early distribution work.
+	* ic/Makefile.am: Some early distribution work.
+	* ic/m68k/Makefile.am: Some early distribution work.
+	* ic/m68k/m68k-insns-auto.sh: Fixed some bad macro and type name references.
+	* ic/m68k/m68k-insns-auto.sh: Handled the rename of the aligned and unaligned memory access
+	rwlocking macros, and use the new tme_memory_sequence_ rwlocking
+	macros.  Generally made things a little easier to read, although
+	we do rely on the optimizer to do the right thing somewhat more.
+
+	* ic/m68k/m68k-misc-auto.sh: Fixed some bad macro and type name references.
+	* ic/m68k/m68k-misc-auto.sh: Handled the rename of the aligned and unaligned memory access
+	rwlocking macros, and use the new tme_memory_sequence_ rwlocking
+	macros.  Generally made things a little easier to read, although
+	we do rely on the optimizer to do the right thing somewhat more.
+
+	* machine/Makefile.am: Some early distribution work.
+	* machine/sun2/Makefile.am: Some early distribution work.
+	* tme/Makefile.am: Some early distribution work.
+	* tme/threads.h: Renamed the memory-access locking functions to be
+	tme_memory_HOW_WHATlock, where HOW is aligned or
+	unaligned, and WHAT is rd or wr.
+	Now define the tme_memory_sequence_WHATlock macros,
+	used when doing a sequence of memory accesses that
+	must appear to be atomic.
+	Now define TME_SEQUENCE_ACCESS_NOT_COSTLIER as TRUE
+	if locking for a sequence and locking for an aligned
+	access have the same cost, else define it as FALSE.
+
+Sat May 10 00:31:32 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* ic/m68k/m68k-insns-auto.sh: Overhauled the shift instructions to not use loops.
+
+Fri May 09 16:32:06 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* ic/m68k/m68k-execute.c: As an optimization, now require the individual insn functions
+	to use TME_M68K_INSN_CANFAULT if they may fault, instead of
+	figuring out every time if an insn can fault or not.  Check
+	that insn functions have set it if they need it, and left it
+	unset if they do not need it.
+
+	* ic/m68k/m68k-execute.c: Made some changes to somewhat optimize certain
+	effective address calculations.
+
+	* ic/m68k/m68k-impl.h: Now define TME_M68K_INSN_CANFAULT.
+	* ic/m68k/m68k-impl.h: Renumbered the TME_M68K_SIZE_ macros slightly to enable an
+	optimization on effective address predecrement/postincrement
+	calculation.  Grew the memory transfer function arrays to
+	match.
+	Moved the generic IC data structure to the top of the m68k
+	structure, to enable register indexing to happen without
+	an offset.
+	Removed _tme_m68k_areg_increment, it's no longer needed.
+
+	* ic/m68k/m68k-insns-auto.sh: Now use TME_M68K_INSN_CANFAULT where it's needed.  Also
+	fixed some random restarting bugs in some insns.
+
+	* ic/m68k/m68k-insns.c: Now use TME_M68K_INSN_CANFAULT where it's needed.  Also
+	fixed some random restarting bugs in some insns.
+
+	* ic/m68k/m68k-misc.c: Removed _tme_m68k_areg_increment, it's no longer needed.
+	Grew the memory transfer function arrays to match the
+	renumbering of the TME_M68K_SIZE_ macros, and added some
+	preprocessor error checking on those macros.
+
+Fri May 09 13:12:01 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* bus/multibus/3c400.c: Bulk change to no longer require bus connections to have a
+	power-of-two width.  This is largely a name change, renaming
+	address_mask to address_last, as nothing depended on the
+	address_mask being all-bits-one.
+
+	* bus/multibus/3c400.c (_tme_3c400_callout): Make buffer status values have the minimum
+	Ethernet frame size.
+
+	* generic/bus-device.c: Bulk change to no longer require bus connections to have a
+	power-of-two width.  This is largely a name change, renaming
+	address_mask to address_last, as nothing depended on the
+	address_mask being all-bits-one.
+
+	* generic/bus-el.c: Bulk change to no longer require bus connections to have a
+	power-of-two width.  This is largely a name change, renaming
+	address_mask to address_last, as nothing depended on the
+	address_mask being all-bits-one.
+
+	* generic/bus.c: Bulk change to no longer require bus connections to have a
+	power-of-two width.  This is largely a name change, renaming
+	address_mask to address_last, as nothing depended on the
+	address_mask being all-bits-one.
+
+	* host/posix/posix-memory.c: Bulk change to no longer require bus connections to have a
+	power-of-two width.  This is largely a name change, renaming
+	address_mask to address_last, as nothing depended on the
+	address_mask being all-bits-one.
+
+	* ic/am9513.c: Now include <stdio.h>, in case TME_AM9513_TRACK_INT_RATE is
+	defined.
+
+	* ic/am9513.c: Bulk change to no longer require bus connections to have a
+	power-of-two width.  This is largely a name change, renaming
+	address_mask to address_last, as nothing depended on the
+	address_mask being all-bits-one.
+
+	* ic/am9513.c: Under TME_AM9513_TRACK_INT_RATE, periodically report the
+	interrupt rates achieved by the various timers.
+
+	* ic/mm58167.c: Bulk change to no longer require bus connections to have a
+	power-of-two width.  This is largely a name change, renaming
+	address_mask to address_last, as nothing depended on the
+	address_mask being all-bits-one.
+
+	* ic/z8530.c: Bulk change to no longer require bus connections to have a
+	power-of-two width.  This is largely a name change, renaming
+	address_mask to address_last, as nothing depended on the
+	address_mask being all-bits-one.
+
+	* machine/sun2/sun2-mmu.c (_tme_sun2_m68k_tlb_fill): Because supervisor and user accesses
+	go through different context registers, TLBs are generally only
+	ever valid for the supervisor or the user, but not both.  Fixed
+	a bug where a TLB for a user-visible page would be marked as good
+	for the supervisor even if the mapping isn't the same in the
+	system context.
+
+	* tme/generic/bus-device.h: Bulk change to no longer require bus connections to have a
+	power-of-two width.  This is largely a name change, renaming
+	address_mask to address_last, as nothing depended on the
+	address_mask being all-bits-one.
+
+	* tme/generic/bus.h: Bulk change to no longer require bus connections to have a
+	power-of-two width.  This is largely a name change, renaming
+	address_mask to address_last, as nothing depended on the
+	address_mask being all-bits-one.
+
+	* tme/generic/ethernet.h: Now define TME_ETHERNET_CRC_SIZE.
+
+Thu May 08 23:37:10 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* ic/m68k/m68k-insns-auto.sh: Fixed bugs, found by the verifier, in the SR and CCR immediate
+	instructions.
+
+	* ic/m68k/m68k-verify.c: Now keep a short ring of PCs verified.
+
+Thu May 08 18:25:20 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* ic/z8530.c (_tme_z8530_intack): Changes to silence -Wuninitialized.
+	* ic/m68k/Makefile.am: No longer define _TME_M68K_OPW_OK.
+	* ic/m68k/m68k-execute.c: Changes to support verifying restarted instructions.
+	* ic/m68k/m68k-impl.h: Fixed the definitions of the dummy tme_m68k_verify_ macros.
+	* ic/m68k/m68k-impl.h: Now call tme_m68k_verify_end_branch inside TME_M68K_INSN_BRANCH.
+	Added a unique identifier member to the sequence structure.
+	Made a few functions take a const struct tme_m68k *.
+	Made changes to the verifier to support verifying restarted
+	instructions.
+
+	* ic/m68k/m68k-insns-auto.sh: Fixed a bug found by the verifier, where the movem
+	instructions weren't following the EA discipline correctly
+	and so would transfer to the wrong addresses after a
+	restart.
+
+	* ic/m68k/m68k-misc.c (tme_m68k_go_slow): Now take a const struct tme_m68k *.
+	(tme_m68k_sequence_empty):
+	(tme_m68k_sequence_fill): Made the argument that's supposed
+	to be read-only const.  Under _TME_M68K_VERIFY, save and
+	restore the sequence unique identifier.
+
+	* ic/m68k/m68k-verify.c: Many changes to support verifying instructions that ended
+	only after they were restarted because of one or more bus
+	faults.
+
+Thu May 08 13:35:43 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* ic/m68k/m68k-execute.c: Replaced _TME_M68K_OPW_OK bits with new _TME_M68K_VERIFY bits.
+	* ic/m68k/m68k-impl.h: Replaced _TME_M68K_OPW_OK bits with new _TME_M68K_VERIFY bits.
+	* ic/m68k/m68k-insns-auto.sh: In all memory access functions, added calls to the verifier.
+	Fixed a bug in the divide routines, found by the verifier -
+	the N flag in set based on the final small quotient, not on
+	the big one.
+
+	* ic/m68k/m68k-misc-auto.sh: Now define TME_M68K_IREG32_COUNT.
+	* ic/m68k/m68k-misc.c: Replaced _TME_M68K_OPW_OK bits with new _TME_M68K_VERIFY bits.
+	* ic/m68k/m68k-verify.c: Added.
+
+Wed May 07 02:35:17 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* generic/bus-el.c (_tme_bus_connections_new): Store the final bus interrupt
+	signal number, not the raw ipl.
+
+	* ic/z8530.c: Although I hate doing this, too many changes to go into
+	detail.  Much work to support interrupt driven operation.
+
+	* ic/z8530reg.h: Added definitions for RR3.
+	* ic/m68k/m68k-impl.h: Fixed a serious bug in the TME_M68K_FLAG_SR definition
+	that would zero part of the interrupt mask.
+
+	* ic/m68k/m68k-insns-auto.sh: Fixed a bug where negx wasn't preserving the Z flag if the
+	result was zero.
+
+	* machine/sun2/sun2-test.c (main): Fixed a bug where the zs0 ipl arg was getting lost.
+
+Mon May 05 23:08:13 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* TODO: Updated.
+	* generic/serial.c (tme_serial_buffer_copyout): Fixed a bug where if we were
+	copying to a NULL buffer and the copyout wrapped in the
+	ring buffer, we would do pointer arithmetic on the NULL.
+
+	* ic/m68k/m68010.c (_tme_m68010_rte): Fixed a bug where we forgot to recover
+	the group 0 function code and address for the cycle restart.
+	Fixed a bug where we wouldn't reset to extract our internal
+	state from the stack buffer.
+
+	* ic/m68k/m68k-insns-auto.sh: Fixed several instructions that trap or do trap-like things
+	to update PC to be the PC of the following instruction before
+	trapping.
+	(tme_m68k_read_mem): Fixed a memcpy direction bug.
+
+	* ic/m68k/m68k-insns.c: Fixed several instructions that trap or do trap-like things
+	to update PC to be the PC of the following instruction before
+	trapping.
+
+	* libtme/threads-sjlj.c (tme_sjlj_cond_notify): Fixed a bug where we would cancel
+	a thread's wait condition instead of notifying the thread.
+
+	* machine/sun/sun-mmu.c (tme_sun_mmu_tlb_fill): Support the new expansive MMU PTE
+	protections.
+
+	* machine/sun2/sun2-mainbus.c (_tme_sun2_bus_intack): Now acknowledge soft interrupts.
+	(tme_machine_sun2_clock_new): Fixed a bug where we had the
+	Timer 2 output miswired.
+
+	* machine/sun2/sun2-mmu.c: Many changes to support the new full understanding of sun2
+	PTE protections.
+
+	* tme/machine/sun.h: Expanded on the generic PTE protections, to support the more
+	expressive sun2 protections.
+
+Sun May 04 22:26:01 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* ic/am9513.c (_tme_am9513_counters_disarm): Added.
+	(_tme_am9513_th_timer): Try to avoid 32-bit integer overflow
+	when calculating the sleep time.
+	(_tme_am9513_bus_cycle): Now support the disarm timers command.
+
+	* ic/mm58167.c: Changes to silence -Wuninitialized.
+	* ic/mm58167.c: Added.
+	* ic/z8530.c: Although I hate doing this, too much work to go into detail.
+	Did more groundwork for eventually generating interrupts.
+
+	* ic/m68k/m68k-execute.c: Now wrap the execute hook call in _TME_M68K_OPW_OK.
+	* ic/m68k/m68k-misc.c (tme_m68k_exception_process_start): Fixed a bug where the new
+	ipl mask was put into the sr at the wrong position.
+
+	* machine/sun2/sun2-mainbus.c (tme_machine_sun2_tod_new): Added.
+	* machine/sun2/sun2-mmu.c (_tme_sun2_obbus_fault_handler): Removed.
+	(_tme_sun2_bus_fault_handler):
+	(_tme_sun2_obio_fault_handler):
+	(_tme_sun2_obmem_fault_handler): Added.
+	(_tme_sun2_multibus_fault_handler): Now just call
+	_tme_sun2_bus_fault_handler.
+	(_tme_sun2_tlb_fill_mmu): Use the new bus-specific
+	fault handlers.
+
+	* machine/sun2/sun2-test.c: Now create and connect the TOD chip.
+	* tme/ic/Makefile.am: Updated.
+	* tme/ic/mm58167.h: Added.
+
+Sat May 03 19:27:07 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* TODO: Updated.
+	* ic/m68k/m68k-execute.c: Fixed multiple bugs in the handling of brief EA extension words.
+	* ic/m68k/m68k-insns-auto.sh: Fixed a bug where subx and addx didn't take the (previous) X
+	flag into account when calculating flags.
+
+	* machine/sun2/sun2-control.c (_tme_sun2_control_cycle_handler): Now call _tme_sun2_ipl_check
+	whenever the enable register is written.
+
+	* machine/sun2/sun2-impl.h: Added macros for the enable register bits.
+	* machine/sun2/sun2-mainbus.c (_tme_sun2_ipl_check): Added.
+	(_tme_sun2_bus_signal): Now call _tme_sun2_ipl_check to update
+	the ipl driven to the CPU.
+
+Fri May 02 17:10:58 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* TODO: Updated.
+	* acconfig.h: Added.
+	* acinclude.m4: Added.
+	* configure.in: Now check for minimum alignments.
+	Now check for various headers and other things needed by the BSD code.
+
+	* bus/Makefile.am: Added support for new components.
+	* bus/multibus/3c400.c (_tme_3c400): Some changes to silence -Wuninitialized.
+	* bus/multibus/3c400.c: Added.
+	* bus/multibus/Makefile.am: Added.
+	* generic/Makefile.am: Added support for new components.
+	* generic/ethernet.c: Added.
+	* host/Makefile.am: Added support for new components.
+	* host/bsd/Makefile.am: Added.
+	* host/bsd/bsd-bpf.c: Added.
+	* host/bsd/bsd-if.c: Added.
+	* host/posix/posix-serial.c: Fixed some indentation, and one 0 to a TME_OK.
+	* ic/am9513.c (_tme_am9513_counters_load):
+	(_tme_am9513_counters_arm): Added.
+	(_tme_am9513_th_timer): Try to avoid multiplication overflow
+	when calculating the number of basic ticks that have elapsed.
+	Try to handle armed and unarmed counters correctly.
+	(_tme_am9513_bus_cycle): Now load and arm counters correctly.
+	(tme_ic_am9513_new): Calculate the number of basic ticks in
+	a millisecond for the benefit of the timer thread.
+
+	* ic/m68k/m68010.c (_tme_m68010_rte): tme_m68k_rte_finish no longer touches the
+	sequence at all, so before calling it make sure the sequence
+	is exactly what it's supposed to be.
+
+	* ic/m68k/m68k-execute.c: In the fast executor, assert that the ITLB entry allows fast
+	reading for the current PC or that the PC is one greater than
+	the last address covered by the entry.  Fixed the fast-fetch-failed
+	code to more correctly simulate a group 0 exception and associated
+	RTE.
+
+	* ic/m68k/m68k-insns-auto.sh: Cleaned up and fixed the code generated for cmpm, addx, and subx.
+	At least, cmpm wasn't getting its address registers postincremented,
+	and addx and subx weren't treating the Z flag properly.
+	In the fetch insns, take the address to fetch from as an argument,
+	instead of using the real ic->tme_m68k_ireg_pc with tme_m68k_read
+	(which could actually update it, if recovering from a group 0
+	exception!)
+
+	* ic/m68k/m68k-misc-auto.sh: The slow-executor fetch macros now call the fetch insns with the
+	PC to fetch from.
+
+	* ic/m68k/m68k-misc.c (tme_m68k_rte_finish): No longer do anything with the sequence
+	at all, just redispatch it.
+	(tme_m68k_sequence_fill): Now set the sequence next-transfer to
+	one, to force a restart in case later code doesn't.
+	(tme_m68k_insn_buffer_xfer): The insn buffer is kept in host
+	byte order, not big-endian byte order.
+
+	* libtme/threads-sjlj.c: No longer track and relock a mutex that was held when
+	tme_sjlj_cond_wait_yield was called; the thread itself
+	will relock the mutex when it is restarted.
+
+	* machine/sun2/Makefile.am: Now build and link against the Multibus and BSD libraries.
+	* machine/sun2/sun2-test.c (tme_memdup): Added.
+	(connect_elements): Now start the new convention of initializing
+	the new-connections lists to NULL and letting the new-connections
+	functions add elements incrementally.
+	(main): Now create the ec0 and bpf0 elements and add them to the
+	machine.
+
+	* tme/common.h: Added a macro for tme_dup and a prototype for tme_memdup.
+	* tme/connection.h: Now define TME_CONNECTION_ETHERNET.
+	* tme/threads.h: Fixed a bug where the tme_thread_write macro was defined to
+	be the read syscall.
+
+	* tme/generic/Makefile.am: Added support for new components.
+	* tme/generic/ethernet.h: Added.
+
+Tue Apr 29 20:28:05 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* AUTHORS: Added.
+	* COPYING: Added.
+	* NEWS: Added.
+	* README: Added.
+	* generic/bus-device.c: In all connections_new functions, add the new connection
+	possibilities to the list rooted at *_conns, instead of
+	always replacing the list.
+
+	* generic/bus-el.c: In all connections_new functions, add the new connection
+	possibilities to the list rooted at *_conns, instead of
+	always replacing the list.
+
+	* generic/bus-el.c: Changes to silence -Wuninitialized.
+	* generic/serial.c: Removed all instances of gen- in comments.
+	* host/posix/posix-memory.c: Changes to silence -Wuninitialized.
+	* host/posix/posix-serial.c: In all connections_new functions, add the new connection
+	possibilities to the list rooted at *_conns, instead of
+	always replacing the list.
+
+	* host/posix/posix-serial.c (_tme_posix_serial_th_reader): Fixed bugs in scanning the input
+	for various escape-like sequences, especially for the escaped
+	break signal.
+
+	* host/posix/posix-serial.c (_tme_posix_serial_th_reader): Simplified the code that decides
+	to call out that we are readable.
+	(_tme_posix_serial_ctrl): Always try to call out reads if the
+	connection says it's readable, even if we already knew that.
+	(_tme_posix_serial_read): Fixed a bug where we would clear
+	everything *except* TME_SERIAL_CTRL_OK_READ, instead of clearing
+	only that bit.
+	(tme_host_posix_serial_new): Return EINVAL on bad arguments.
+
+	* ic/Makefile.am: Now define DIST_SUBDIRS.
+	* ic/am9513.c: Changes to silence -Wuninitialized.
+	* ic/z8530.c: In all connections_new functions, add the new connection
+	possibilities to the list rooted at *_conns, instead of
+	always replacing the list.
+
+	* ic/z8530.c (_tme_z8530_callout): Fixed a bug where we would use an uninitialized
+	chan variable to find WR9, which actually only exists in channel A
+	anyways.
+	(_tme_z8530_ctrl): Now always try to call out reads if the connection
+	says it's readable.
+
+	* ic/m68k/m68k-execute.c: Changes to silence -Wuninitialized.
+	* ic/m68k/m68k-insns-auto.sh: Changes to silence -Wuninitialized.
+	* ic/m68k/m68k-insns.c: Changes to silence -Wuninitialized.
+	* ic/m68k/m68k-misc.c: In all connections_new functions, add the new connection
+	possibilities to the list rooted at *_conns, instead of
+	always replacing the list.
+
+	* libtme/threads-sjlj.c: Wrap all of the rwlock operations in !TME_NO_DEBUG_LOCKS.
+	(tme_sjlj_threads_run): Changes to silence -Wuninitialized.
+
+	* machine/sun2/sun2-mainbus.c: In all connections_new functions, add the new connection
+	possibilities to the list rooted at *_conns, instead of
+	always replacing the list.
+
+	* machine/sun2/sun2-mainbus.c: Changes to silence -Wuninitialized.
+	* tme/Makefile.am: Now install roughly the correct files into the correct place.
+	* tme/atomics.h: Fixed a bug where TME_ATOMIC_POINTER_TYPE was adding an extra *.
+	* tme/element.h: Fixed bugs in the TME_NO_LOG versions of TME_LOG_X and TME_LOG_FINISH.
+	* tme/generic/Makefile.am: Now install roughly the correct files into the correct place.
+	* tme/generic/serial.h: Removed all instances of gen- in comments.
+
+Tue Apr 29 02:47:30 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* TODO: Updated.
+	* generic/bus-device.c: Support the new generic bus signal interface.
+	(tme_bus_device_connection_score):
+	(tme_bus_device_connection_make):
+	(tme_bus_device_connection_break): These are now public.
+
+	* generic/bus-el.c: Added support for the new generic bus signal interface.
+	(_tme_bus_line_raise): Removed.
+	(_tme_bus_signal):
+	(_tme_bus_intack): Added.
+
+	* generic/serial.c: Removed all uses of TME_ATOMIC.
+	(tme_serial_buffer_copyout): Fixed a bug where we would
+	overwrite data_flags with -1 early, resulting in our
+	returning no data.
+
+	* host/posix/posix-serial.c: Too much work to go into detail.  Everything is at least
+	sketched out.
+
+	* ic/am9513.c (_tme_am9513_callout):
+	(_tme_am9513_th_timer): Added.
+	(_tme_am9513_bus_cycle): Now properly handle the
+	Clear Toggle Output command, and log it correctly.
+	Lock the new mutex on entry, call _tme_am9513_callout
+	if needed before exit, and unlock the mutex on exit.
+	(tme_ic_am9513_new): Start the new timer thread.
+
+	* ic/z8530.c: Too many changes to go into detail.  Highlights include
+	a real bus cycle handler, real channels, real serial
+	connections, real threads.  Everything seems to be at
+	least sketched out.
+
+	* ic/z8530reg.h: Added.
+	* ic/m68k/m68k-execute.c: Fixed a bug where we were using the return value of
+	tme_mutex_trylock as a truth value.
+
+	* ic/m68k/m68k-misc.c: Changed to support the new generic bus signal interface
+	and the new m68k bus interrupt interface.
+
+	* libtme/threads-sjlj.c (tme_sjlj_threads_run): Fixed a bug where we wouldn't lock
+	the mutex before returning from a condition wait.  Fixed
+	a bug where we would block in select(2) instead of calling
+	it with a zero timeout.
+	(tme_sjlj_cond_wait_yield): Remember the mutex the thread
+	had locked so it can be relocked when the thread resumes.
+	(tme_sjlj_select_yield): Fixed bugs where we would treat
+	the nfds argument as the maximum fd, instead of the maximum
+	fd plus one.  Fixed a bug where we couldn't handle NULL
+	descriptor sets.
+	(tme_sjlj_read_yield):
+	(tme_sjlj_write_yield):
+	(tme_sjlj_read_yield):
+	(tme_sjlj_rwlock_init):
+	(tme_sjlj_rwlock_lock):
+	(tme_sjlj_rwlock_unlock): Added.
+
+	* machine/sun2/sun2-impl.h: Now track the interrupts asserted in the system, and the
+	last ipl asserted to the CPU.
+
+	* machine/sun2/sun2-mainbus.c (_tme_sun2_line_reset):
+	(_tme_sun2_line_halt):
+	(_tme_sun2_line_interrupt): Removed.
+	(_tme_sun2_bus_signal):
+	(_tme_sun2_bus_intack): Added.
+	(_tme_sun2_power): Use the generic bus signal interface
+	to reset everything.
+	(tme_machine_sun2_clock_new): Store how the Am9513 output
+	pins are connected to bus interrupt lines.
+
+	* machine/sun2/sun2-mmu.c (_tme_sun2_multibus_fault_handler): Added a hack to avoid
+	an mbmem bus error when accessed through virtual 0xffffffff,
+	which apparently happens in the PROM NMI routine when it
+	polls the keyboard, even if it didn't probe a keyboard.
+
+	* machine/sun2/sun2-test.c: Updated.
+	* tme/element.h: Fixed various const to _tme_const.
+	* tme/threads.h: Redid the setjmp/longjmp rwlock operations.
+	Added various new function prototypes and macros.
+
+	* tme/generic/bus-device.h: Support the new generic bus signal interface.
+	The tme_bus_device_connection_score, tme_bus_device_connection_make,
+	and tme_bus_device_connection_break functions are now public.
+	Fixed a const to _tme_const.
+
+	* tme/generic/bus.h: Added the new generic bus signal and interrupt acknowledge
+	interfaces.  Fixed various const to _tme_const.
+
+	* tme/generic/serial.h: Now define TME_SERIAL_CTRL_OK_READ.
+	Removed the write method from a serial connection.  All
+	data transfer happens with reads, with control signals
+	to indicate when reads are OK.
+	Removed the TME_ATOMIC use in struct tme_serial_buffer.
+	(tme_serial_buffer_is_empty):
+	(tme_serial_buffer_is_full): Added.
+
+	* tme/ic/am9513.h: struct tme_am9513_socket now holds the basic clock provided
+	to the chip, and a mapping of its output pins to bus signals.
+	Fixed a const to _tme_const.
+
+	* tme/ic/m68k.h: Now define some m68k IPL constant macros.
+	Add the new m68k bus interrupt method.
+	Fixed various const to _tme_const.
+
+	* tme/ic/z8530.h: Made the channel letters lowercase in structure member names.
+	Fixed a const to _tme_const.
+
+Sat Apr 26 21:14:29 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* Makefile.am: Added.
+	* TODO: Added.
+	* configure.in: Added.
+	* bus/Makefile.am: Updated.
+	* bus/bus-device.c: Removed.
+	* bus/bus.c: Removed.
+	* generic/Makefile.am: Added.
+	* generic/bus-device.c: Added.
+	* generic/bus-el.c: Added.
+	* generic/bus.c: Added.
+	* generic/serial.c: Added.
+	* host/posix/Makefile.am: Updated.
+	* host/posix/memory.c: Renamed to posix-memory.c.
+	* host/posix/posix-memory.c: Added.
+	* host/posix/posix-serial.c: Added.
+	* ic/am9513.c: Added.
+	* ic/z8530.c: Added.
+	* ic/i386/i386-decode.c: Added.
+	* ic/i386/i386-misc-auto-make.sh: Added.
+	* ic/i386/i386-opmaps-make.sh: Added.
+	* ic/i386/i386-save.c: Added.
+	* ic/i386/i386-uinsns-auto-make.sh: Added.
+	* ic/i386/i386-uinsns.c: Added.
+	* ic/i386/i386.h: Added.
+	* ic/m68k/Makefile.am: Updated.
+	* ic/m68k/m68k-execute.c: Under _TME_M68K_EXECUTE_FAST, at the beginning of each
+	instruction we do have to check if our ITLB has been invalidated,
+	as it might have been by some random (control) memory cycle
+	we just did.
+	Fixed bugs in the predecrement and postincrement EA handlers.
+
+	* ic/m68k/m68k-impl.h: Now include <tme/generic/ic.h>.
+	* ic/m68k/m68k-impl.h: Added support for logging.
+	* ic/m68k/m68k-insns-auto.sh: Fixed a serious movem bug where we would start at bit 1
+	in the mask, and not bit 0.
+	In all memory transfer functions, log the transfer.
+	Made the bus cycle functions "work correctly".
+	Fixed bugs in the generated divide instructions.
+
+	* ic/m68k/m68k-insns.c (tme_m68k_swap): Fixed a bug where this wouldn't work on
+	big-endian systems.
+	(tme_m68k_link):
+	(tme_m68k_unlk): Fixed serious bugs where we simply didn't
+	do what these instructions are supposed to do.
+
+	* ic/m68k/m68k-iset.txt: On the 68010 and up, the move_from_sr and move_from_ccr
+	instructions don't read memory before writing it.
+	Fixed bugs in the encoding of the register bit-shifting
+	with a register count instructions.
+
+	* ic/m68k/m68k-misc.c (tme_m68k_idle): Use the renamed tme_cond_wait_yield function.
+	(tme_m68k_new): Store the element in the IC.
+	(tme_m68k_go_slow): Use the TME_M68K_TLB_OK_FAST_READ to check
+	for a bad TLB entry.
+	(tme_m68k_exception_process): Don't insist on there being
+	exceptions to process.  CPU-specific exception processors
+	may handle them all, yet still use this function to redispatch.
+	(_tme_m68k_execute_hook): Added.
+
+	* libtme/threads-sjlj.c (_tme_sjlj_then):
+	(_tme_sjlj_timeout):
+	(tme_sjlj_sleep_yield):
+	(tme_sjlj_select_yield): Added.
+	(tme_sjlj_threads_run): Cleaned up the threads dispatcher to
+	support threads waiting on classic select(2) fd sets,
+	(tme_sjlj_cond_wait_yield): Renamed from tme_sjlj_cond_wait.
+	(tme_sjlj_sleep): This function no longer yields.
+
+	* machine/Makefile.am: Updated.
+	* machine/sun/Makefile.am: Updated.
+	* machine/sun/sun-mmu.c: Added some logging.
+	Disabled the explicit SEGINV support, for now.  It appears that
+	the hardware MMU doesn't have a notion of an invalid PMEG.
+	Now call the post-MMU TLB fillers with the PTE struct and the
+	virtual address.
+
+	* machine/sun2/Makefile.am: Updated.
+	* machine/sun2/sun2-control.c (_tme_sun2_control_cycle_handler): Don't bother to fill the
+	segmap register unless this is a read.
+
+	* machine/sun2/sun2-impl.h: Now include <tme/generic/ic.h>.
+	* machine/sun2/sun2-impl.h: Now include <tme/generic/bus.h>.
+	Added some support for logging.
+
+	* machine/sun2/sun2-mainbus.c: Added some support for logging.
+	(tme_machine_sun2_clock_new):
+	(tme_machine_sun2_zs_new): Added.
+
+	* machine/sun2/sun2-mmu.c: Too much to go into detail.  Highlights:
+	Added some logging support.
+	Made the bus error behavior more correct.  On the sun2,
+	obio and obmem don't generate bus errors.  Now the post-MMU
+	TLB filler takes the original PTE entry and the original
+	virtual address.
+
+	* machine/sun2/sun2-test.c: Updated.
+	* tme/bus-device.h: Removed.
+	* tme/bus.h: Removed.
+	* tme/connection.h: Now define TME_CONNECTION_SERIAL.
+	* tme/element.h: Added logging support.
+	* tme/ic.h: Removed.
+	* tme/ic.h: Now include <tme/generic/bus.h>
+	* tme/threads.h: Defined more of the tme threads API.
+	* tme/generic/Makefile.am: Added.
+	* tme/generic/bus-device.h: Added.
+	* tme/generic/bus.h: Added.
+	* tme/generic/ic.h: Added.
+	* tme/generic/serial.h: Added.
+	* tme/ic/am9513.h: Added.
+	* tme/ic/m68k.h: Now include <tme/generic/bus.h>.
+	* tme/ic/z8530.h: Added.
+	* tme/machine/sun.h: Added support for logging.
+	Changed the interface to pass the whole PTE struct to the post-MMU
+	TLB fillers.
+
+Sat Apr 26 14:44:07 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* bus/bus.c (tme_bus_cycle_xfer): Fixed a bug where we used cycle_writer to
+	get the reader's port size.  When indexing bus router arrays, we
+	have to subtract out the participant's least port lane, since
+	the arrays don't include information for lanes not connected
+	to the participant.
+
+Wed Apr 23 19:29:33 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* bus/Makefile.am: Added.
+	* bus/bus-device.c: Added.
+	* bus/bus.c: Added.
+	* host/Makefile.am: Added.
+	* host/posix/Makefile.am: Added.
+	* host/posix/memory.c: Added.
+	* ic/Makefile.am: Added.
+	* ic/m68k/m68010.c (_tme_m68010_exception):
+	(_tme_m68010_rte): Added.
+
+	* ic/m68k/m68k-bus-auto.sh: Now generates the combined input/output bus routers.
+	* ic/m68k/m68k-execute.c: Although I hate doing this, "too many changes to list."
+	* ic/m68k/m68k-impl.h: Added.
+	* ic/m68k/m68k-insns-auto.sh: Some minor copyright and cosmetic fixes.
+	Updated the bus cycle functions to support the latest
+	generic bus cycle idea.
+
+	* ic/m68k/m68k-insns.c: Although I hate doing this, "too many changes to list."
+	* ic/m68k/m68k-iset-expand.pl: When the EA is an immediate, just emit the immediate information
+	and skip the EA information - we don't want to use the EA path
+	in this case.
+
+	* ic/m68k/m68k-iset.txt: moveq is now its own insn.
+	* ic/m68k/m68k-misc-auto.sh: Copyright sweep.
+	* ic/m68k/m68k-misc.c: Although I hate doing this, "too many changes to list."
+	* ic/m68k/m68k-opmap-make.pl: Fixed some random bugs, and correctly handle the case where EA and
+	immediate operand must be undefined for a pattern, to avoid using
+	the EA and immediate operand in any root entry.
+
+	* ic/m68k/m68k.h: Removed.
+	* libtme/Makefile.am: Added.
+	* libtme/threads-sjlj.c: Added.
+	* machine/sun/Makefile.am: Added.
+	* machine/sun/sun-mmu.c: Added.
+	* machine/sun2/Makefile.am: Added.
+	* machine/sun2/sun2-control.c: Added.
+	* machine/sun2/sun2-impl.h: Added.
+	* machine/sun2/sun2-mainbus.c: Added.
+	* machine/sun2/sun2-mmu.c: Added.
+	* machine/sun2/sun2-test.c: Added.
+	* tme/Makefile.am: Added.
+	* tme/atomics.h: Added.
+	* tme/bus-device.h: Added.
+	* tme/bus.h: Added.
+	* tme/common.h: Added.
+	* tme/connection.h: Added.
+	* tme/element.h: Added.
+	* tme/ic.h: Added.
+	* tme/threads.h: Added.
+	* tme/ic/Makefile.am: Added.
+	* tme/ic/m68k.h: Added.
+	* tme/machine/Makefile.am: Added.
+	* tme/machine/sun.h: Added.
+
+Sun Apr 20 21:33:05 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* ic/m68k/m68k-bus-auto.sh: Added.
+
+Fri Apr 18 04:56:36 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* ic/m68k/m68k-insns-auto.sh: Added support for generating the moveq32 insn.
+	Cleaned up and fixed some bugs in the bus cycle functions.
+
+	* ic/m68k/m68k-misc-auto.sh: Cleaned up the set of registers that we define.
+	Added better locking support to the instruction fetch macros.
+
+Tue Apr 15 13:32:37 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* ic/m68k/m68k-insns-auto.sh: Unfortunately, too much work to list in detail.  Improved the
+	arithmetic function flag-setting code to compile well on i386
+	with gcc -O2.  Added many special-purpose memory read and write
+	functions, and finally introduced the general bus-cycle read
+	and write functions.  Added many new instructions, including
+	multiply and divide.
+
+Sat Apr 05 18:47:38 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* machine/Makefile.am: Added.
+
+Tue Apr 01 20:13:07 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* ic/m68k/Makefile.am: Build decoders for the 68000, 68010, and 68020.
+	* ic/m68k/m68k-iset-expand.pl: Added a very basic preprocessor to support generating
+	different instruction sets for different CPUs.
+	Now whenever an instruction wants the EA, its operand
+	is eax.32 even if the known EA is address register indirect.
+
+	* ic/m68k/m68k-iset.txt: This should be the complete integer instruction set for the
+	68000, 68010, 68020, and 68030.
+
+	* ic/m68k/m68k-opmap-make.pl: Added comments, and reworked to support compiling instruction
+	sets for different CPUs together, reusing submaps and opcode
+	maps whenever possible.
+
+	* ic/m68k/m68k.h: Before the -impl.h split.
+
+Sun Mar 30 22:04:15 2003  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* ic/m68k/Makefile.am: Added.
+	* ic/m68k/m68010.c: Added.
+	* ic/m68k/m68k-execute.c: Added.
+	* ic/m68k/m68k-insns-auto.sh: Added.
+	* ic/m68k/m68k-insns.c: Added.
+	* ic/m68k/m68k-iset-expand.pl: Added.
+	* ic/m68k/m68k-iset.txt: Added.
+	* ic/m68k/m68k-misc-auto.sh: Added.
+	* ic/m68k/m68k-misc.c: Added.
+	* ic/m68k/m68k-opmap-make.pl: Added.
+	* ic/m68k/m68k.h: Added.
+
+Sun Mar 30 22:04:15 2000  Matthew Fredette  <fredette@alum.mit.edu>
+
+	* Dummy entry.

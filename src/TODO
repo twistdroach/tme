@@ -1,0 +1,30 @@
+the m68k exception vector table lists the spaces used for the different vectors
+
+clean up posix-serial callouts to be like 3c400
+
+is the (brief) extension word handling correct for PC-relative 
+EAs when there are multiple brief extension words?  (i.e., is 
+first_ea_extword_offset updated (does it need to be?))
+
+in type 8 frames, we currently store the address as it appeared
+on the bus - i.e., only 24 bits, not the full 32.  maybe this is
+incorrect?
+
+should tme_m68k_rte_start have more RESTARTING checks?
+
+are the data input buffer and data output buffers being kept in the
+right endianness in both the trap frames and in the ic buffers?
+
+watch out for (raw[0] << 4) possibly staying 8-bit and then overflowing
+in tme_m68k_insn_buffer_xfer
+
+optimization: have the fast executor only execute an instruction if
+there are TME_M68K_INSN_WORDS_MAX * sizeof(tme_uint16_t) bytes
+available.  note that this does *not* eliminate the need for the
+group0 hook entirely, since while we guarantee that we won't fault on
+an instruction fetch, we still might fault on data in
+mid-instruction-fetch.  this optimization would however remove a 
+test and goto in the fast FETCH macros.
+
+probably the way ENA_NONBOOT works on the sun2 is that all FC_SP
+references go to the PROM
