@@ -66,7 +66,7 @@ _TME_RCSID("$Id: module.c,v 1.10 2010/06/05 19:04:42 fredette Exp $");
    renames lt_preloaded_symbols with a macro, to a name different from
    what our libtool script makes.  it's possible that the renaming
    macro is meant to be undefined to handle this problem: */
-#undef lt_preloaded_symbols
+//#undef lt_preloaded_symbols
 
 /* types: */
 struct tme_module {
