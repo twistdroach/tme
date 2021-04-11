@@ -936,7 +936,6 @@ tme_bus_cycle_xfer_reg(struct tme_bus_cycle *cycle_init,
   unsigned int port_lane_least_resp;
   const tme_bus_lane_t *lane_routing_init;
   unsigned int lane_count;
-  unsigned int lane;
   tme_uint8_t *buffer_init;
   tme_uint8_t *buffer_resp;
   int lane_routing;
@@ -1000,7 +999,6 @@ tme_bus_cycle_xfer_reg(struct tme_bus_cycle *cycle_init,
 		    : 0));
 
   /* loop over the lanes: */
-  lane = 0;
   cycle_size_init = 0;
   do {
 

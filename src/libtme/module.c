@@ -383,14 +383,13 @@ int
 tme_module_close(void *_module)
 {
   struct tme_module *module;
-  int rc;
 
   /* recover the module: */
   module = (struct tme_module *) _module;
 
   /* close the module: */
   tme_mutex_lock(&_tme_module_mutex);
-  rc = lt_dlclose(module->tme_module_dlhandle);
+  lt_dlclose(module->tme_module_dlhandle);
   tme_mutex_unlock(&_tme_module_mutex);
 
   /* free our structure: */

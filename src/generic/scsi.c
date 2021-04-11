@@ -46,18 +46,12 @@ _TME_RCSID("$Id: scsi.c,v 1.3 2007/01/07 23:27:50 fredette Exp $");
 int
 tme_scsi_connection_score(struct tme_connection *conn, unsigned int *_score)
 {
-  struct tme_scsi_connection *conn_scsi;
-  struct tme_scsi_connection *conn_scsi_other;
 
   /* both sides must be SCSI connections: */
   assert(conn->tme_connection_type == TME_CONNECTION_SCSI);
   assert(conn->tme_connection_other->tme_connection_type == TME_CONNECTION_SCSI);
 
   /* you cannot connect a bus to a bus, or a device to a device: */
-  conn_scsi
-    = (struct tme_scsi_connection *) conn;
-  conn_scsi_other 
-    = (struct tme_scsi_connection *) conn->tme_connection_other;
   /* XXX we need a way to distinguish a bus from a device: */
   *_score
     = 1;
