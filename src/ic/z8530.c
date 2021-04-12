@@ -699,6 +699,7 @@ _tme_z8530_callout(struct tme_z8530 *z8530, struct tme_z8530_chan *chan, int new
 
     /* get this channel's flags: */
     chan_flags = chan->tme_z8530_chan_flags;
+    UNUSED(chan_flags);
 
     /* if we need to call out new control information: */
     if (callouts & TME_Z8530_CALLOUT_CTRL) {
@@ -957,6 +958,7 @@ _tme_z8530_bus_cycle(void *_z8530, struct tme_bus_cycle *cycle_init)
   z8530_address_last = z8530->tme_z8530_device.tme_bus_device_address_last;
   assert(cycle_init->tme_bus_cycle_address <= z8530_address_last);
   assert(cycle_init->tme_bus_cycle_size <= (z8530_address_last - cycle_init->tme_bus_cycle_address) + 1);
+  UNUSED(z8530_address_last);
 
   /* see if this is channel A or channel B: */
   address = cycle_init->tme_bus_cycle_address;
@@ -1585,14 +1587,10 @@ _tme_z8530_hard_intack(void *_z8530, unsigned int ipl, int *_vector)
 static int
 _tme_z8530_connection_score(struct tme_connection *conn, unsigned int *_score)
 {
-  struct tme_z8530 *z8530;
   struct tme_z8530_connection *conn_z8530;
-  struct tme_serial_connection *conn_serial_other;
 
   /* recover our data structures: */
-  z8530 = conn->tme_connection_element->tme_element_private;
   conn_z8530 = (struct tme_z8530_connection *) conn;
-  conn_serial_other = (struct tme_serial_connection *) conn->tme_connection_other;
 
   /* both sides must be serial connections: */
   assert(conn->tme_connection_type == TME_CONNECTION_SERIAL);
@@ -1600,6 +1598,7 @@ _tme_z8530_connection_score(struct tme_connection *conn, unsigned int *_score)
 
   /* this channel must be free: */
   assert(conn_z8530->tme_z8530_connection_chan->tme_z8530_chan_connection == NULL);
+  UNUSED(conn_z8530);
 
   /* we're lax on checking the members of the serial connection, 
      and just assume this connection is fine: */
@@ -1611,12 +1610,10 @@ _tme_z8530_connection_score(struct tme_connection *conn, unsigned int *_score)
 static int
 _tme_z8530_connection_make(struct tme_connection *conn, unsigned int state)
 {
-  struct tme_z8530 *z8530;
   struct tme_z8530_connection *conn_z8530;
   struct tme_serial_connection *conn_serial_other;
 
   /* recover our data structures: */
-  z8530 = conn->tme_connection_element->tme_element_private;
   conn_z8530 = (struct tme_z8530_connection *) conn;
   conn_serial_other = (struct tme_serial_connection *) conn->tme_connection_other;
 

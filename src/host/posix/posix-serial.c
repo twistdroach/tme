@@ -553,7 +553,7 @@ _tme_posix_serial_config(struct tme_serial_connection *conn_serial, struct tme_s
   struct termios serial_termios;
   tme_uint32_t config_baud;
   speed_t termios_baud;
-  int is_input, rc;
+  int is_input;
 
   /* recover our data structure: */
   serial = conn_serial->tme_serial_connection.tme_connection_element->tme_element_private;
@@ -565,7 +565,7 @@ _tme_posix_serial_config(struct tme_serial_connection *conn_serial, struct tme_s
   for (is_input = 2; is_input-- > 0; ) {
 
     /* get the current configuration of the device: */
-    rc = tcgetattr((is_input
+    tcgetattr((is_input
 		    ? serial->tme_posix_serial_fd_in
 		    : serial->tme_posix_serial_fd_out),
 		   &serial_termios);
@@ -595,7 +595,7 @@ _tme_posix_serial_config(struct tme_serial_connection *conn_serial, struct tme_s
       /* XXX diagnostic */
       termios_baud = B38400;
     }
-    rc = cfsetspeed(&serial_termios, termios_baud);
+    cfsetspeed(&serial_termios, termios_baud);
 
     /* input mode or output mode: */
     if (is_input) {
@@ -633,7 +633,7 @@ _tme_posix_serial_config(struct tme_serial_connection *conn_serial, struct tme_s
     serial_termios.c_lflag = 0;
 
     /* set the configuration on the devices: */
-    rc = tcsetattr((is_input
+    tcsetattr((is_input
 		    ? serial->tme_posix_serial_fd_in
 		    : serial->tme_posix_serial_fd_out),
 		   TCSADRAIN,
@@ -663,6 +663,7 @@ _tme_posix_serial_ctrl(struct tme_serial_connection *conn_serial, unsigned int c
 
   /* get the current output device modem state: */
   rc = ioctl(serial->tme_posix_serial_fd_out, TIOCMGET, &modem_state);
+  UNUSED(rc);
 
   /* update the modem state: */
   if (control & TME_SERIAL_CTRL_DTR) {
@@ -740,11 +741,6 @@ _tme_posix_serial_read(struct tme_serial_connection *conn_serial,
 static int
 _tme_posix_serial_connection_score(struct tme_connection *conn, unsigned int *_score)
 {
-  struct tme_posix_serial *serial;
-
-  /* recover our serial: */
-  serial = conn->tme_connection_element->tme_element_private;
-
   /* both sides must be serial connections: */
   assert(conn->tme_connection_type == TME_CONNECTION_SERIAL);
   assert(conn->tme_connection_other->tme_connection_type == TME_CONNECTION_SERIAL);

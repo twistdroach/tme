@@ -435,6 +435,7 @@ _tme_posix_tape_mark_skip(struct tme_posix_tape *posix_tape,
     rc = _tme_posix_tape_segment_open(posix_tape,
 				      segment);
     assert (rc == TME_OK);
+    UNUSED(rc);
   }
 
   /* if we are skipping in reverse, we must leave the tape on the
@@ -670,6 +671,7 @@ _tme_posix_tape_xfer0(struct tme_posix_tape *posix_tape,
 			       &old_count_bytes,
 			       FALSE);
     assert (rc == TME_OK);
+    UNUSED(rc);
 
     /* this buffer is no longer dirty: */
     posix_tape->tme_posix_tape_flags
@@ -971,7 +973,6 @@ __tme_posix_tape_command(struct tme_posix_tape *posix_tape,
   struct stat statbuf;
   int flags;
   int arg_i;
-  int usage;
   int rc;
   int new_callouts;
 
@@ -979,7 +980,6 @@ __tme_posix_tape_command(struct tme_posix_tape *posix_tape,
   new_callouts = 0;
 
   /* check the command: */
-  usage = FALSE;
   arg_i = 1;
 
   /* the "load" command: */

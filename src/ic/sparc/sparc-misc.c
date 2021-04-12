@@ -558,6 +558,7 @@ _tme_sparc_connection_make(struct tme_connection *conn, unsigned int state)
 	  (conn_bus,
 	   &tlb_set_info));
     assert (rc == TME_OK);
+    UNUSED(rc);
 
     /* if this is a v7 cpu: */
     if (TME_SPARC_VERSION(ic) == 7) {

@@ -532,12 +532,8 @@ _tme_stp2024_tlb_fill_sbus(struct tme_bus_connection *master_conn_bus,
 			   tme_bus_addr_t address_wider,
 			   unsigned int cycles)
 {
-  struct tme_stp2024 *stp2024;
   tme_bus_addr32_t address;
   const struct tme_bus_subregion *subregion;
-
-  /* recover our data structures: */
-  stp2024 = master_conn_bus->tme_bus_connection.tme_connection_element->tme_element_private;
 
   /* get our address: */
   address = address_wider;
@@ -718,6 +714,7 @@ _tme_stp2024_tlb_fill_codec(struct tme_bus_connection *codec_conn_bus,
 	   cycles);
 #if TME_STP2024_BUS_TRANSITION
 	assert (rc == TME_OK);
+  UNUSED(rc);
 #endif /* TME_STP2024_BUS_TRANSITION */
 
 	/* reenter: */
@@ -856,17 +853,10 @@ static int
 _tme_stp2024_connection_score(struct tme_connection *conn,
 			      unsigned int *_score)
 {
-  struct tme_stp2024 *stp2024;
-  struct tme_stp2024_connection *conn_stp2024;
-
   /* both sides must be generic bus connections: */
   assert(conn->tme_connection_type == TME_CONNECTION_BUS_GENERIC);
   assert(conn->tme_connection_other->tme_connection_type
 	 == conn->tme_connection_type);
-
-  /* recover our data structures: */
-  stp2024 = conn->tme_connection_element->tme_element_private;
-  conn_stp2024 = (struct tme_stp2024_connection *) conn;
 
   /* this is a generic bus connection, so just score it nonzero and
      return.  note that there's no good way to differentiate a
@@ -883,7 +873,6 @@ _tme_stp2024_connection_make(struct tme_connection *conn,
 {
   struct tme_stp2024 *stp2024;
   struct tme_stp2024_connection *conn_stp2024;
-  struct tme_bus_connection *conn_bus;
 
   /* both sides must be generic bus connections: */
   assert(conn->tme_connection_type == TME_CONNECTION_BUS_GENERIC);
@@ -893,7 +882,6 @@ _tme_stp2024_connection_make(struct tme_connection *conn,
   /* recover our data structures: */
   stp2024 = conn->tme_connection_element->tme_element_private;
   conn_stp2024 = (struct tme_stp2024_connection *) conn;
-  conn_bus = &conn_stp2024->tme_stp2024_connection;
 
   /* we're always set up to answer calls across the connection, so we
      only have to do work when the connection has gone full, namely

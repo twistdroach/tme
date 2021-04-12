@@ -198,6 +198,7 @@ _tme_sun44c_cache_actions(const struct tme_bus_connection *conn_bus_init,
 			     address,
 			     &pte_mmu);
     assert (rc == TME_OK);
+    UNUSED(rc);
     pte = pte_mmu.tme_sun_mmu_pte_raw;
 
     /* if this PTE is not valid: */
@@ -275,6 +276,7 @@ _tme_sun4_cache_tlb_internal_fill(const struct tme_bus_connection *conn_bus_init
 			   address,
 			   &pte_mmu);
   assert (rc == TME_OK);
+  UNUSED(rc);
 
   /* this PTE must be valid for cacheable obmem space, and, if we're
      writing, it must allow writing: */

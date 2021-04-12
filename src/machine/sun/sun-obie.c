@@ -575,17 +575,10 @@ _tme_sun_obie_tlb_fill_regs(struct tme_bus_connection *conn_bus,
 static int
 _tme_sun_obie_connection_score(struct tme_connection *conn, unsigned int *_score)
 {
-  struct tme_sun_obie *sun_obie;
-  struct tme_sun_obie_connection *conn_sun_obie;
-
   /* both sides must be generic bus connections: */
   assert(conn->tme_connection_type == TME_CONNECTION_BUS_GENERIC);
   assert(conn->tme_connection_other->tme_connection_type
 	 == conn->tme_connection_type);
-
-  /* recover our data structures: */
-  sun_obie = conn->tme_connection_element->tme_element_private;
-  conn_sun_obie = (struct tme_sun_obie_connection *)conn;
 
   /* this is a generic bus connection, so just score it nonzero and
      return.  note that there's no good way to differentiate a

@@ -122,6 +122,7 @@ _tme_sun44c_buserr_log(struct tme_sun4 *sun4,
   pte.tme_sun_mmu_pte_raw = 0;
 #endif /* TME_NO_LOG */
   assert (rc == TME_OK);
+  UNUSED(rc);
   pte_sun44c = pte.tme_sun_mmu_pte_raw;
 
   /* get the physical address: */
@@ -948,6 +949,7 @@ _tme_sun44c_mmu_pte_get(struct tme_sun4 *sun4, tme_uint32_t address, tme_uint32_
 			   address,
 			   &pte);
   assert(rc == TME_OK);
+  UNUSED(rc);
     
   /* form the Sun 4/4c PTE: */
   pte_sun44c = pte.tme_sun_mmu_pte_raw;

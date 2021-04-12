@@ -694,6 +694,7 @@ _tme_sun3_mmu_pte_get(struct tme_sun3 *sun3, tme_uint32_t address, tme_uint32_t 
 			   address,
 			   &pte);
   assert(rc == TME_OK);
+  UNUSED(rc);
     
   /* form the Sun-3 PTE: */
   pte_sun3 = pte.tme_sun_mmu_pte_raw;

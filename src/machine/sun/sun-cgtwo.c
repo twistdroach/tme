@@ -1588,6 +1588,7 @@ _tme_suncg2_connection_make(struct tme_connection *conn, unsigned int state)
   if (conn_fb->tme_fb_connection_buffer == NULL) {
     rc = tme_fb_xlat_alloc_src(conn_fb);
     assert (rc == TME_OK);
+    UNUSED(rc);
   }
   suncg2->tme_suncg2_displayed_memory = conn_fb->tme_fb_connection_buffer;
 

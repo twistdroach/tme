@@ -1247,14 +1247,10 @@ _tme_stp220x_command(struct tme_element *element,
 {
   struct tme_bus_connection dummy_conn_bus;
   struct tme_stp220x *stp220x;
-  int do_reset;
 
   /* enter: */
   dummy_conn_bus.tme_bus_connection.tme_connection_element = element;
   stp220x = _tme_stp220x_enter_bus(&dummy_conn_bus);
-
-  /* assume no reset: */
-  do_reset = FALSE;
 
   /* the "power" command: */
   if (TME_ARG_IS(args[1], "power")

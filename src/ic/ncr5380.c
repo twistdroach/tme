@@ -1058,7 +1058,6 @@ _tme_ncr5380_scsi_cycle(struct tme_scsi_connection *conn_scsi,
   unsigned long count;
   tme_uint8_t icr_old;
   tme_uint8_t icr_new;
-  tme_uint8_t csb_old;
   tme_uint8_t csb_new;
   tme_uint8_t bsr_old;
   tme_uint8_t bsr_new;
@@ -1080,7 +1079,6 @@ _tme_ncr5380_scsi_cycle(struct tme_scsi_connection *conn_scsi,
 
   /* get old register values: */
   icr_old = ncr5380->tme_ncr5380_regs[TME_NCR5380_REG_ICR];
-  csb_old = ncr5380->tme_ncr5380_regs[TME_NCR5380_REG_CSB];
   bsr_old = ncr5380->tme_ncr5380_regs[TME_NCR5380_REG_BSR];
 
   /* start some new register values: */
@@ -1484,6 +1482,7 @@ _tme_ncr5380_connection_make_bus(struct tme_connection *conn,
     conn_bus = tme_memory_atomic_pointer_read(struct tme_bus_connection *,
 					      ncr5380->tme_ncr5380_device.tme_bus_device_connection,
 					      &ncr5380->tme_ncr5380_device.tme_bus_device_connection_rwlock);
+    UNUSED(conn_bus);
 
     /* allocate the TLB set: */
     rc = tme_bus_device_tlb_set_add(&ncr5380->tme_ncr5380_device,
@@ -1502,12 +1501,10 @@ _tme_ncr5380_connection_make_scsi(struct tme_connection *conn,
 				  unsigned int state)
 {
   struct tme_ncr5380 *ncr5380;
-  struct tme_scsi_connection *conn_scsi;
   struct tme_scsi_connection *conn_scsi_other;
 
   /* recover our data structures: */
   ncr5380 = conn->tme_connection_element->tme_element_private;
-  conn_scsi = (struct tme_scsi_connection *) conn;
   conn_scsi_other = (struct tme_scsi_connection *) conn->tme_connection_other;
 
   /* both sides must be SCSI connections: */

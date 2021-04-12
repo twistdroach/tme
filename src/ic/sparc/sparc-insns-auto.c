@@ -1305,6 +1305,7 @@ TME_SPARC_FORMAT3(tme_sparc32_ldb, tme_uint32_t)
 
   /* get the byte order of this transfer: */
   endian_little = FALSE;
+  UNUSED(endian_little);
 
   /* do the fast transfer: */
   memory += address;
@@ -1427,6 +1428,7 @@ TME_SPARC_FORMAT3(tme_sparc32_stb, tme_uint32_t)
 
   /* get the byte order of this transfer: */
   endian_little = FALSE;
+  UNUSED(endian_little);
 
   /* do the fast transfer: */
   memory += address;
@@ -2209,6 +2211,7 @@ TME_SPARC_FORMAT3(tme_sparc32_ldstub, tme_uint32_t)
 
   /* get the byte order of this transfer: */
   endian_little = FALSE;
+  UNUSED(endian_little);
 
   /* do the fast transfer: */
   memory += address;
@@ -2331,6 +2334,7 @@ TME_SPARC_FORMAT3(tme_sparc32_ldstuba, tme_uint32_t)
 
   /* get the byte order of this transfer: */
   endian_little = FALSE;
+  UNUSED(endian_little);
 
   /* do the fast transfer: */
   memory += address;
@@ -2724,6 +2728,7 @@ TME_SPARC_FORMAT3(tme_sparc32_ldba, tme_uint32_t)
 
   /* get the byte order of this transfer: */
   endian_little = FALSE;
+  UNUSED(endian_little);
 
   /* do the fast transfer: */
   memory += address;
@@ -2852,6 +2857,7 @@ TME_SPARC_FORMAT3(tme_sparc32_stba, tme_uint32_t)
 
   /* get the byte order of this transfer: */
   endian_little = FALSE;
+  UNUSED(endian_little);
 
   /* do the fast transfer: */
   memory += address;
@@ -4615,6 +4621,7 @@ tme_sparc32_ls(struct tme_sparc *ic,
          address_bus,
          cycle_type);
       assert (rc == TME_OK);
+      UNUSED(rc);
       tme_sparc_callout_relock(ic);
 
       /* map the TLB entry: */
@@ -11420,6 +11427,7 @@ tme_sparc64_ls(struct tme_sparc *ic,
          address_bus,
          cycle_type);
       assert (rc == TME_OK);
+      UNUSED(rc);
       tme_sparc_callout_relock(ic);
 
       /* map the TLB entry: */

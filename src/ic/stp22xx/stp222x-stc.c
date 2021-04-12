@@ -123,6 +123,7 @@ tme_stp222x_stc_flush(struct tme_stp222x *stp222x)
 	TME_BUS_CYCLE_WRITE);
 #if TME_STP22XX_BUS_TRANSITION
      assert (rc == TME_OK);
+     UNUSED(rc);
 #endif /* TME_STP22XX_BUS_TRANSITION */
 
      /* reenter: */
@@ -319,6 +320,7 @@ tme_stp222x_stc_regs_diag(struct tme_stp222x *stp222x,
 
   /* get the streaming cache: */
   stc = &stp222x->tme_stp222x_stcs[stc_i];
+  UNUSED(stc);
 
   /* get the register: */
   reggroup_0_3 = TME_STP222X_REGGROUP_WHICH(reg->tme_stp222x_reg_address) & 0xf;

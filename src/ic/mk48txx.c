@@ -170,6 +170,7 @@ _tme_mk48txx_bus_cycle(void *_mk48txx, struct tme_bus_cycle *cycle_init)
   mk48txx_address_last = mk48txx->tme_mk48txx_device.tme_bus_device_address_last;
   assert(cycle_init->tme_bus_cycle_address <= mk48txx_address_last);
   assert(cycle_init->tme_bus_cycle_size <= (mk48txx_address_last - cycle_init->tme_bus_cycle_address) + 1);
+  UNUSED(mk48txx_address_last);
 
   /* get the register being accessed: */
   address = cycle_init->tme_bus_cycle_address;

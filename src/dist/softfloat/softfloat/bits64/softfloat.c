@@ -1883,6 +1883,7 @@ float32 float32_rem( float32 a, float32 b )
     bSig = extractFloat32Frac( b );
     bExp = extractFloat32Exp( b );
     bSign = extractFloat32Sign( b );
+    UNUSED(bSign);
     if ( aExp == 0xFF ) {
         if ( aSig || ( ( bExp == 0xFF ) && bSig ) ) {
             return propagateFloat32NaN( a, b );
@@ -2817,6 +2818,7 @@ float64 float64_rem( float64 a, float64 b )
     bSig = extractFloat64Frac( b );
     bExp = extractFloat64Exp( b );
     bSign = extractFloat64Sign( b );
+    UNUSED(bSign);
     if ( aExp == 0x7FF ) {
         if ( aSig || ( ( bExp == 0x7FF ) && bSig ) ) {
             return propagateFloat64NaN( a, b );
@@ -3723,6 +3725,7 @@ floatx80 floatx80_rem( floatx80 a, floatx80 b )
     bSig = extractFloatx80Frac( b );
     bExp = extractFloatx80Exp( b );
     bSign = extractFloatx80Sign( b );
+    UNUSED(bSign);
     if ( aExp == 0x7FFF ) {
         if (    (bits64) ( aSig0<<1 )
              || ( ( bExp == 0x7FFF ) && (bits64) ( bSig<<1 ) ) ) {
@@ -4835,6 +4838,7 @@ float128 float128_rem( float128 a, float128 b )
     bSig0 = extractFloat128Frac0( b );
     bExp = extractFloat128Exp( b );
     bSign = extractFloat128Sign( b );
+    UNUSED(bSign);
     if ( aExp == 0x7FFF ) {
         if (    ( aSig0 | aSig1 )
              || ( ( bExp == 0x7FFF ) && ( bSig0 | bSig1 ) ) ) {

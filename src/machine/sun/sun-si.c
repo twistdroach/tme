@@ -1145,17 +1145,10 @@ _tme_sun_si_tlb_set_add(struct tme_bus_connection *conn_bus,
 static int
 _tme_sun_si_connection_score(struct tme_connection *conn, unsigned int *_score)
 {
-  struct tme_sun_si *sun_si;
-  struct tme_sun_si_connection *conn_sun_si;
-
   /* both sides must be generic bus connections: */
   assert(conn->tme_connection_type == TME_CONNECTION_BUS_GENERIC);
   assert(conn->tme_connection_other->tme_connection_type
 	 == conn->tme_connection_type);
-
-  /* recover our data structures: */
-  sun_si = conn->tme_connection_element->tme_element_private;
-  conn_sun_si = (struct tme_sun_si_connection *)conn;
 
   /* this is a generic bus connection, so just score it nonzero and
      return.  note that there's no good way to differentiate a

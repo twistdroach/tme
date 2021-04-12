@@ -119,6 +119,7 @@ _tme_mm58167_bus_cycle(void *_mm58167, struct tme_bus_cycle *cycle_init)
   mm58167_address_last = mm58167->tme_mm58167_device.tme_bus_device_address_last;
   assert(cycle_init->tme_bus_cycle_address <= mm58167_address_last);
   assert(cycle_init->tme_bus_cycle_size <= (mm58167_address_last - cycle_init->tme_bus_cycle_address) + 1);
+  UNUSED(mm58167_address_last);
 
   /* get the register being accessed: */
   address = cycle_init->tme_bus_cycle_address;

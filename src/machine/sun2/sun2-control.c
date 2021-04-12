@@ -81,6 +81,7 @@ _tme_sun2_control_cycle_handler(void *_sun2, struct tme_bus_cycle *cycle_init)
     /* get the PTE from the MMU: */
     rc = _tme_sun2_mmu_pte_get(sun2, address, &pte);
     assert(rc == TME_OK);
+    UNUSED(rc);
     sun2->tme_sun2_pgmap_hi = (pte >> 16);
     sun2->tme_sun2_pgmap_lo = (pte & 0xffff);
   }

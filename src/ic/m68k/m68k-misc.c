@@ -440,6 +440,7 @@ _tme_m68k_connection_make(struct tme_connection *conn, unsigned int state)
 	  (&ic->_tme_m68k_bus_connection->tme_m68k_bus_connection,
 	   &tlb_set_info));
     assert (rc == TME_OK);
+    UNUSED(rc);
   }
 
   /* NB: the machine needs to issue a reset to bring the CPU out of halt. */

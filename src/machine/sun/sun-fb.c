@@ -235,7 +235,6 @@ static int
 _tme_sunfb_mode_change(struct tme_sunfb *sunfb)
 {
   struct tme_fb_connection *conn_fb_other;
-  struct tme_fb_connection *conn_fb;
   int rc;
 
   /* if this framebuffer has a Bt458: */
@@ -255,7 +254,6 @@ _tme_sunfb_mode_change(struct tme_sunfb *sunfb)
 
   /* get both sides of the framebuffer connection: */
   conn_fb_other = sunfb->tme_sunfb_fb_connection;
-  conn_fb = (struct tme_fb_connection *) conn_fb_other->tme_fb_connection.tme_connection_other;
 
   /* unlock the mutex: */
   tme_mutex_unlock(&sunfb->tme_sunfb_mutex);
@@ -1201,6 +1199,7 @@ _tme_sunfb_connection_make(struct tme_connection *conn, unsigned int state)
       /* allocate displayed memory: */
       rc = tme_fb_xlat_alloc_src(conn_fb);
       assert (rc == TME_OK);
+      UNUSED(rc);
     }
 
     /* if this framebuffer just maps the displayed memory on the bus,

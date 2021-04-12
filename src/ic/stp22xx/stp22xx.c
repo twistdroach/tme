@@ -698,6 +698,7 @@ tme_stp22xx_tlb_fill(struct tme_bus_connection *agent_conn_bus,
        cycle_type);
 #if TME_STP22XX_BUS_TRANSITION
     assert (rc == TME_OK);
+    UNUSED(rc);
 #endif /* TME_STP22XX_BUS_TRANSITION */
 
     /* reenter: */

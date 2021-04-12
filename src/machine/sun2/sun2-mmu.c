@@ -390,6 +390,7 @@ _tme_sun2_m68k_tlb_fill(struct tme_m68k_bus_connection *conn_m68k, struct tme_m6
 			   context,
 			   address,
 			   access);
+  UNUSED(tlb_flags);
 
   /* TLB entries are good only for the program and data function
      codes for the user or supervisor, but never both, because
@@ -571,6 +572,7 @@ _tme_sun2_mmu_pte_get(struct tme_sun2 *sun2, tme_uint32_t address, tme_uint32_t 
 			   address,
 			   &pte);
   assert(rc == TME_OK);
+  UNUSED(rc);
     
   /* form the Sun-2 PTE: */
   pte_sun2 = pte.tme_sun_mmu_pte_raw;

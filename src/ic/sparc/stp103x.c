@@ -638,7 +638,9 @@ _tme_stp103x_update_pstate(struct tme_sparc *ic,
 			   tme_uint32_t trap)
 {
   tme_uint64_t lsu_new;
+#if TME_HAVE_RECODE && TME_RECODE_SIZE_GUEST_MAX > TME_RECODE_SIZE_32
   tme_uint32_t pstate_xor;
+#endif
   tme_uint64_t address_mask;
 
   /* if we are in RED_state: */
@@ -730,11 +732,11 @@ _tme_stp103x_update_pstate(struct tme_sparc *ic,
   ic->tme_sparc_ireg_uint64(TME_SPARC_IREG_G0) = 0;
   ic->tme_sparc_ireg_uint64(TME_SPARC_G0_OFFSET(ic) + TME_SPARC_IREG_G0) = 0;
 
+#if TME_HAVE_RECODE && TME_RECODE_SIZE_GUEST_MAX > TME_RECODE_SIZE_32
+  
   /* get the changing bits in PSTATE: */
   pstate_xor = ic->tme_sparc64_ireg_pstate ^ pstate;
 
-#if TME_HAVE_RECODE && TME_RECODE_SIZE_GUEST_MAX > TME_RECODE_SIZE_32
-  
   /* if PSTATE.AM and/or PSTATE.CLE are changing: */
   if (__tme_predict_false(pstate_xor
 			  & (TME_SPARC64_PSTATE_AM
@@ -3378,12 +3380,8 @@ static void
 _tme_stp103x_block_buffer_bswap(struct tme_sparc *ic,
 				const struct tme_sparc_ls *ls)
 {
-  const struct tme_sparc_tlb *tlb;
   tme_uint32_t endian_little;
   signed int value_i;
-
-  /* get the TLB entry: */
-  tlb = ls->tme_sparc_ls_tlb;
 
   /* get the byte order of the memory: */
   endian_little = ls->tme_sparc_ls_lsinfo & TME_SPARC_LSINFO_ENDIAN_LITTLE;

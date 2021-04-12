@@ -820,6 +820,7 @@ do { \
 	     != (ic->_tme_m68k_sequence._tme_m68k_sequence_transfer_next
 		 != transfer_next_before));
       ic->_tme_m68k_mode_flags &= ~TME_M68K_EXECUTION_INST_CANFAULT;
+      UNUSED(transfer_next_before);
     }
 
     /* store up to one EA path: */

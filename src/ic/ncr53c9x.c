@@ -3371,6 +3371,7 @@ _tme_ncr53c9x_connection_make_bus(struct tme_connection *conn,
       = tme_memory_atomic_pointer_read(struct tme_bus_connection *,
 				       ncr53c9x->tme_ncr53c9x_device.tme_bus_device_connection,
 				       &ncr53c9x->tme_ncr53c9x_device.tme_bus_device_connection_rwlock);
+    UNUSED(conn_bus);
 
     /* allocate the TLB set: */
     rc = tme_bus_device_tlb_set_add(&ncr53c9x->tme_ncr53c9x_device,
@@ -3389,12 +3390,10 @@ _tme_ncr53c9x_connection_make_scsi(struct tme_connection *conn,
 				   unsigned int state)
 {
   struct tme_ncr53c9x *ncr53c9x;
-  struct tme_scsi_connection *conn_scsi;
   struct tme_scsi_connection *conn_scsi_other;
 
   /* recover our data structures: */
   ncr53c9x = conn->tme_connection_element->tme_element_private;
-  conn_scsi = (struct tme_scsi_connection *) conn;
   conn_scsi_other = (struct tme_scsi_connection *) conn->tme_connection_other;
 
   /* both sides must be SCSI connections: */

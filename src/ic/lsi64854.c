@@ -357,6 +357,7 @@ _tme_lsi64854_callout(struct tme_lsi64854 *lsi64854)
 		signal))
 	    : TME_OK);
       assert (rc == TME_OK);
+      UNUSED(rc);
 	
       /* lock the mutex: */
       tme_mutex_lock(&lsi64854->tme_lsi64854_mutex);
@@ -827,6 +828,7 @@ _tme_lsi64854_tlb_fill_regs_master(struct tme_bus_connection *conn_bus,
   }
 
   assert (address <= address_mask);
+  UNUSED(address_mask);
 
   /* call the master TLB fill function: */
   rc = (conn_master != NULL
@@ -923,7 +925,6 @@ _tme_lsi64854_tlb_fill(struct tme_bus_connection *conn_bus,
   tme_uint32_t csr;
   tme_bus_addr32_t dma_address;
   tme_bus_addr32_t dma_count;
-  tme_uint32_t bpr;
   unsigned int bpr_count;
 #ifdef TME_LSI64854_STRICT_PACK
   unsigned int bpr_i;
@@ -992,7 +993,6 @@ _tme_lsi64854_tlb_fill(struct tme_bus_connection *conn_bus,
       TME_LSI64854_REG_PUT(lsi64854, tme_lsi64854_address, dma_address);
 
       /* assume that our emulated byte pack is empty: */
-      bpr = 0;
       bpr_count = 0;
 
 #ifdef TME_LSI64854_STRICT_PACK
@@ -1136,17 +1136,10 @@ _tme_lsi64854_tlb_set_add(struct tme_bus_connection *conn_bus,
 static int
 _tme_lsi64854_connection_score(struct tme_connection *conn, unsigned int *_score)
 {
-  struct tme_lsi64854 *lsi64854;
-  struct tme_lsi64854_connection *conn_lsi64854;
-
   /* both sides must be generic bus connections: */
   assert(conn->tme_connection_type == TME_CONNECTION_BUS_GENERIC);
   assert(conn->tme_connection_other->tme_connection_type
 	 == conn->tme_connection_type);
-
-  /* recover our data structures: */
-  lsi64854 = conn->tme_connection_element->tme_element_private;
-  conn_lsi64854 = (struct tme_lsi64854_connection *)conn;
 
   /* this is a generic bus connection, so just score it nonzero and
      return.  note that there's no good way to differentiate a
@@ -1162,7 +1155,6 @@ _tme_lsi64854_connection_make(struct tme_connection *conn, unsigned int state)
 {
   struct tme_lsi64854 *lsi64854;
   struct tme_lsi64854_connection *conn_lsi64854;
-  struct tme_bus_connection *conn_bus;
 
   /* both sides must be generic bus connections: */
   assert(conn->tme_connection_type == TME_CONNECTION_BUS_GENERIC);
@@ -1172,7 +1164,6 @@ _tme_lsi64854_connection_make(struct tme_connection *conn, unsigned int state)
   /* recover our data structures: */
   lsi64854 = conn->tme_connection_element->tme_element_private;
   conn_lsi64854 = (struct tme_lsi64854_connection *) conn;
-  conn_bus = &conn_lsi64854->tme_lsi64854_connection;
 
   /* we're always set up to answer calls across the connection, so we
      only have to do work when the connection has gone full, namely

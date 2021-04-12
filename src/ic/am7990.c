@@ -990,6 +990,7 @@ _tme_am7990_callout(struct tme_am7990 *am7990)
 		ctrl))
 	    : TME_OK);
       assert (rc == TME_OK);
+      UNUSED(rc);
 
       /* lock the mutex: */
       tme_mutex_lock(&am7990->tme_am7990_mutex);
@@ -1712,12 +1713,10 @@ static int
 _tme_am7990_connection_make_eth(struct tme_connection *conn, unsigned int state)
 {
   struct tme_am7990 *am7990;
-  struct tme_ethernet_connection *conn_eth;
   struct tme_ethernet_connection *conn_eth_other;
 
   /* recover our data structures: */
   am7990 = conn->tme_connection_element->tme_element_private;
-  conn_eth = (struct tme_ethernet_connection *) conn;
   conn_eth_other = (struct tme_ethernet_connection *) conn->tme_connection_other;
 
   /* both sides must be Ethernet connections: */
@@ -1768,6 +1767,7 @@ _tme_am7990_connection_make_bus(struct tme_connection *conn,
       = tme_memory_atomic_pointer_read(struct tme_bus_connection *,
 				       am7990->tme_am7990_device.tme_bus_device_connection,
 				       &am7990->tme_am7990_device.tme_bus_device_connection_rwlock);
+    UNUSED(conn_bus);
 
     /* add the TLB set: */
     rc = tme_bus_device_tlb_set_add(&am7990->tme_am7990_device,

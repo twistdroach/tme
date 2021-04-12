@@ -75,6 +75,7 @@ _tme_sun44c_control_cycle_handler(void *_sun4_asi, struct tme_bus_cycle *cycle_i
   case TME_SUN44C_ASI_PGMAP:
     rc = _tme_sun44c_mmu_pte_get(sun4, address, &value32);
     assert(rc == TME_OK);
+    UNUSED(rc);
     break;
       
   case TME_SUN4C_ASI_HW_FLUSH_SEG: /* TME_SUN4_ASI_COPY */

@@ -59,7 +59,8 @@ _tme_sparc_fpu_nan_from_nans_single(struct tme_ieee754_ctl *ctl,
   int b_is_snan;
 
   /* recover our data structure : */
-  ic = ctl->tme_ieee754_ctl_private;    
+  ic = ctl->tme_ieee754_ctl_private;
+  UNUSED(ic);
 
   /* see if any of the NaNs are signaling NaNs: */
   a_is_snan = _TME_SPARC_FPU_IS_SNAN_SINGLE(a);
@@ -142,7 +143,8 @@ _tme_sparc_fpu_nan_from_nans_double(struct tme_ieee754_ctl *ctl,
   int b_is_snan;
 
   /* recover our data structure : */
-  ic = ctl->tme_ieee754_ctl_private;    
+  ic = ctl->tme_ieee754_ctl_private;
+  UNUSED(ic);
 
   /* see if any of the NaNs are signaling NaNs: */
   a_is_snan = _TME_SPARC_FPU_IS_SNAN_DOUBLE(a);
@@ -225,7 +227,8 @@ _tme_sparc_fpu_nan_from_nans_quad(struct tme_ieee754_ctl *ctl,
   int b_is_snan;
 
   /* recover our data structure : */
-  ic = ctl->tme_ieee754_ctl_private;    
+  ic = ctl->tme_ieee754_ctl_private;
+  UNUSED(ic);
 
   /* see if any of the NaNs are signaling NaNs: */
   a_is_snan = _TME_SPARC_FPU_IS_SNAN_QUAD(a);

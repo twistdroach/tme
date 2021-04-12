@@ -61,6 +61,12 @@
 #define FALSE (0)
 #define TRUE (!FALSE)
 
+/* UNUSED macro to keep the compiler from complaining.
+ * Most if not all of these should be reviewed in the
+ * future, which is why I didn't just disable the
+ * warning. */
+#define UNUSED(x) ((x) = (x))
+
 /* RCS IDs: */
 #ifdef notyet
 #define _TME_RCSID(x) static const char _tme_rcsid[] = x

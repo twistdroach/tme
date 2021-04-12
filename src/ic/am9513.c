@@ -534,6 +534,7 @@ _tme_am9513_bus_cycle(void *_am9513, struct tme_bus_cycle *cycle_init)
   am9513_address_last = am9513->tme_am9513_device.tme_bus_device_address_last;
   assert(cycle_init->tme_bus_cycle_address <= am9513_address_last);
   assert(cycle_init->tme_bus_cycle_size <= (am9513_address_last - cycle_init->tme_bus_cycle_address) + 1);
+  UNUSED(am9513_address_last);
 
   /* see if this is a command or data access: */
   is_cmd = ((am9513->tme_am9513_address_cmd

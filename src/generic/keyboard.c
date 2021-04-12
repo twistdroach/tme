@@ -1569,6 +1569,7 @@ _tme_keymode_stage(struct tme_keyboard_buffer_int *buffer,
 	    (buffer,
 	     auto_keymode->tme_keymode_state_keysym,
 	     _tme_keyboard_event_time_diff(event_time, -1));
+    UNUSED(rc);
 	  assert (rc == TME_OK);
 	}
       }
@@ -2077,6 +2078,7 @@ _tme_keyboard_buffer_out0(struct tme_keyboard_buffer_int *buffer,
 					   mod_keysym,
 					   _tme_keyboard_event_time_diff(event_time, -1));
 	    assert (rc == TME_OK);
+      UNUSED(rc);
 	  }
 
 	  /* otherwise, this modifier is stuck on: */
@@ -2326,6 +2328,7 @@ _tme_keyboard_buffer_in2(struct tme_keyboard_buffer_int *buffer,
 	  && TME_KEYBOARD_PRESSED_IN2(sub_keysym) != sub_pressed_old) {
 	rc = _tme_keyboard_buffer_out0(buffer, sub_keysym, event_time);
 	assert (rc == TME_OK);
+  UNUSED(rc);
       }
     }
   }
@@ -2442,6 +2445,7 @@ _tme_keyboard_buffer_in0_bottom(struct tme_keyboard_buffer_int *buffer,
 					   keysym,
 					   &event_pseudo);
       assert (rc == TME_OK);
+      UNUSED(rc);
     }
     
     /* this keysym is now pressed: */
@@ -2594,6 +2598,7 @@ _tme_keyboard_buffer_in0(struct tme_keyboard_buffer_int *buffer,
 					       mod_keysym,
 					       &event_pseudo);
 	  assert (rc == TME_OK);
+    UNUSED(rc);
 	}
       }
 

@@ -334,14 +334,12 @@ _tme_ad184x_cycle_transition(void *_master_conn_bus,
 			     struct tme_bus_cycle *master_cycle)
 {
   struct tme_completion completion_buffer;
-  struct tme_ad184x *ad184x;
   struct tme_bus_connection *master_conn_bus;
   tme_uint32_t master_fast_cycle_types;
 
   tme_completion_init(&completion_buffer);
 
   master_conn_bus = (struct tme_bus_connection *) _master_conn_bus;
-  ad184x = (struct tme_ad184x *) master_conn_bus->tme_bus_connection.tme_connection_element->tme_element_private;
   _tme_ad184x_cycle(master_conn_bus,
 		    master_cycle,
 		    &master_fast_cycle_types,
@@ -392,12 +390,10 @@ _tme_ad184x_new(struct tme_element *element,
   struct tme_ad184x *ad184x;
   int arg_i;
   int usage;
-  const char *type;
 
   /* check our arguments: */
   usage = 0;
   arg_i = 1;
-  type = NULL;
   for (;;) {
 
     if (0) {

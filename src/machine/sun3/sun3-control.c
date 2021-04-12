@@ -79,6 +79,7 @@ _tme_sun3_control_cycle_handler(void *_sun3, struct tme_bus_cycle *cycle_init)
   case TME_SUN3_CONTROL_REG(TME_SUN3_CONTROL_PGMAP):
     rc = _tme_sun3_mmu_pte_get(sun3, address, &value32);
     assert(rc == TME_OK);
+    UNUSED(rc);
     *port_data32 = tme_htobe_u32(value32);
     break;
       
@@ -246,6 +247,7 @@ _tme_sun3_intreg_cycle_handler(void *_sun3, struct tme_bus_cycle *cycle_init)
   if (cycle_init->tme_bus_cycle_type == TME_BUS_CYCLE_WRITE) {
     rc = _tme_sun3_ipl_check(sun3);
     assert(rc == TME_OK);
+    UNUSED(rc);
   }
 
   return (TME_OK);

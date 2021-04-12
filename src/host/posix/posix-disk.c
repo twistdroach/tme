@@ -155,6 +155,7 @@ _tme_posix_disk_buffer_free(struct tme_posix_disk *posix_disk,
     rc = munmap(buffer->tme_posix_disk_buffer_data,
 		buffer->tme_posix_disk_buffer_size);
     assert (rc == 0);
+    UNUSED(rc);
 	
     /* free this buffer: */
     buffer->tme_posix_disk_buffer_size = 0;
@@ -179,6 +180,7 @@ _tme_posix_disk_buffer_free(struct tme_posix_disk *posix_disk,
 		    buffer->tme_posix_disk_buffer_data,
 		    buffer->tme_posix_disk_buffer_size);
       assert (ssize == buffer->tme_posix_disk_buffer_size);
+      UNUSED(ssize);
     }
 
     /* free this buffer: */
@@ -434,6 +436,7 @@ _tme_posix_disk_buffer_get(struct tme_posix_disk *posix_disk,
 		       - agg_pre),
 		      SEEK_SET) < 0);
 	  assert (rc == 0);
+    UNUSED(rc);
 	  
 	  /* read in the buffer.  if the read fails with more
 	     read-ahead than is needed to meet the block size, try the
@@ -530,6 +533,7 @@ _tme_posix_disk_read(struct tme_disk_connection *conn_disk,
 				  TRUE,
 				  &buffer);
   assert (rc == TME_OK);
+  UNUSED(rc);
 
   /* unlock the mutex: */
   tme_mutex_unlock(&posix_disk->tme_posix_disk_mutex);
@@ -562,6 +566,7 @@ _tme_posix_disk_write(struct tme_disk_connection *conn_disk,
 				  FALSE,
 				  _buffer);
   assert (rc == TME_OK);
+  UNUSED(rc);
 
   /* unlock the mutex: */
   tme_mutex_unlock(&posix_disk->tme_posix_disk_mutex);
@@ -726,14 +731,12 @@ __tme_posix_disk_command(struct tme_posix_disk *posix_disk,
 			 const char * const * args, 
 			 char **_output)
 {
-  int usage;
   int arg_i;
   const char *filename;
   int flags;
   int rc;
 
   /* check the command: */
-  usage = FALSE;
   arg_i = 1;
 
   /* the "load" command: */

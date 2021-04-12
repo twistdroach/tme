@@ -750,12 +750,10 @@ static int
 _tme_3c400_connection_make(struct tme_connection *conn, unsigned int state)
 {
   struct tme_3c400 *_3c400;
-  struct tme_ethernet_connection *conn_eth;
   struct tme_ethernet_connection *conn_eth_other;
 
   /* recover our data structures: */
   _3c400 = conn->tme_connection_element->tme_element_private;
-  conn_eth = (struct tme_ethernet_connection *) conn;
   conn_eth_other = (struct tme_ethernet_connection *) conn->tme_connection_other;
 
   /* both sides must be Ethernet connections: */

@@ -777,14 +777,10 @@ _tme_suncg6_bus_cycle_alt(struct tme_sunfb *sunfb,
 			  tme_uint32_t *_master_fast_cycle_types,
 			  struct tme_completion *master_completion)
 {
-  struct tme_suncg6 *suncg6;
   tme_bus_addr32_t reg;
   tme_suncg6_reg_t *_reg;
   tme_suncg6_reg_t value32_buffer;
   tme_suncg6_reg_t value32;
-
-  /* recover our data structure: */
-  suncg6 = (struct tme_suncg6 *) sunfb;
 
   /* get the register: */
   reg = master_cycle->tme_bus_cycle_address;

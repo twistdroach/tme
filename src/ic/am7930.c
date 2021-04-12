@@ -154,6 +154,7 @@ _tme_am7930_callout(struct tme_am7930 *am7930)
 	    ? TME_BUS_SIGNAL_LEVEL_ASSERTED
 	    : TME_BUS_SIGNAL_LEVEL_NEGATED));
       assert (rc == TME_OK);
+      UNUSED(rc);
       
       /* lock our mutex: */
       tme_mutex_lock(&am7930->tme_am7930_mutex);
@@ -315,11 +316,7 @@ _tme_am7930_connections_new(struct tme_element *element,
 			   struct tme_connection **_conns,
 			   char **_output)
 {
-  struct tme_am7930 *am7930;
   int rc;
-
-  /* recover our data structure: */
-  am7930 = (struct tme_am7930 *) element->tme_element_private;
 
   /* make the generic bus device connection side: */
   rc = tme_bus_device_connections_new(element, args, _conns, _output);

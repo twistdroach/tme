@@ -112,6 +112,7 @@ _tme_sun4_ipl_check(struct tme_sun4 *sun4)
     rc = ((*sun4->tme_sun4_sparc->tme_sparc_bus_interrupt)
 	  (sun4->tme_sun4_sparc, ipl));
     assert (rc == TME_OK);
+    UNUSED(rc);
   }
 
   /* return nonzero if any interrupt is pending: */

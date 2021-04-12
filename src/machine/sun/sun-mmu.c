@@ -234,12 +234,11 @@ tme_sun_mmu_pte_get(void *_mmu, tme_uint8_t context, tme_uint32_t address,
 		    struct tme_sun_mmu_pte *_pte)
 {
   struct tme_sun_mmu *mmu;
-  unsigned short segment_map_index;
   struct tme_sun_mmu_pte *pte;
 
   /* lookup this address: */
   mmu = (struct tme_sun_mmu *) _mmu;
-  segment_map_index = _tme_sun_mmu_lookup(mmu, context, address, &pte);
+  _tme_sun_mmu_lookup(mmu, context, address, &pte);
 
   /* otherwise, copy the PTE: */
   *_pte = *pte;

@@ -555,6 +555,7 @@ TME_M68K_INSN(tme_m68k_fpgen)
 
   /* get the IEEE 754 ctl: */
   ieee754_ctl = &ic->tme_m68k_fpu_ieee754_ctl;
+  UNUSED(ieee754_ctl);
 
   /* this is an FPU instruction: */
   TME_M68K_INSN_FPU;
@@ -1865,7 +1866,9 @@ _tme_m6888x_predicate_true(struct tme_m68k *ic, tme_uint16_t predicate)
 
   /* get the condition codes: */
   cc_nan = (ic->tme_m68k_fpu_fpsr & TME_M6888X_FPSR_CC_NAN) != 0;
+  /* TODO looks like a bug? */
   cc_i = (ic->tme_m68k_fpu_fpsr & TME_M6888X_FPSR_CC_I) != 0;
+  UNUSED(cc_i);
   cc_z = (ic->tme_m68k_fpu_fpsr & TME_M6888X_FPSR_CC_Z) != 0;
   cc_n = (ic->tme_m68k_fpu_fpsr & TME_M6888X_FPSR_CC_N) != 0;
 

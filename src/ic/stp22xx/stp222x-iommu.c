@@ -635,6 +635,7 @@ tme_stp222x_iommu_cycle(struct tme_bus_connection *master_conn_bus,
 	 TME_BUS_CYCLE_READ);
 #if TME_STP22XX_BUS_TRANSITION
       assert (rc == TME_OK);
+      UNUSED(rc);
 #endif /* TME_STP22XX_BUS_TRANSITION */
 
       /* reenter: */

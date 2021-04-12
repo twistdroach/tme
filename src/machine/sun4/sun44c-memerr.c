@@ -643,6 +643,7 @@ _tme_sun44c_tlb_fill_memerr(const struct tme_bus_connection *conn_bus_init,
 	  || asi_mask == TME_SPARC32_ASI_MASK_UI
 	  || asi_mask == TME_SPARC32_ASI_MASK_SD
 	  || asi_mask == TME_SPARC32_ASI_MASK_SI);
+  UNUSED(asi_mask);
 
   /* invalidate any other memory test TLB entry: */
   if (sun4->tme_sun4_memtest_tlb != NULL
@@ -665,6 +666,7 @@ _tme_sun44c_tlb_fill_memerr(const struct tme_bus_connection *conn_bus_init,
 				address,
 				cycle_type);
   assert (rc == TME_OK);
+  UNUSED(rc);
 
   /* get the PTE for this address and context from the MMU: */
   rc = tme_sun_mmu_pte_get(sun4->tme_sun44c_mmu, 

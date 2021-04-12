@@ -478,7 +478,6 @@ _tme_nec765_new(struct tme_element *element,
   struct tme_nec765 *nec765;
   int arg_i;
   int usage;
-  const char *type;
 
   /* dispatch on our socket version: */
   socket = (const struct tme_nec765_socket *) extra;
@@ -498,7 +497,6 @@ _tme_nec765_new(struct tme_element *element,
   /* check our arguments: */
   usage = 0;
   arg_i = 1;
-  type = NULL;
   for (;;) {
 
     if (0) {

@@ -62,6 +62,7 @@ do {								\
 				  (tme_uint8_t *) &(v),		\
 				  TME_I825X6_LOCKS_DEFAULT);	\
   assert (rc == TME_OK);					\
+  UNUSED(rc);                     \
 } while (/* CONSTCOND */ 0)
 #define TME_I825X6_WRITE(address, v)				\
 do {								\
@@ -71,6 +72,7 @@ do {								\
 				  (const tme_uint8_t *) &(v),	\
 				  TME_I825X6_LOCKS_DEFAULT);	\
   assert (rc == TME_OK);					\
+  UNUSED(rc);                      \
 } while (/* CONSTCOND */ 0)
 
 /* these read and write values of different sizes using DMA: */
@@ -2041,12 +2043,10 @@ static int
 _tme_i825x6_connection_make_eth(struct tme_connection *conn, unsigned int state)
 {
   struct tme_i825x6 *i825x6;
-  struct tme_ethernet_connection *conn_eth;
   struct tme_ethernet_connection *conn_eth_other;
 
   /* recover our data structures: */
   i825x6 = conn->tme_connection_element->tme_element_private;
-  conn_eth = (struct tme_ethernet_connection *) conn;
   conn_eth_other = (struct tme_ethernet_connection *) conn->tme_connection_other;
 
   /* both sides must be Ethernet connections: */

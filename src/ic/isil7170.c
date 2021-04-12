@@ -417,6 +417,7 @@ _tme_isil7170_bus_cycle(void *_isil7170, struct tme_bus_cycle *cycle_init)
   isil7170_address_last = isil7170->tme_isil7170_device.tme_bus_device_address_last;
   assert(cycle_init->tme_bus_cycle_address <= isil7170_address_last);
   assert(cycle_init->tme_bus_cycle_size <= (isil7170_address_last - cycle_init->tme_bus_cycle_address) + 1);
+  UNUSED(isil7170_address_last);
 
   /* get the register being accessed: */
   address = cycle_init->tme_bus_cycle_address;

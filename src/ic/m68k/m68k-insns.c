@@ -38,6 +38,7 @@
 
 _TME_RCSID("$Id: m68k-insns.c,v 1.16 2007/08/25 22:05:02 fredette Exp $");
 
+
 #define TME_M68K_STD_FLAGS \
 do { \
   ic->tme_m68k_ireg_ccr = ((ic->tme_m68k_ireg_ccr \
@@ -430,6 +431,7 @@ TME_M68K_INSN(tme_m68k_reset)
      (TME_BUS_SIGNAL_RESET
       | TME_BUS_SIGNAL_LEVEL_ASSERTED));
   assert (rc == TME_OK);
+  UNUSED(rc);
 
   /* XXX RESET is supposed to be asserted for 512 clocks, 
      so a sleep is needed here: */
