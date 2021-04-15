@@ -223,8 +223,7 @@ _TME_RCSID("$Id: stp103x.c,v 1.5 2010/06/05 18:57:04 fredette Exp $");
 #undef  TME_SPARC_MEMORY_FLAGS
 #define TME_SPARC_MEMORY_FLAGS(ic)		\
   (TME_SPARC_MEMORY_FLAG_HAS_NUCLEUS		\
-   + TME_SPARC_MEMORY_FLAG_HAS_INVERT_ENDIAN	\
-   + !TME_SPARC_MEMORY_FLAG_HAS_LDDF_STDF_32)
+   + TME_SPARC_MEMORY_FLAG_HAS_INVERT_ENDIAN)
 
 /* this recovers the stp103x state from the generic sparc state: */
 #define TME_STP103X(ic) ((struct tme_stp103x *) (TRUE ? (ic) : (struct tme_sparc *) 0))

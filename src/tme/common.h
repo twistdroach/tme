@@ -242,13 +242,14 @@ tme_bswap_u32(tme_uint32_t x)
 /* gcc has a `long long' type that is defined to be twice as long as
    an int: */
 /* XXX when exactly did this feature appear? */
-#if defined(__GNUC__) && (__GNUC__ >= 2) && (_TME_SIZEOF_INT == 4)
+#if (defined(__GNUC__) && (__GNUC__ >= 2))
 #define TME_HAVE_INT64_T
 #define _TME_ALIGNOF_INT64_T _TME_ALIGNOF_INT32_T
 #define _TME_SHIFTMAX_INT64_T (63)
 #define _TME_PRI64 "ll"
 typedef signed long long int tme_int64_t;
 typedef unsigned long long int tme_uint64_t;
+#else
 #endif /* __GNUC__ && __GNUC__ >= 2 */
 
 #endif /* TME_HAVE_INT64_T */

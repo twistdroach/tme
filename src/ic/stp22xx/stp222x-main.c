@@ -76,7 +76,7 @@ _TME_RCSID("$Id: stp222x-main.c,v 1.4 2009/09/07 15:41:07 fredette Exp $");
 #define TME_STP2220_REG20_SBUS_CONFIG(n)	(0x2020 + (TME_STP222X_REG_SIZE * (n)))
 
 /* the stp2220 slot size: */
-#define TME_STP2220_SLOT_SIZE			(256 * 1024 * 1024)
+#define TME_STP2220_SLOT_SIZE			(256 * 1024 * 1024u)
 
 /* this gives the raw stp2220 address for a slot and offset: */
 #define TME_STP2220_SBUS_ADDRESS(slot, offset)	(((slot) * TME_STP2220_SLOT_SIZE) + (offset))

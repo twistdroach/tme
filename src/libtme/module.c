@@ -248,7 +248,7 @@ tme_module_open(const char *module_fake_pathname, void **_module, char **_output
   /* if there were no slashes in the fake module pathname, there is no
      top name, which is incorrect: */
   if (first_slash == NULL) {
-    tme_output_append_error(_output, module_fake_pathname);
+    tme_output_append_error(_output, "%s", module_fake_pathname);
     tme_free(module_raw_name);
     return (EINVAL);
   }
@@ -258,7 +258,7 @@ tme_module_open(const char *module_fake_pathname, void **_module, char **_output
 				    (first_slash - module_raw_name),
 				    &modules_dir);
   if (modules_index == NULL) {
-    tme_output_append_error(_output, module_fake_pathname);
+    tme_output_append_error(_output, "%s", module_fake_pathname);
     tme_free(module_raw_name);
     return (ENOENT);
   }
@@ -300,7 +300,7 @@ tme_module_open(const char *module_fake_pathname, void **_module, char **_output
 
   /* if we didn't find the module in the index: */
   if (tokens_count == 0) {
-    tme_output_append_error(_output, module_fake_pathname);
+    tme_output_append_error(_output, "%s", module_fake_pathname);
     tme_free(modules_dir);
     return (ENOENT);
   }
@@ -325,7 +325,7 @@ tme_module_open(const char *module_fake_pathname, void **_module, char **_output
   tme_mutex_unlock(&_tme_module_mutex);
   tme_free(module_pathname);
   if (handle == NULL) {
-    tme_output_append_error(_output, module_fake_pathname);
+    tme_output_append_error(_output, "%s", module_fake_pathname);
     tme_free_string_array(tokens, -1);
     return (ENOENT);
   }

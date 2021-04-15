@@ -144,12 +144,12 @@ _TME_RCSID("$Id: stp222x-impl.h,v 1.4 2009/11/08 16:45:14 fredette Exp $");
    always contain the addressing information for the connection, which
    can always be quickly mapped into a base IDI.  card identifiers for
    masters can usually be mapped quickly into a connection index: */
-#define TME_STP222X_CONNID_TYPE			(0x1 << 0)
-#define  TME_STP222X_CONNID_TYPE_OBIO		 (0x1 << 0)
-#define  TME_STP222X_CONNID_TYPE_CARD		 (0x0 << 0)
-#define TME_STP222X_CONNID_OBIO_TYPE		(0x1 << 1)
-#define  TME_STP222X_CONNID_OBIO_TYPE_SHORT	 (0x1 << 1)
-#define  TME_STP222X_CONNID_OBIO_TYPE_LONG	 (0x0 << 1)
+#define TME_STP222X_CONNID_TYPE			(1u)
+#define  TME_STP222X_CONNID_TYPE_OBIO		 (1u)
+#define  TME_STP222X_CONNID_TYPE_CARD		 (0u)
+#define TME_STP222X_CONNID_OBIO_TYPE		(1u << 1)
+#define  TME_STP222X_CONNID_OBIO_TYPE_SHORT	 (1u << 1)
+#define  TME_STP222X_CONNID_OBIO_TYPE_LONG	 (0u << 1)
 #if (TME_STP222X_IDI_NULL & (TME_STP222X_IDI_NULL - 1))
 #error "TME_STP222X_IDI_NULL must be a power of two"
 #endif

@@ -220,9 +220,9 @@ _TME_RCSID("$Id: sparc-impl.h,v 1.11 2010/06/05 16:13:15 fredette Exp $");
 #define TME_SPARC64_FPRS_FEF	TME_BIT(2)
 
 /* sparc64 TSTATE flags: */
-#define TME_SPARC64_TSTATE_MASK_CWP	(0x1f << 0)
-#define TME_SPARC64_TSTATE_MASK_PSTATE	(0xfff << 8)
-#define TME_SPARC64_TSTATE_MASK_ASI	(0xff << 24)
+#define TME_SPARC64_TSTATE_MASK_CWP	(0x1fu << 0)
+#define TME_SPARC64_TSTATE_MASK_PSTATE	(0xfffu << 8)
+#define TME_SPARC64_TSTATE_MASK_ASI	(0xffu << 24)
 #define TME_SPARC64_TSTATE_MASK_CCR	(((tme_uint64_t) 0xff) << 32)
 
 /* sparc64 WSTATE fields: */

@@ -345,7 +345,7 @@ _tmesh_parser_argv_arg(struct tmesh_parser_argv *argv, char *arg, int new)
 static void
 yyerror(char *msg)
 {
-  tme_output_append(_tmesh_output, msg);
+  tme_output_append(_tmesh_output, "%s", msg);
   _tmesh_input->tmesh_scanner.tmesh_scanner_in_args = FALSE;
 }
 

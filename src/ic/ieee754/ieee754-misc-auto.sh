@@ -601,9 +601,9 @@ EOF
 	    echo ""
 	    echo "/* this does a NaN check for an IEEE 754 ${precision} precision ${type} function: */"
 	    echo "int"
-	    echo -n "tme_ieee754_${precision}_check_nan_${type}(struct tme_ieee754_ctl *ieee754_ctl, const struct tme_float *src0"
+	    /bin/echo -n "tme_ieee754_${precision}_check_nan_${type}(struct tme_ieee754_ctl *ieee754_ctl, const struct tme_float *src0"
 	    if ${monadic}; then :; else
-		echo -n ", const struct tme_float *src1"
+		/bin/echo -n ", const struct tme_float *src1"
 	    fi
 	    echo ", struct tme_float *dst)"
 	    echo "{"

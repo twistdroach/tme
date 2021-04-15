@@ -81,6 +81,9 @@ _tme_ncr89c105_bus_cycle(void *_ncr89c105,
   tme_uint8_t value32;
   tme_uint8_t value8;
 
+  /* initialize value8 */
+  value8 = 0;
+
   /* recover our data structure: */
   ncr89c105 = (struct tme_ncr89c105 *) _ncr89c105;
 

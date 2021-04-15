@@ -765,7 +765,7 @@ tme_stp222x_iommu_cycle(struct tme_bus_connection *master_conn_bus,
   }
 
   /* assume that there is no IOMMU error: */
-  tlb_tag_error = !TME_STP222X_IOMMU_TLB_TAG_ERROR;
+  tlb_tag_error = FALSE;
 
   /* if the address is not writable: */
   if (__tme_predict_false((tlb_mash & TME_STP222X_IOMMU_TLB_TAG_W) == 0)) {
@@ -793,7 +793,7 @@ tme_stp222x_iommu_cycle(struct tme_bus_connection *master_conn_bus,
   }
 
   /* if there is an IOMMU error: */
-  if (tlb_tag_error != !TME_STP222X_IOMMU_TLB_TAG_ERROR) {
+  if (tlb_tag_error) {
 
     /* if this isn't a fixed translation: */
     if ((tlb_mash & TME_STP222X_IOMMU_TLB_MASH_FIXED) == 0) {
