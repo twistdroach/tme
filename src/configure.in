@@ -181,6 +181,9 @@ AC_MSG_RESULT($tme_raw_type)
 
 dnl Checks for X11.
 AC_PATH_XTRA
+dnl AC_PATH_XTRA does not fail so do it manually
+AS_IF([test "X$no_x" = "Xyes" && test ${with_x+y} && test "x$with_x" != xno],
+  [AC_MSG_ERROR([X11 enabled but could not find X11])])
 
 dnl Checks for GTK.
 AM_PATH_GTK_2_0([], have_gtk=true, have_gtk=false)
